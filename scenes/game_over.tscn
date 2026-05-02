@@ -1,0 +1,230 @@
+[gd_scene format=3 uid="uid://gameover0001"]
+
+[ext_resource type="Script" path="res://scenes/game_over.gd" id="1_go"]
+
+[node name="GameOver" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_go")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 540.0
+color = Color(1, 0.992157, 0.960784, 1)
+mouse_filter = 2
+
+[node name="TopBarBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 44.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+mouse_filter = 2
+
+[node name="TopBar" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 44.0
+theme_override_styles/panel = null
+
+[node name="TopBarLabel" type="Label" parent="TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "⚔  战斗结束"
+
+[node name="BorderFrame" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 956.0
+offset_bottom = 536.0
+mouse_filter = 2
+
+[node name="LeftPanelBg" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 228.0
+offset_bottom = 532.0
+mouse_filter = 2
+
+[node name="LeftHeaderBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 228.0
+offset_bottom = 80.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+mouse_filter = 2
+
+[node name="LeftHeaderLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 228.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "淘汰顺序"
+mouse_filter = 2
+
+[node name="EliminationPanel" type="ScrollContainer" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 80.0
+offset_right = 228.0
+offset_bottom = 532.0
+
+[node name="EliminationList" type="VBoxContainer" parent="EliminationPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="WinnerPanel" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 236.0
+offset_top = 52.0
+offset_right = 728.0
+offset_bottom = 532.0
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="VictoryBanner" type="PanelContainer" parent="WinnerPanel"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+
+[node name="VictoryLabel" type="Label" parent="WinnerPanel/VictoryBanner"]
+layout_mode = 2
+text = "Victory！"
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(1, 0.992157, 0.960784, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CrownLabel" type="Label" parent="WinnerPanel"]
+layout_mode = 2
+text = "👑"
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+
+[node name="WinnerAvatar" type="PanelContainer" parent="WinnerPanel"]
+custom_minimum_size = Vector2(120, 76)
+layout_mode = 2
+
+[node name="WinnerAvatarLabel" type="Label" parent="WinnerPanel/WinnerAvatar"]
+layout_mode = 2
+text = "?"
+theme_override_font_sizes/font_size = 36
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="WinnerNameBar" type="PanelContainer" parent="WinnerPanel"]
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+
+[node name="WinnerNameLabel" type="Label" parent="WinnerPanel/WinnerNameBar"]
+layout_mode = 2
+text = "—"
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FinalHPBox" type="PanelContainer" parent="WinnerPanel"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+
+[node name="FinalHPLabel" type="Label" parent="WinnerPanel/FinalHPBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="UnlockedSkillLabel" type="Label" parent="WinnerPanel"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 11
+horizontal_alignment = 1
+visible = false
+
+[node name="RightPanelBg" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 736.0
+offset_top = 52.0
+offset_right = 952.0
+offset_bottom = 532.0
+mouse_filter = 2
+
+[node name="RightHeaderBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 736.0
+offset_top = 52.0
+offset_right = 952.0
+offset_bottom = 80.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+mouse_filter = 2
+
+[node name="RightHeaderLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 736.0
+offset_top = 52.0
+offset_right = 952.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "下一步"
+mouse_filter = 2
+
+[node name="ActionPanel" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 744.0
+offset_top = 88.0
+offset_right = 948.0
+offset_bottom = 532.0
+theme_override_constants/separation = 10
+
+[node name="BtnReplay" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+focus_mode = 0
+text = "再来一局"
+theme_override_font_sizes/font_size = 14
+
+[node name="BtnReselect" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+focus_mode = 0
+text = "更换角色"
+theme_override_font_sizes/font_size = 14
+
+[node name="BtnMainMenu" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+focus_mode = 0
+text = "返回主菜单"
+theme_override_font_sizes/font_size = 12
+
+[node name="BtnReview" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+focus_mode = 0
+text = "查看战斗回放"
+theme_override_font_sizes/font_size = 11
+
+[node name="BtnSkillLog" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+focus_mode = 0
+text = "查看技能使用记录"
+theme_override_font_sizes/font_size = 11

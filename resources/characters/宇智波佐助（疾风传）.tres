@@ -1,0 +1,71 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://543qdqjk1b"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Texture2D" uid="uid://bn21w6yw5x3fd" path="res://resources/characters/portraits/疾风传佐助.jpg" id="1_euv2h"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Resource" uid="uid://cn7gt3pxb8rwm" path="res://resources/characters/skills/kirin.tres" id="4_kirin"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+value = 1
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "迅捷突进攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_s1a"]
+script = ExtResource("1_effect")
+value = 2
+
+[sub_resource type="Resource" id="SE_s1b"]
+script = ExtResource("1_effect")
+effect_type = 5
+value = 1
+duration = 2
+
+[sub_resource type="Resource" id="SE_s1c"]
+script = ExtResource("1_effect")
+effect_type = 6
+target = 2
+unlock_skill = ExtResource("4_kirin")
+
+[sub_resource type="Resource" id="SD_s1"]
+script = ExtResource("2_skill")
+skill_name = "火遁·豪龙火"
+description = "喷出龙形火焰，造成 2 点伤害+下回合 1 点灼烧，并永久解锁【麒麟】。"
+energy_cost = 3
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_s1a"), SubResource("SE_s1b"), SubResource("SE_s1c")])
+
+[sub_resource type="Resource" id="SE_s2a"]
+script = ExtResource("1_effect")
+value = 2
+
+[sub_resource type="Resource" id="SE_s2b"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 1
+
+[sub_resource type="Resource" id="SD_s2"]
+script = ExtResource("2_skill")
+skill_name = "千鸟锐枪"
+description = "以雷遁刺穿敌人，造成 2 点伤害并麻痹 1 回合，射程 1~2 格。"
+energy_cost = 2
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_s2a"), SubResource("SE_s2b")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "宇智波佐助（疾风传）"
+max_hp = 6
+portrait = ExtResource("1_euv2h")
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_s1"), SubResource("SD_s2")])
+tags = Array[String](["刺客", "法师"])

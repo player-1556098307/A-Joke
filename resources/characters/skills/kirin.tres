@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="SkillData" format=3 uid="uid://cn7gt3pxb8rwm"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_k1"]
+script = ExtResource("1_effect")
+value = 3
+
+[sub_resource type="Resource" id="SE_k2"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 1
+
+[sub_resource type="Resource" id="SE_k3"]
+script = ExtResource("1_effect")
+value = 1
+target = 3
+
+[sub_resource type="Resource" id="SE_k4"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 1
+target = 3
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "麒麟"
+description = "召唤雷电麒麟，对目标造成 3 点伤害并麻痹，溅射周围敌人 1 点伤害+麻痹。"
+energy_cost = 4
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_k1"), SubResource("SE_k2"), SubResource("SE_k3"), SubResource("SE_k4")])

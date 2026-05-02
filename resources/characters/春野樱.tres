@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://bmt3v8qnx2c4p"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Texture2D" uid="uid://bydh7bt766u7w" path="res://resources/characters/portraits/春野樱.jpg" id="1_mx7i2"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba_sk"]
+script = ExtResource("1_effect")
+value = 1
+
+[sub_resource type="Resource" id="SD_ba_sk"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "力道十足的拳击，造成 1 点伤害。"
+energy_cost = 2
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_sk")])
+
+[sub_resource type="Resource" id="SE_sk1"]
+script = ExtResource("1_effect")
+value = 2
+
+[sub_resource type="Resource" id="SD_sk1"]
+script = ExtResource("2_skill")
+skill_name = "铁锤"
+description = "以怪力重拳击打，造成 2 点伤害。"
+energy_cost = 3
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_sk1")])
+
+[sub_resource type="Resource" id="SE_sk2"]
+script = ExtResource("1_effect")
+effect_type = 4
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SD_sk2"]
+script = ExtResource("2_skill")
+skill_name = "治疗"
+description = "运用医疗忍术恢复自身 1 点生命值。"
+energy_cost = 2
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_sk2")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "春野樱"
+max_hp = 8
+basic_attack_cost = 2
+portrait = ExtResource("1_mx7i2")
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_sk"), SubResource("SD_sk1"), SubResource("SD_sk2")])
+tags = Array[String](["坦克"])

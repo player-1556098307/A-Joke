@@ -1,0 +1,90 @@
+<svg viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <pattern id="dots" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+    <circle cx="6" cy="6" r="1" fill="#E8E4D0" opacity="0.6"/>
+  </pattern>
+  <pattern id="speed" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+    <line x1="0" y1="40" x2="40" y2="0" stroke="#D3D1C7" stroke-width="0.5" opacity="0.4"/>
+  </pattern>
+</defs>
+<rect width="960" height="540" fill="#FFFDF5"/>
+<rect width="960" height="540" fill="url(#dots)"/>
+<rect width="960" height="540" fill="url(#speed)"/>
+<rect x="4" y="4" width="952" height="532" rx="6" fill="none" stroke="#2C2C2A" stroke-width="3"/>
+<line x1="560" y1="4" x2="560" y2="536" stroke="#2C2C2A" stroke-width="2.5"/>
+<rect x="4" y="4" width="556" height="180" fill="#2C2C2A"/>
+<text x="50" y="80" font-size="52" font-weight="500" fill="#FAC775" font-family="sans-serif">猜拳</text>
+<text x="50" y="148" font-size="52" font-weight="500" fill="#FFFDF5" font-family="sans-serif">对战！</text>
+<rect x="4" y="184" width="556" height="32" fill="#BA7517"/>
+<text x="40" y="205" font-size="13" fill="#FFFDF5" font-family="sans-serif">Rock · Paper · Scissors Battle</text>
+<rect x="4" y="216" width="556" height="320" fill="#EAF3DE" opacity="0.4"/>
+<!-- 鸣人卡片 -->
+<rect x="60" y="250" width="90" height="120" rx="6" fill="#FFFDF5" stroke="#2C2C2A" stroke-width="2"/>
+<rect x="72" y="258" width="66" height="74" rx="4" fill="#B5D4F4" stroke="#185FA5" stroke-width="1.5"/>
+<text x="105" y="305" font-size="32" text-anchor="middle" font-family="sans-serif">🥷</text>
+<rect x="60" y="348" width="90" height="18" rx="0" fill="#2C2C2A"/>
+<text x="105" y="361" font-size="10" font-weight="500" fill="#FAC775" font-family="sans-serif" text-anchor="middle">漩涡鸣人</text>
+<text x="105" y="378" font-size="10" fill="#3B6D11" font-family="sans-serif" text-anchor="middle">HP 6 · 战士</text>
+<text x="105" y="392" font-size="9" fill="#888780" font-family="sans-serif" text-anchor="middle">螺旋丸 · 影分身</text>
+<!-- 佐助疾风传卡片 -->
+<rect x="180" y="238" width="90" height="120" rx="6" fill="#FFFDF5" stroke="#2C2C2A" stroke-width="2.5"/>
+<rect x="192" y="246" width="66" height="74" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+<text x="225" y="293" font-size="32" text-anchor="middle" font-family="sans-serif">⚔️</text>
+<rect x="180" y="336" width="90" height="18" fill="#534AB7"/>
+<text x="225" y="349" font-size="10" font-weight="500" fill="#EEEDFE" font-family="sans-serif" text-anchor="middle">佐助（疾风传）</text>
+<text x="225" y="366" font-size="10" fill="#534AB7" font-family="sans-serif" text-anchor="middle">HP 6 · B级</text>
+<text x="225" y="380" font-size="9" fill="#888780" font-family="sans-serif" text-anchor="middle">豪龙火 · 千鸟锐枪</text>
+<!-- 春野樱卡片 -->
+<rect x="310" y="248" width="90" height="120" rx="6" fill="#FFFDF5" stroke="#2C2C2A" stroke-width="2"/>
+<rect x="322" y="256" width="66" height="74" rx="4" fill="#F4C0D1" stroke="#993556" stroke-width="1.5"/>
+<text x="355" y="303" font-size="32" text-anchor="middle" font-family="sans-serif">🌸</text>
+<rect x="310" y="346" width="90" height="18" fill="#D4537E"/>
+<text x="355" y="359" font-size="10" font-weight="500" fill="#FFFDF5" font-family="sans-serif" text-anchor="middle">春野樱</text>
+<text x="355" y="376" font-size="10" fill="#D4537E" font-family="sans-serif" text-anchor="middle">HP 8 · 坦克</text>
+<text x="355" y="390" font-size="9" fill="#888780" font-family="sans-serif" text-anchor="middle">铁锤 · 治疗</text>
+<!-- 佐助C卡片 -->
+<rect x="440" y="253" width="90" height="120" rx="6" fill="#FFFDF5" stroke="#2C2C2A" stroke-width="2"/>
+<rect x="452" y="261" width="66" height="74" rx="4" fill="#F5C4B3" stroke="#993C1D" stroke-width="1.5"/>
+<text x="485" y="308" font-size="32" text-anchor="middle" font-family="sans-serif">🔥</text>
+<rect x="440" y="351" width="90" height="18" fill="#993C1D"/>
+<text x="485" y="364" font-size="10" font-weight="500" fill="#FFFDF5" font-family="sans-serif" text-anchor="middle">宇智波佐助</text>
+<text x="485" y="381" font-size="10" fill="#993C1D" font-family="sans-serif" text-anchor="middle">HP 6 · 法师</text>
+<text x="485" y="395" font-size="9" fill="#888780" font-family="sans-serif" text-anchor="middle">豪火球 · 千鸟</text>
+<!-- 漫画气泡 -->
+<rect x="40" y="410" width="120" height="28" rx="10" fill="#FAC775" stroke="#BA7517" stroke-width="1.5"/>
+<polygon points="60,438 70,452 80,438" fill="#FAC775" stroke="#BA7517" stroke-width="1" stroke-linejoin="round"/>
+<text x="100" y="428" font-size="11" fill="#412402" font-family="sans-serif" text-anchor="middle">信じろ！</text>
+<rect x="360" y="410" width="100" height="28" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+<polygon points="400,438 410,452 420,438" fill="#EEEDFE" stroke="#534AB7" stroke-width="1" stroke-linejoin="round"/>
+<text x="410" y="428" font-size="11" fill="#26215C" font-family="sans-serif" text-anchor="middle">くだらない</text>
+<line x1="4" y1="468" x2="556" y2="468" stroke="#2C2C2A" stroke-width="1.5"/>
+<text x="40" y="486" font-size="11" fill="#888780" font-family="sans-serif">v1.0 · 本地单机原型</text>
+<text x="40" y="502" font-size="10" fill="#B4B2A9" font-family="sans-serif">联机功能开发中...</text>
+<!-- 右侧菜单 -->
+<rect x="560" y="4" width="396" height="532" fill="#FFFDF5"/>
+<text x="758" y="100" font-size="28" font-weight="500" fill="#2C2C2A" font-family="sans-serif" text-anchor="middle">START</text>
+<!-- PvE按钮 -->
+<rect x="610" y="130" width="296" height="80" rx="8" fill="#3B6D11" stroke="#2C2C2A" stroke-width="2.5"/>
+<rect x="610" y="130" width="6" height="80" rx="4" fill="#97C459"/>
+<text x="758" y="166" font-size="18" font-weight="500" fill="#EAF3DE" font-family="sans-serif" text-anchor="middle">PvE 对战</text>
+<text x="758" y="188" font-size="11" fill="#C0DD97" font-family="sans-serif" text-anchor="middle">vs AI · 立即开始</text>
+<!-- PvP按钮（禁用） -->
+<rect x="610" y="226" width="296" height="80" rx="8" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="1.5" stroke-dasharray="6 3"/>
+<rect x="610" y="226" width="6" height="80" rx="4" fill="#D3D1C7"/>
+<text x="758" y="262" font-size="18" font-weight="500" fill="#B4B2A9" font-family="sans-serif" text-anchor="middle">PvP 联机</text>
+<text x="758" y="284" font-size="11" fill="#D3D1C7" font-family="sans-serif" text-anchor="middle">开发中，敬请期待...</text>
+<rect x="858" y="240" width="36" height="24" rx="4" fill="#D3D1C7"/>
+<text x="876" y="256" font-size="11" fill="#888780" font-family="sans-serif" text-anchor="middle">🔒</text>
+<!-- 设置/退出 -->
+<rect x="610" y="322" width="140" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+<text x="680" y="355" font-size="14" font-weight="500" fill="#0C447C" font-family="sans-serif" text-anchor="middle">⚙ 设置</text>
+<rect x="766" y="322" width="140" height="56" rx="8" fill="#FCEBEB" stroke="#E24B4A" stroke-width="1.5"/>
+<text x="836" y="355" font-size="14" font-weight="500" fill="#791F1F" font-family="sans-serif" text-anchor="middle">✕ 退出</text>
+<!-- 操作说明 -->
+<rect x="610" y="394" width="296" height="60" rx="6" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.8"/>
+<text x="758" y="416" font-size="11" fill="#5F5E5A" font-family="sans-serif" text-anchor="middle">操作说明</text>
+<text x="758" y="433" font-size="10" fill="#888780" font-family="sans-serif" text-anchor="middle">猜拳获胜 → 聚气或释放技能</text>
+<text x="758" y="448" font-size="10" fill="#888780" font-family="sans-serif" text-anchor="middle">距离影响技能射程 · 最后存活者获胜</text>
+<line x1="560" y1="472" x2="956" y2="472" stroke="#D3D1C7" stroke-width="1"/>
+<text x="758" y="492" font-size="10" fill="#B4B2A9" font-family="sans-serif" text-anchor="middle">© 2025 · Godot 4 · GDScript</text>
+</svg>

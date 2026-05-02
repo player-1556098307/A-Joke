@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://d07s77h6sexh2"]
+
+[ext_resource type="Texture2D" uid="uid://v5p58up2gq04" path="res://resources/characters/portraits/漩涡鸣人.jpg" id="1_jb1ta"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="1_w7w86"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_dkdcv"]
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="3_dkdcv"]
+
+[sub_resource type="Resource" id="SE_ba_nr"]
+script = ExtResource("3_dkdcv")
+value = 1
+metadata/_custom_type_script = "uid://bkdmsc5i8nnec"
+
+[sub_resource type="Resource" id="SD_ba_nr"]
+script = ExtResource("2_dkdcv")
+skill_name = "普攻"
+description = "近身攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("3_dkdcv")]([SubResource("SE_ba_nr")])
+metadata/_custom_type_script = "uid://dfnpbvupc8l38"
+
+[sub_resource type="Resource" id="Resource_jb1ta"]
+script = ExtResource("3_dkdcv")
+effect_type = 5
+value = 3
+duration = 2
+metadata/_custom_type_script = "uid://bkdmsc5i8nnec"
+
+[sub_resource type="Resource" id="Resource_ltmqi"]
+script = ExtResource("2_dkdcv")
+skill_name = "螺旋丸"
+description = "集中查克拉压缩成旋转球，下回合末对目标造成 3 点伤害。"
+energy_cost = 2
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("3_dkdcv")]([SubResource("Resource_jb1ta")])
+metadata/_custom_type_script = "uid://dfnpbvupc8l38"
+
+[sub_resource type="Resource" id="Resource_qe1ux"]
+script = ExtResource("3_dkdcv")
+effect_type = 7
+target = 2
+metadata/_custom_type_script = "uid://bkdmsc5i8nnec"
+
+[sub_resource type="Resource" id="Resource_cvo13"]
+script = ExtResource("2_dkdcv")
+skill_name = "影分身"
+description = "创造替身承受下次伤害，并积累查克拉。"
+energy_cost = 1
+max_range = 999
+effects = Array[ExtResource("3_dkdcv")]([SubResource("Resource_qe1ux")])
+metadata/_custom_type_script = "uid://dfnpbvupc8l38"
+
+[resource]
+script = ExtResource("1_w7w86")
+character_name = "漩涡鸣人"
+max_hp = 6
+portrait = ExtResource("1_jb1ta")
+skills = Array[ExtResource("2_dkdcv")]([SubResource("SD_ba_nr"), SubResource("Resource_ltmqi"), SubResource("Resource_cvo13")])
+tags = Array[String](["战士"])
+metadata/_custom_type_script = "uid://dx561rntxjbhw"

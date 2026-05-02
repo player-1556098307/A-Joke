@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://bkm8n5pwq7dvf"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Texture2D" uid="uid://ch3p7ypdw1tpl" path="res://resources/characters/portraits/宇智波佐助.jpg" id="1_xkdpf"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba_ss"]
+script = ExtResource("1_effect")
+value = 1
+
+[sub_resource type="Resource" id="SD_ba_ss"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_ss")])
+
+[sub_resource type="Resource" id="SE_sc1a"]
+script = ExtResource("1_effect")
+value = 2
+
+[sub_resource type="Resource" id="SE_sc1b"]
+script = ExtResource("1_effect")
+effect_type = 5
+value = 1
+duration = 2
+
+[sub_resource type="Resource" id="SD_sc1"]
+script = ExtResource("2_skill")
+skill_name = "豪火球之术"
+description = "吐出巨大火球，造成 2 点伤害，下回合末追加 1 点灼烧。"
+energy_cost = 3
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_sc1a"), SubResource("SE_sc1b")])
+
+[sub_resource type="Resource" id="SE_sc2a"]
+script = ExtResource("1_effect")
+value = 2
+
+[sub_resource type="Resource" id="SE_sc2b"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 1
+
+[sub_resource type="Resource" id="SD_sc2"]
+script = ExtResource("2_skill")
+skill_name = "千鸟"
+description = "以雷遁贯穿目标，造成 2 点伤害并使其麻痹 1 回合。"
+energy_cost = 2
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_sc2a"), SubResource("SE_sc2b")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "宇智波佐助"
+max_hp = 6
+portrait = ExtResource("1_xkdpf")
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_ss"), SubResource("SD_sc1"), SubResource("SD_sc2")])
+tags = Array[String](["法师", "刺客"])

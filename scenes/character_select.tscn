@@ -1,0 +1,260 @@
+[gd_scene format=3 uid="uid://charselect001"]
+
+[ext_resource type="Script" path="res://scenes/character_select.gd" id="1_cs"]
+
+[node name="CharacterSelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_cs")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 540.0
+color = Color(1, 0.992157, 0.960784, 1)
+
+[node name="TopBarBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 956.0
+offset_bottom = 48.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="TitleLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 956.0
+offset_bottom = 48.0
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "选择你的角色"
+
+[node name="BtnBack" type="Button" parent="."]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 12.0
+offset_right = 94.0
+offset_bottom = 36.0
+text = "← 返回"
+
+[node name="LeftPanelBg" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 308.0
+offset_bottom = 532.0
+mouse_filter = 2
+
+[node name="LeftHeaderBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 308.0
+offset_bottom = 80.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="LeftHeaderLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 308.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "选择角色"
+
+[node name="LeftList" type="ScrollContainer" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 80.0
+offset_right = 308.0
+offset_bottom = 532.0
+
+[node name="CharacterList" type="VBoxContainer" parent="LeftList"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="RightPanelBg" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 316.0
+offset_top = 52.0
+offset_right = 956.0
+offset_bottom = 532.0
+mouse_filter = 2
+
+[node name="RightHeaderBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 316.0
+offset_top = 52.0
+offset_right = 956.0
+offset_bottom = 80.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="RightHeaderLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 316.0
+offset_top = 52.0
+offset_right = 956.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "角色详情预览"
+
+[node name="AvatarBox" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 88.0
+offset_right = 460.0
+offset_bottom = 218.0
+
+[node name="AvatarLabel" type="Label" parent="AvatarBox"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 60
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "?"
+
+[node name="StatsPanel" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 470.0
+offset_top = 88.0
+offset_right = 942.0
+offset_bottom = 218.0
+
+[node name="SkillsHeaderBg" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 228.0
+offset_right = 940.0
+offset_bottom = 256.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="SkillsHeaderLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 228.0
+offset_right = 940.0
+offset_bottom = 256.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "技能详情"
+
+[node name="SkillsScroll" type="ScrollContainer" parent="."]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 264.0
+offset_right = 940.0
+offset_bottom = 408.0
+
+[node name="SkillsContainer" type="VBoxContainer" parent="SkillsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="AIConfigContent" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 416.0
+offset_right = 940.0
+offset_bottom = 472.0
+
+[node name="AIConfigHBox" type="HBoxContainer" parent="AIConfigContent"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 0
+
+[node name="AILeftVBox" type="VBoxContainer" parent="AIConfigContent/AIConfigHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 4
+
+[node name="AIRoleLabel" type="Label" parent="AIConfigContent/AIConfigHBox/AILeftVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.372549, 0.368627, 0.352941, 1)
+horizontal_alignment = 1
+text = "AI 角色"
+
+[node name="AIRoleSubLabel" type="Label" parent="AIConfigContent/AIConfigHBox/AILeftVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.172549, 0.172549, 0.164706, 1)
+horizontal_alignment = 1
+text = "随机从剩余角色中抽取"
+
+[node name="ConfigDivider" type="ColorRect" parent="AIConfigContent/AIConfigHBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(1, 0)
+size_flags_vertical = 3
+color = Color(0.827451, 0.819608, 0.780392, 1)
+
+[node name="AIRightHBox" type="HBoxContainer" parent="AIConfigContent/AIConfigHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="AICountTitleLabel" type="Label" parent="AIConfigContent/AIConfigHBox/AIRightHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.372549, 0.368627, 0.352941, 1)
+vertical_alignment = 1
+text = "AI 数量"
+
+[node name="BtnMinus" type="Button" parent="AIConfigContent/AIConfigHBox/AIRightHBox"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "−"
+
+[node name="CountBox" type="Panel" parent="AIConfigContent/AIConfigHBox/AIRightHBox"]
+custom_minimum_size = Vector2(40, 28)
+layout_mode = 2
+
+[node name="CountLabel" type="Label" parent="AIConfigContent/AIConfigHBox/AIRightHBox/CountBox"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "2"
+
+[node name="BtnPlus" type="Button" parent="AIConfigContent/AIConfigHBox/AIRightHBox"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="BtnStart" type="Button" parent="."]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 498.0
+offset_right = 940.0
+offset_bottom = 530.0
+
+[node name="BorderFrame" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 956.0
+offset_bottom = 534.0
+mouse_filter = 2

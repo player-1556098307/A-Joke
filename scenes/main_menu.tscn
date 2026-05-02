@@ -1,0 +1,226 @@
+[gd_scene format=3 uid="uid://mainmenu0001"]
+
+[ext_resource type="Script" uid="uid://bxyjqjuxevoy8" path="res://scenes/main_menu.gd" id="1_mm"]
+
+[node name="MainMenu" type="Control" unique_id=7177487]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mm")
+
+[node name="Background" type="ColorRect" parent="." unique_id=287323216]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 540.0
+color = Color(1, 0.992157, 0.960784, 1)
+
+[node name="LeftTitleBar" type="ColorRect" parent="." unique_id=1693488518]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 560.0
+offset_bottom = 184.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="TitleLabel1" type="Label" parent="." unique_id=330372391]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 14.0
+offset_right = 320.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+theme_override_font_sizes/font_size = 52
+text = "猜拳"
+
+[node name="TitleLabel2" type="Label" parent="." unique_id=676403199]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 82.0
+offset_right = 420.0
+offset_bottom = 160.0
+theme_override_colors/font_color = Color(1, 0.992157, 0.960784, 1)
+theme_override_font_sizes/font_size = 52
+text = "对战！"
+
+[node name="SubtitleBar" type="ColorRect" parent="." unique_id=2086744628]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 184.0
+offset_right = 560.0
+offset_bottom = 216.0
+color = Color(0.729412, 0.458824, 0.0901961, 1)
+
+[node name="SubtitleLabel" type="Label" parent="." unique_id=1429620374]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 184.0
+offset_right = 556.0
+offset_bottom = 216.0
+theme_override_colors/font_color = Color(1, 0.992157, 0.960784, 1)
+theme_override_font_sizes/font_size = 13
+text = "Rock · Paper · Scissors Battle"
+vertical_alignment = 1
+
+[node name="ShowcaseBg" type="ColorRect" parent="." unique_id=287414962]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 216.0
+offset_right = 560.0
+offset_bottom = 468.0
+color = Color(0.917647, 0.952941, 0.870588, 0.4)
+
+[node name="CharacterShowcase" type="HBoxContainer" parent="." unique_id=498672850]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 228.0
+offset_right = 560.0
+offset_bottom = 468.0
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="LeftFooterLine" type="ColorRect" parent="." unique_id=1928157002]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 467.0
+offset_right = 556.0
+offset_bottom = 469.5
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="FooterLabel1" type="Label" parent="." unique_id=1252214598]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 471.0
+offset_right = 556.0
+offset_bottom = 487.0
+theme_override_colors/font_color = Color(0.533333, 0.529412, 0.501961, 1)
+theme_override_font_sizes/font_size = 11
+text = "v1.0 · 本地单机原型"
+
+[node name="FooterLabel2" type="Label" parent="." unique_id=1939021685]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 487.0
+offset_right = 556.0
+offset_bottom = 501.0
+theme_override_colors/font_color = Color(0.705882, 0.698039, 0.662745, 1)
+theme_override_font_sizes/font_size = 10
+text = "联机功能开发中..."
+
+[node name="Divider" type="ColorRect" parent="." unique_id=170165365]
+layout_mode = 0
+offset_left = 558.0
+offset_top = 4.0
+offset_right = 561.0
+offset_bottom = 536.0
+color = Color(0.172549, 0.172549, 0.164706, 1)
+
+[node name="RightBg" type="ColorRect" parent="." unique_id=2083606563]
+layout_mode = 0
+offset_left = 560.0
+offset_top = 4.0
+offset_right = 956.0
+offset_bottom = 536.0
+color = Color(1, 0.992157, 0.960784, 1)
+
+[node name="StartLabel" type="Label" parent="." unique_id=1839042948]
+layout_mode = 0
+offset_left = 560.0
+offset_top = 68.0
+offset_right = 956.0
+offset_bottom = 112.0
+theme_override_colors/font_color = Color(0.172549, 0.172549, 0.164706, 1)
+theme_override_font_sizes/font_size = 28
+text = "START"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BtnPvE" type="Button" parent="." unique_id=1399798801]
+layout_mode = 0
+offset_left = 610.0
+offset_top = 130.0
+offset_right = 906.0
+offset_bottom = 210.0
+
+[node name="BtnPvP" type="Button" parent="." unique_id=92866732]
+layout_mode = 0
+offset_left = 610.0
+offset_top = 226.0
+offset_right = 906.0
+offset_bottom = 306.0
+disabled = true
+
+[node name="BtnSettings" type="Button" parent="." unique_id=1679551461]
+layout_mode = 0
+offset_left = 610.0
+offset_top = 322.0
+offset_right = 750.0
+offset_bottom = 378.0
+
+[node name="BtnQuit" type="Button" parent="." unique_id=559644760]
+layout_mode = 0
+offset_left = 766.0
+offset_top = 322.0
+offset_right = 906.0
+offset_bottom = 378.0
+
+[node name="TipsPanel" type="PanelContainer" parent="." unique_id=1530077088]
+layout_mode = 0
+offset_left = 610.0
+offset_top = 394.0
+offset_right = 906.0
+offset_bottom = 454.0
+
+[node name="TipsVBox" type="VBoxContainer" parent="TipsPanel" unique_id=78619081]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="TipsTitle" type="Label" parent="TipsPanel/TipsVBox" unique_id=665734330]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.368627, 0.352941, 1)
+theme_override_font_sizes/font_size = 11
+text = "操作说明"
+horizontal_alignment = 1
+
+[node name="TipsLine1" type="Label" parent="TipsPanel/TipsVBox" unique_id=1441071723]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.533333, 0.529412, 0.501961, 1)
+theme_override_font_sizes/font_size = 10
+text = "猜拳获胜 → 聚气或释放技能"
+horizontal_alignment = 1
+
+[node name="TipsLine2" type="Label" parent="TipsPanel/TipsVBox" unique_id=84332695]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.533333, 0.529412, 0.501961, 1)
+theme_override_font_sizes/font_size = 10
+text = "距离影响技能射程 · 最后存活者获胜"
+horizontal_alignment = 1
+
+[node name="RightBottomLine" type="ColorRect" parent="." unique_id=326606578]
+layout_mode = 0
+offset_left = 560.0
+offset_top = 472.0
+offset_right = 956.0
+offset_bottom = 473.0
+color = Color(0.827451, 0.819608, 0.780392, 1)
+
+[node name="CreditLabel" type="Label" parent="." unique_id=1332041815]
+layout_mode = 0
+offset_left = 560.0
+offset_top = 480.0
+offset_right = 956.0
+offset_bottom = 498.0
+theme_override_colors/font_color = Color(0.705882, 0.698039, 0.662745, 1)
+theme_override_font_sizes/font_size = 10
+text = "© 2025 · Godot 4 · GDScript"
+horizontal_alignment = 1
+
+[node name="BorderFrame" type="Panel" parent="." unique_id=104878520]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 956.0
+offset_bottom = 536.0
+mouse_filter = 2
