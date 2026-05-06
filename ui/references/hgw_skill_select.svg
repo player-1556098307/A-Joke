@@ -1,0 +1,79 @@
+<svg viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">
+<!-- ── BACKGROUND ── -->
+<rect width="960" height="540" fill="#09070F" opacity="0.92"/>
+
+<!-- ── HIT FLASH BANNER ── -->
+<rect x="0" y="0" width="960" height="60" fill="#1A0E0A"/>
+<text x="480" y="38" text-anchor="middle" font-family="sans-serif" font-size="26" fill="#FAC775" font-weight="bold">命  中！</text>
+<text x="480" y="56" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#C9A84C">漩涡鸣人 的出拳胜利 · 请选择释放的技能</text>
+
+<!-- ── MODAL ── -->
+<rect x="180" y="76" width="600" height="400" rx="8" fill="#1E1730" stroke="#4A3A5C" stroke-width="2"/>
+
+<!-- Context row: attacker info + current energy -->
+<rect x="180" y="76" width="600" height="48" rx="8" fill="#2A1F40"/>
+<rect x="180" y="110" width="600" height="14" fill="#2A1F40"/>
+<text x="220" y="106" font-family="sans-serif" font-size="13" fill="#F0E6D3" font-weight="bold">漩涡鸣人</text>
+<text x="220" y="120" font-family="sans-serif" font-size="10" fill="#8A8494">猜拳1气已消耗</text>
+<text x="480" y="106" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#7ABCE8" font-weight="bold">当前气: 2</text>
+<text x="480" y="120" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#8A8494">(命中前3气 - 猜拳1气)</text>
+<text x="730" y="106" text-anchor="end" font-family="sans-serif" font-size="12" fill="#F07070">目标: 宇智波佐助</text>
+<text x="730" y="120" text-anchor="end" font-family="sans-serif" font-size="10" fill="#8A8494">HP 5/6 · 无替身 · 无护盾</text>
+
+<line x1="180" y1="124" x2="780" y2="124" stroke="#4A3A5C" stroke-width="1"/>
+
+<text x="480" y="146" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#8A8494">─── A类技能（需猜拳命中才能选择）───</text>
+
+<!-- ── SKILL CARD 1: 普攻 ── -->
+<rect x="196" y="154" width="568" height="68" fill="#201535" stroke="#4A3A5C" rx="5"/>
+<!-- Cost badge -->
+<rect x="706" y="162" width="48" height="48" rx="4" fill="#102030" stroke="#4A8CC9" stroke-width="1.5"/>
+<text x="730" y="183" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7ABCE8">技能气</text>
+<text x="730" y="200" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#7ABCE8" font-weight="bold">1</text>
+<!-- Skill info -->
+<text x="210" y="176" font-family="sans-serif" font-size="15" fill="#F0E6D3" font-weight="bold">普攻</text>
+<text x="210" y="194" font-family="sans-serif" font-size="11" fill="#C9A84C">总消耗: 猜拳1 + 技能1 = 2气</text>
+<text x="210" y="210" font-family="sans-serif" font-size="11" fill="#8A8494">命中后造成 1点 HP伤害（走伤害结算链）</text>
+<!-- Affordable badge -->
+<rect x="660" y="162" width="40" height="22" rx="3" fill="#0E2010" stroke="#2A6A2A"/>
+<text x="680" y="177" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#5AFC9A">可用</text>
+
+<!-- ── SKILL CARD 2: 螺旋丸 ── -->
+<rect x="196" y="230" width="568" height="68" fill="#201535" stroke="#4A3A5C" rx="5"/>
+<rect x="706" y="238" width="48" height="48" rx="4" fill="#102030" stroke="#4A8CC9" stroke-width="1.5"/>
+<text x="730" y="259" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7ABCE8">技能气</text>
+<text x="730" y="276" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#7ABCE8" font-weight="bold">3</text>
+<text x="210" y="252" font-family="sans-serif" font-size="15" fill="#8A8494" font-weight="bold">螺旋丸</text>
+<text x="210" y="270" font-family="sans-serif" font-size="11" fill="#8A5050">总消耗: 猜拳1 + 技能3 = 4气   ← 气不足</text>
+<text x="210" y="286" font-family="sans-serif" font-size="11" fill="#6A6070">蓄力效果，下回合结束时对目标造成3点伤害</text>
+<!-- Not affordable -->
+<rect x="656" y="238" width="44" height="22" rx="3" fill="#2A0E0E" stroke="#7A2A2A"/>
+<text x="678" y="253" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#C84C4C">气不足</text>
+
+<!-- B-class divider -->
+<line x1="196" y1="308" x2="764" y2="308" stroke="#3A2A4C" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="480" y="324" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#6A5A30">─── B类技能在行动阶段单独使用，不经过猜拳 ───</text>
+
+<!-- ── B CLASS SKILL: 影分身 (GRAYED, not available here) ── -->
+<rect x="196" y="332" width="568" height="52" fill="#1A1820" stroke="#2A2A30" rx="5" opacity="0.6"/>
+<rect x="706" y="340" width="48" height="36" rx="4" fill="#0E1018" stroke="#2A2A30" stroke-width="1" opacity="0.5"/>
+<text x="730" y="359" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#3A3A40">1</text>
+<text x="210" y="354" font-family="sans-serif" font-size="14" fill="#4A4A50" font-weight="bold">影分身</text>
+<text x="210" y="372" font-family="sans-serif" font-size="11" fill="#3A3A40">B类技能无法在命中后选择，须单独在行动阶段使用</text>
+
+<!-- ── BOTTOM BUTTONS ── -->
+<line x1="180" y1="392" x2="780" y2="392" stroke="#4A3A5C" stroke-width="1"/>
+
+<!-- Select (普攻 highlighted) -->
+<rect x="220" y="402" width="240" height="60" fill="#280E0E" stroke="#C84C4C" stroke-width="2" rx="5"/>
+<text x="340" y="427" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#F07070" font-weight="bold">确认: 普攻</text>
+<text x="340" y="448" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7A4A4A">消耗1气 · 剩余1气</text>
+
+<!-- Cancel -->
+<rect x="500" y="402" width="240" height="60" fill="#18141E" stroke="#3A2A4C" stroke-width="1" rx="5"/>
+<text x="620" y="427" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#5A5070" font-weight="bold">放弃攻击</text>
+<text x="620" y="448" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#3A3050">1气已消耗，本回合攻击结束</text>
+
+<!-- Damage chain reminder -->
+<text x="480" y="494" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#4A3A5C">伤害结算链：替身 → 无限盾 → 数值盾 → HP（归零触发击杀结算）</text>
+</svg>

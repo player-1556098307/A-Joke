@@ -1,7 +1,10 @@
+## 主菜单场景 — 标题画面，展示角色卡和导航按钮
+## 所有 UI 样式通过代码中的 StyleBoxFlat 动态构建（无 theme 文件）
 extends Control
 
 @onready var btn_pve: Button = $BtnPvE
 @onready var btn_pvp: Button = $BtnPvP
+@onready var btn_hgw: Button = $BtnHGW
 @onready var btn_settings: Button = $BtnSettings
 @onready var btn_quit: Button = $BtnQuit
 @onready var character_showcase: HBoxContainer = $CharacterShowcase
@@ -12,10 +15,12 @@ func _ready() -> void:
 	_apply_border_frame()
 	_style_pve_button()
 	_style_pvp_button()
+	_style_hgw_button()
 	_style_settings_button()
 	_style_quit_button()
 	_style_tips_panel()
 	btn_pve.pressed.connect(_on_pve_pressed)
+	btn_hgw.pressed.connect(_on_hgw_pressed)
 	btn_settings.pressed.connect(_on_settings_pressed)
 	btn_quit.pressed.connect(get_tree().quit)
 	_spawn_character_showcase()
@@ -134,6 +139,17 @@ func _style_pvp_button() -> void:
 	lock.offset_bottom = 34.0
 	btn_pvp.add_child(lock)
 
+func _style_hgw_button() -> void:
+	btn_hgw.text = ""
+	btn_hgw.focus_mode = Control.FOCUS_NONE
+	btn_hgw.add_theme_stylebox_override("normal", _make_flat(Color("#4A2C6E"), Color("#2C2C2A"), 3, 8))
+	btn_hgw.add_theme_stylebox_override("hover",  _make_flat(Color("#5E3A8A"), Color("#2C2C2A"), 3, 8))
+	btn_hgw.add_theme_stylebox_override("pressed",_make_flat(Color("#3A1F5C"), Color("#2C2C2A"), 3, 8))
+	_add_left_bar(btn_hgw, Color("#C9A84C"))
+	_add_two_line_labels(btn_hgw,
+		"圣杯战争", Color("#F0E6D3"), 18,
+		"测试 · 六边形地图", Color("#C9A84C"), 11)
+
 func _style_settings_button() -> void:
 	btn_settings.text = ""
 	btn_settings.focus_mode = Control.FOCUS_NONE
@@ -160,6 +176,9 @@ func _style_tips_panel() -> void:
 
 func _on_pve_pressed() -> void:
 	SceneManager.go_to("res://scenes/character_select.tscn")
+
+func _on_hgw_pressed() -> void:
+	SceneManager.go_to("res://scenes/hgw/hgw_character_select.tscn")
 
 func _on_settings_pressed() -> void:
 	SceneManager.go_to("res://scenes/settings.tscn")

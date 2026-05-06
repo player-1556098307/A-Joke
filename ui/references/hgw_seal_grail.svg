@@ -1,0 +1,148 @@
+<svg viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">
+<!-- ── BACKGROUND ── -->
+<rect width="960" height="540" fill="#12101A"/>
+<rect x="3" y="3" width="954" height="534" rx="6" fill="none" stroke="#4A3A5C" stroke-width="1.5"/>
+
+<!-- ── TITLE ── -->
+<rect x="3" y="3" width="954" height="48" rx="6" fill="#1E1730"/>
+<rect x="3" y="35" width="954" height="16" fill="#1E1730"/>
+<text x="480" y="34" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#FAC775" font-weight="bold">封印状态 · 圣杯开启机制</text>
+
+<!-- ── THREE SEAL PANELS (equal columns) ── -->
+<!-- Column 1: 封印1 野怪 -->
+<rect x="12" y="60" width="300" height="280" fill="#1A1228" stroke="#7A3A3A" stroke-width="1.5" rx="6"/>
+<rect x="12" y="60" width="300" height="40" rx="6" fill="#2A1010"/>
+<rect x="12" y="86" width="300" height="14" fill="#2A1010"/>
+<text x="162" y="86" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#F07070" font-weight="bold">封印1 · 野怪守护</text>
+
+<!-- Boss HP -->
+<text x="26" y="120" font-family="sans-serif" font-size="11" fill="#8A8494">野怪 HP</text>
+<rect x="26" y="126" width="272" height="18" fill="#2A0E0E" rx="3"/>
+<rect x="26" y="126" width="163" height="18" fill="#C84C4C" rx="3"/>
+<text x="162" y="139" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#F0E6D3" font-weight="bold">12 / 20</text>
+
+<!-- Boss behavior -->
+<text x="26" y="162" font-family="sans-serif" font-size="11" fill="#C9A84C" font-weight="bold">野怪行为</text>
+<rect x="26" y="168" width="272" height="48" fill="#1E0E0E" stroke="#5A2A2A" rx="3"/>
+<text x="34" y="184" font-family="sans-serif" font-size="10" fill="#F0E6D3">攻击后立即反击，技能二选一：</text>
+<text x="34" y="200" font-family="sans-serif" font-size="10" fill="#F07070">• 单体撕咬 (3pt) → 伤害最多的玩家</text>
+<text x="34" y="212" font-family="sans-serif" font-size="10" fill="#F0A070">• AOE冲击 (1pt) → 3格内所有玩家</text>
+
+<!-- Damage log -->
+<text x="26" y="234" font-family="sans-serif" font-size="11" fill="#C9A84C" font-weight="bold">伤害记录</text>
+<rect x="26" y="240" width="272" height="26" fill="#1A100A" stroke="#3A2A10" rx="3"/>
+<text x="34" y="256" font-family="sans-serif" font-size="10" fill="#FAC775">鸣人: 3pt  · 佐助: 2pt · 樱: 0pt</text>
+<text x="26" y="284" font-family="sans-serif" font-size="10" fill="#8A8494">→ 下次被攻击将单体撕咬鸣人</text>
+
+<!-- Unlock reward -->
+<rect x="26" y="298" width="272" height="32" fill="#102010" stroke="#2A6A2A" rx="3"/>
+<text x="162" y="312" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5AFC9A" font-weight="bold">解封奖励</text>
+<text x="162" y="326" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3AC47A">击杀者永久 +1气/回合（自动）</text>
+
+<!-- Column 2: 封印2 祭坛 -->
+<rect x="330" y="60" width="300" height="280" fill="#1A1228" stroke="#3A5C8A" stroke-width="1.5" rx="6"/>
+<rect x="330" y="60" width="300" height="40" rx="6" fill="#101828"/>
+<rect x="330" y="86" width="300" height="14" fill="#101828"/>
+<text x="480" y="86" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#7ABCE8" font-weight="bold">封印2 · 气之祭坛</text>
+
+<!-- Per-player progress -->
+<text x="344" y="118" font-family="sans-serif" font-size="11" fill="#C9A84C" font-weight="bold">注气进度（各自独立）</text>
+<text x="344" y="136" font-family="sans-serif" font-size="10" fill="#8A8494">目标: 每位玩家累计注入 3气</text>
+
+<!-- 佐助 progress -->
+<text x="344" y="158" font-family="sans-serif" font-size="11" fill="#F0E6D3">宇智波佐助</text>
+<rect x="344" y="164" width="240" height="14" fill="#0A1628" rx="2"/>
+<rect x="344" y="164" width="160" height="14" fill="#4A8CC9" rx="2"/>
+<text x="592" y="175" text-anchor="end" font-family="sans-serif" font-size="10" fill="#7ABCE8">2 / 3气</text>
+<!-- 鸣人 progress -->
+<text x="344" y="192" font-family="sans-serif" font-size="11" fill="#F0E6D3">漩涡鸣人</text>
+<rect x="344" y="198" width="240" height="14" fill="#0A1628" rx="2"/>
+<rect x="344" y="198" width="80" height="14" fill="#4A8CC9" rx="2"/>
+<text x="592" y="209" text-anchor="end" font-family="sans-serif" font-size="10" fill="#7ABCE8">1 / 3气</text>
+<!-- 樱 progress -->
+<text x="344" y="226" font-family="sans-serif" font-size="11" fill="#F0E6D3">春野樱</text>
+<rect x="344" y="232" width="240" height="14" fill="#0A1628" rx="2"/>
+<text x="592" y="243" text-anchor="end" font-family="sans-serif" font-size="10" fill="#5A5A70">0 / 3气</text>
+
+<!-- Rules -->
+<rect x="336" y="258" width="280" height="54" fill="#0A1018" stroke="#2A3A5A" rx="3"/>
+<text x="344" y="274" font-family="sans-serif" font-size="10" fill="#8A8494">• 进入祭坛格 → 行动阶段可选"注入气"</text>
+<text x="344" y="288" font-family="sans-serif" font-size="10" fill="#8A8494">• 可分多次注入，离开后进度保留</text>
+<text x="344" y="302" font-family="sans-serif" font-size="10" fill="#8A8494">• 可一次注入全部气（待确认）</text>
+
+<!-- Unlock reward -->
+<rect x="344" y="316" width="272" height="32" fill="#102010" stroke="#2A6A2A" rx="3"/>
+<text x="480" y="330" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5AFC9A" font-weight="bold">解封奖励</text>
+<text x="480" y="344" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3AC47A">最先完成者永久 移动距离+2</text>
+
+<!-- Column 3: 封印3 废墟 -->
+<rect x="648" y="60" width="300" height="280" fill="#1A1228" stroke="#5C8A3A" stroke-width="1.5" rx="6"/>
+<rect x="648" y="60" width="300" height="40" rx="6" fill="#102010"/>
+<rect x="648" y="86" width="300" height="14" fill="#102010"/>
+<text x="798" y="86" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#5AFC9A" font-weight="bold">封印3 · 废墟探索  ✓</text>
+
+<!-- Status: UNLOCKED -->
+<rect x="660" y="100" width="276" height="32" fill="#0A2010" stroke="#2A6A2A" rx="3"/>
+<text x="798" y="112" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#5AFC9A" font-weight="bold">已解封</text>
+<text x="798" y="128" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3AC47A">道具位置已标记并被拾取</text>
+
+<!-- Item trail -->
+<text x="662" y="152" font-family="sans-serif" font-size="11" fill="#C9A84C" font-weight="bold">探索记录</text>
+<rect x="662" y="158" width="272" height="60" fill="#0E1408" stroke="#2A4010" rx="3"/>
+<text x="670" y="174" font-family="sans-serif" font-size="10" fill="#8A8494">回合 7: 鸣人 进入废墟</text>
+<text x="670" y="188" font-family="sans-serif" font-size="10" fill="#8A8494">道具标记位置: (q=2, r=-3) [仅鸣人可见]</text>
+<text x="670" y="202" font-family="sans-serif" font-size="10" fill="#5AFC9A">回合 9: 鸣人 到达标记位置，拾取道具</text>
+<text x="670" y="214" font-family="sans-serif" font-size="10" fill="#5AFC9A">封印3 解除 · 奖励生效</text>
+
+<!-- Rules -->
+<rect x="662" y="228" width="272" height="54" fill="#0A1008" stroke="#2A4010" rx="3"/>
+<text x="670" y="244" font-family="sans-serif" font-size="10" fill="#8A8494">• 仅进入废墟的玩家可见道具位置</text>
+<text x="670" y="258" font-family="sans-serif" font-size="10" fill="#8A8494">• 多名玩家进入废墟看到同一位置</text>
+<text x="670" y="272" font-family="sans-serif" font-size="10" fill="#8A8494">• 先到者拾取，封印解除</text>
+
+<!-- Unlock reward -->
+<rect x="662" y="290" width="272" height="38" fill="#102010" stroke="#2A6A2A" rx="3"/>
+<text x="798" y="304" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5AFC9A" font-weight="bold">解封奖励</text>
+<text x="798" y="320" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3AC47A">拾取者永久 攻击距离+1</text>
+
+<!-- ── GRAIL & SHRINK RING SECTION ── -->
+<rect x="12" y="350" width="936" height="80" fill="#1A1228" stroke="#C9A84C" stroke-width="2" rx="6"/>
+<text x="480" y="372" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#FAC775" font-weight="bold">圣杯开启流程</text>
+
+<!-- Flow diagram -->
+<text x="60" y="400" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#8A8494">三个封印</text>
+<text x="60" y="416" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#8A8494">全部解除</text>
+<text x="130" y="408" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#4A3A5C">→</text>
+<text x="210" y="400" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#FAC775">圣杯开启</text>
+<text x="210" y="416" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#FAC775">缩圈激活</text>
+<text x="290" y="408" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#4A3A5C">→</text>
+<text x="400" y="400" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#C9A84C">台座可占领</text>
+<text x="400" y="416" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#C9A84C">需连续驻留3回合</text>
+<text x="510" y="408" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#4A3A5C">→</text>
+<rect x="554" y="388" width="160" height="36" fill="#1A2810" stroke="#5AFC9A" stroke-width="1.5" rx="4"/>
+<text x="634" y="402" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5AFC9A" font-weight="bold">胜利: 台座占领</text>
+<text x="634" y="416" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3AC47A">连续3回合无中断</text>
+<text x="740" y="408" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#4A3A5C">or</text>
+<rect x="768" y="388" width="160" height="36" fill="#1A0E0E" stroke="#C84C4C" stroke-width="1.5" rx="4"/>
+<text x="848" y="402" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#F07070" font-weight="bold">胜利: 缩圈淘汰</text>
+<text x="848" y="416" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#9A4A4A">最后存活者胜利</text>
+
+<!-- ── SHRINK RING STATUS ── -->
+<rect x="12" y="440" width="936" height="88" fill="#1A1228" stroke="#4A3A5C" stroke-width="1" rx="6"/>
+<text x="480" y="460" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#C9A84C" font-weight="bold">缩圈状态（圣杯开启后）</text>
+
+<!-- OFF state -->
+<rect x="24" y="468" width="200" height="50" fill="#181228" stroke="#3A2A4C" rx="4"/>
+<text x="124" y="487" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#5A5070" font-weight="bold">当前: 未激活</text>
+<text x="124" y="505" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3A3050">圣杯尚未开启</text>
+
+<!-- ON state example -->
+<rect x="240" y="468" width="440" height="50" fill="#180A0A" stroke="#C84C4C" rx="4"/>
+<text x="460" y="485" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#F07070" font-weight="bold">激活后示例: 半径缩至 8格 · 圆环外每回合-1HP</text>
+<text x="460" y="502" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#8A4A4A">每 3 回合收缩 1 格 · 圣杯台座永远在安全区内</text>
+
+<!-- Grail interrupt rule -->
+<rect x="696" y="468" width="240" height="50" fill="#101A10" stroke="#2A6A2A" rx="4"/>
+<text x="816" y="485" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5AFC9A" font-weight="bold">台座占领中断规则</text>
+<text x="816" y="502" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3AC47A">受到伤害 → 计数归零重算</text>
+</svg>

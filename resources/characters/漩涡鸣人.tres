@@ -40,6 +40,7 @@ metadata/_custom_type_script = "uid://dfnpbvupc8l38"
 [sub_resource type="Resource" id="Resource_qe1ux"]
 script = ExtResource("3_dkdcv")
 effect_type = 7
+value = 1
 target = 2
 metadata/_custom_type_script = "uid://bkdmsc5i8nnec"
 

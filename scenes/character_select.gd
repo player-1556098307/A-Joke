@@ -1,3 +1,5 @@
+## 角色选择场景 — 左侧角色列表，右侧角色详情预览，底部AI数量配置
+## 选中角色后构建游戏config存储到SceneManager，跳转到Main场景开始游戏
 extends Control
 
 @onready var btn_back: Button           = $BtnBack

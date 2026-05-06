@@ -1,3 +1,6 @@
+## GameUI — 主游戏界面，监听 GameManager 全部20个信号
+## 负责渲染环形排列的玩家卡片、手势/行动/目标选择面板、战斗日志、回合倒计时、
+## 思考动画、手势揭示弹窗、加赛高亮、技能效果动画等所有战斗UI交互
 class_name GameUI
 extends Control
 
@@ -166,7 +169,89 @@ func _setup_menu_button() -> void:
 	add_child(menu_btn)
 
 func _on_menu_pressed() -> void:
-	SceneManager.go_to("res://scenes/main_menu.tscn")
+	# Backdrop
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0, 0, 0, 0.35)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(backdrop)
+
+	# Panel
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.5; panel.anchor_right = 0.5
+	panel.anchor_top = 0.5; panel.anchor_bottom = 0.5
+	panel.custom_minimum_size = Vector2(300, 0)
+
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = Color("#FFFDF5")
+	pstyle.border_color = Color("#2C2C2A")
+	pstyle.set_border_width_all(2)
+	pstyle.set_corner_radius_all(8)
+	pstyle.content_margin_left = 20.0
+	pstyle.content_margin_top = 20.0
+	pstyle.content_margin_right = 20.0
+	pstyle.content_margin_bottom = 20.0
+	panel.add_theme_stylebox_override("panel", pstyle)
+	add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	panel.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "返回菜单"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 14)
+	title_lbl.add_theme_color_override("font_color", Color("#2C2C2A"))
+	vbox.add_child(title_lbl)
+
+	var body_lbl := Label.new()
+	body_lbl.text = "确定要返回主菜单吗？\n当前对战进度将会丢失。"
+	body_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body_lbl.add_theme_font_size_override("font_size", 12)
+	body_lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
+	vbox.add_child(body_lbl)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+	vbox.add_child(btn_row)
+
+	# "继续游戏" button
+	var stay_btn := Button.new()
+	stay_btn.text = "继续游戏"
+	stay_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stay_btn.add_theme_font_size_override("font_size", 12)
+	stay_btn.add_theme_color_override("font_color", Color("#2C2C2A"))
+	stay_btn.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#5A5A57"), 1, 4))
+	stay_btn.add_theme_stylebox_override("hover", _make_flat(Color("#E6E2D4"), Color("#2C2C2A"), 1, 4))
+	stay_btn.pressed.connect(func():
+		backdrop.queue_free()
+		panel.queue_free()
+	)
+	btn_row.add_child(stay_btn)
+
+	# "确定返回" button
+	var leave_btn := Button.new()
+	leave_btn.text = "确定返回"
+	leave_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	leave_btn.add_theme_font_size_override("font_size", 12)
+	leave_btn.add_theme_color_override("font_color", Color("#FFFDF5"))
+	leave_btn.add_theme_stylebox_override("normal", _make_flat(Color("#E24B4A"), Color("#C03838"), 1, 4))
+	leave_btn.add_theme_stylebox_override("hover", _make_flat(Color("#C03838"), Color("#A02020"), 1, 4))
+	leave_btn.pressed.connect(func():
+		backdrop.queue_free()
+		panel.queue_free()
+		SceneManager.go_to("res://scenes/main_menu.tscn")
+	)
+	btn_row.add_child(leave_btn)
+
+	# Center panel after layout
+	await get_tree().process_frame
+	var sz := panel.get_combined_minimum_size()
+	panel.offset_left = -sz.x / 2.0
+	panel.offset_right = sz.x / 2.0
+	panel.offset_top = -sz.y / 2.0
+	panel.offset_bottom = sz.y / 2.0
 
 # ── Action effects ────────────────────────────────────────────────────────────
 
@@ -963,14 +1048,25 @@ func _make_skill_button(skill: SkillData, idx: int, can_use: bool) -> Button:
 	cb_lbl.anchor_right = 1.0; cb_lbl.anchor_bottom = 1.0
 	cb.add_child(cb_lbl)
 
+	var desc_scroll := ScrollContainer.new()
+	desc_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	desc_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	desc_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	desc_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	desc_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	vbox.add_child(desc_scroll)
+
 	var sub_lbl := Label.new()
 	sub_lbl.text = "%s · %s" % [range_str, skill.description if skill.description != "" else "—"]
 	sub_lbl.add_theme_font_size_override("font_size", 9)
 	sub_lbl.add_theme_color_override("font_color", Color("#185FA5") if can_use else Color("#B4B2A9"))
 	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	sub_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sub_lbl.custom_minimum_size = Vector2(160, 0)
 	sub_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(sub_lbl)
+	desc_scroll.add_child(sub_lbl)
 
+	btn.tooltip_text = "%s\n%s\n气: %d · %s" % [skill.skill_name, skill.description, skill.energy_cost, range_str]
 	btn.pressed.connect(_on_skill_button_pressed.bind(idx, skill))
 	return btn
 

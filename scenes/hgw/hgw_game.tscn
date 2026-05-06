@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://bfqggtwwqwvau"]
+
+[ext_resource type="Script" uid="uid://okfuekvmr8mg" path="res://scenes/hgw/hgw_game.gd" id="1_game"]
+
+[node name="HGWGame" type="Control" unique_id=565207065]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_game")
+LAND_THRESHOLD = null
+EDGE_DETAIL_AMP = null
+ELEVATION_FREQ = null
+MOISTURE_FREQ = null
+FORTRESS_COUNT = null
+NUM_PLAYERS = null
+MAP_RADIUS = null

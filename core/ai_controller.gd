@@ -1,6 +1,9 @@
+## AI控制器 — 非人类玩家（AI）的决策逻辑
+## 手势随机选择，技能按条件筛选后随机使用，无可用技能时自动充能
 class_name AIController
 extends RefCounted
 
+## 随机选择手势：ROCK/SCISSORS/PAPER 等概率
 func decide_gesture(_player: PlayerState) -> PlayerState.Gesture:
 	var options := [
 		PlayerState.Gesture.ROCK,
@@ -9,6 +12,8 @@ func decide_gesture(_player: PlayerState) -> PlayerState.Gesture:
 	]
 	return options[randi() % 3]
 
+## 决定行动：在可用技能中随机选择，没有则充能
+## 返回 {action: ActionType, skill_index: int, target_id: int}
 func decide_action(
 	player: PlayerState,
 	alive_players: Array[PlayerState],
@@ -19,6 +24,7 @@ func decide_action(
 		if p.player_id != player.player_id:
 			others.append(p)
 
+	# 收集所有能量足够且有合法目标的技能
 	var all_skills := player.get_all_skills()
 	var usable: Array[Dictionary] = []
 	for i in range(all_skills.size()):
@@ -34,6 +40,7 @@ func decide_action(
 		var skill_index: int   = chosen["index"]
 		var target_id          := -1
 
+		# 需要单一目标的技能，随机选一个合法目标
 		var needs_single_target := false
 		for effect in skill.effects:
 			if effect.target == SkillEffect.EffectTarget.ENEMY_SINGLE:
@@ -52,6 +59,7 @@ func decide_action(
 
 	return { "action": PlayerState.ActionType.CHARGE, "skill_index": -1, "target_id": -1 }
 
+## 检查技能是否有至少一个合法目标（包含 SELF 类型和敌对目标）
 func _has_valid_target(
 	player: PlayerState,
 	skill: SkillData,

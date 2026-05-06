@@ -1,3 +1,5 @@
+## 游戏结束场景 — 胜负展示 + 3-tab分析面板（统计/回放/技能记录）
+## 从 SceneManager.pending_game_result 读取 MatchRecord 并构建完整结算UI
 extends Control
 
 var _record: MatchRecord

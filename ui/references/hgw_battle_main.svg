@@ -1,0 +1,287 @@
+<svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <pattern id="hexbg" x="0" y="0" width="32" height="28" patternUnits="userSpaceOnUse">
+    <polygon points="16,1 30,9 30,22 16,27 2,22 2,9" fill="none" stroke="#2A2038" stroke-width="0.6" opacity="0.35"/>
+  </pattern>
+</defs>
+
+<!-- ── BACKGROUND ── -->
+<rect width="1280" height="720" fill="#12101A"/>
+
+<!-- ── TOP BAR ── -->
+<rect x="0" y="0" width="1280" height="50" fill="#1E1730" stroke="#4A3A5C" stroke-width="1"/>
+<text x="20" y="31" font-family="sans-serif" font-size="12" fill="#8A8494">圣杯战争模式</text>
+<text x="640" y="33" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#FAC775" font-weight="bold">回合 12 · 漩涡鸣人的回合</text>
+<rect x="742" y="10" width="96" height="28" fill="#0A2218" stroke="#2A8C5A" stroke-width="1.5" rx="4"/>
+<text x="790" y="29" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#5AFC9A" font-weight="bold">行动阶段</text>
+<text x="1255" y="31" text-anchor="end" font-family="sans-serif" font-size="12" fill="#C9A84C">封印 2/3 已解封</text>
+
+<!-- ── LEFT PANEL (current player, 220px) ── -->
+<rect x="0" y="50" width="220" height="670" fill="#1A1425" stroke="#4A3A5C" stroke-width="1"/>
+
+<!-- Portrait -->
+<rect x="50" y="66" width="120" height="120" rx="4" fill="#2A1F40" stroke="#C9A84C" stroke-width="2"/>
+<line x1="50" y1="66" x2="170" y2="186" stroke="#3A2A50" stroke-width="1" stroke-dasharray="5,4"/>
+<line x1="170" y1="66" x2="50" y2="186" stroke="#3A2A50" stroke-width="1" stroke-dasharray="5,4"/>
+<text x="110" y="132" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#C9A84C">鸣</text>
+<text x="110" y="200" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#F0E6D3" font-weight="bold">漩涡鸣人</text>
+<text x="110" y="216" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#8A8494">战士 · C级 · 移动力 3</text>
+
+<!-- HP bar -->
+<text x="14" y="244" font-family="sans-serif" font-size="10" fill="#8A8494">HP</text>
+<rect x="38" y="232" width="166" height="16" fill="#2A1530" rx="3"/>
+<rect x="38" y="232" width="110" height="16" fill="#C84C4C" rx="3"/>
+<text x="121" y="244" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#F0E6D3">4 / 6</text>
+
+<!-- Energy orbs -->
+<text x="14" y="270" font-family="sans-serif" font-size="10" fill="#8A8494">气</text>
+<circle cx="42"  cy="264" r="9" fill="#4A8CC9" stroke="#7ABCE8" stroke-width="1.5"/>
+<circle cx="62"  cy="264" r="9" fill="#4A8CC9" stroke="#7ABCE8" stroke-width="1.5"/>
+<circle cx="82"  cy="264" r="9" fill="#4A8CC9" stroke="#7ABCE8" stroke-width="1.5"/>
+<circle cx="102" cy="264" r="9" fill="#2A1F40" stroke="#4A3A5C" stroke-width="1.5"/>
+<circle cx="122" cy="264" r="9" fill="#2A1F40" stroke="#4A3A5C" stroke-width="1.5"/>
+<text x="148" y="268" font-family="sans-serif" font-size="13" fill="#7ABCE8" font-weight="bold">3气</text>
+
+<!-- Buff tags -->
+<text x="14" y="294" font-family="sans-serif" font-size="10" fill="#8A8494">增益</text>
+<rect x="48" y="282" width="64" height="20" fill="#1A2810" stroke="#4A7A20" rx="3"/>
+<text x="80" y="296" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#7ABC50">+1气/回合</text>
+<rect x="118" y="282" width="52" height="20" fill="#2A1F30" stroke="#5A3A5C" rx="3"/>
+<text x="144" y="296" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#8A6A9A">替身 ×1</text>
+
+<!-- Skills section -->
+<text x="14" y="322" font-family="sans-serif" font-size="11" fill="#C9A84C" font-weight="bold">— 技能 —</text>
+
+<rect x="8" y="328" width="202" height="38" fill="#20193A" stroke="#4A3A5C" rx="3"/>
+<text x="16" y="343" font-family="sans-serif" font-size="12" fill="#F0E6D3" font-weight="bold">普攻</text>
+<text x="16" y="357" font-family="sans-serif" font-size="9" fill="#6A6A80">A类 · 命中后造成1点伤害</text>
+<rect x="180" y="333" width="22" height="18" fill="#102030" stroke="#4A8CC9" rx="2"/>
+<text x="191" y="346" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7ABCE8" font-weight="bold">1</text>
+
+<rect x="8" y="372" width="202" height="38" fill="#20193A" stroke="#4A3A5C" rx="3"/>
+<text x="16" y="387" font-family="sans-serif" font-size="12" fill="#F0E6D3" font-weight="bold">螺旋丸</text>
+<text x="16" y="401" font-family="sans-serif" font-size="9" fill="#6A6A80">A类 · 蓄力，下回合末造成3伤</text>
+<rect x="180" y="377" width="22" height="18" fill="#102030" stroke="#4A8CC9" rx="2"/>
+<text x="191" y="390" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7ABCE8" font-weight="bold">3</text>
+
+<rect x="8" y="416" width="202" height="38" fill="#25201A" stroke="#5A5030" rx="3"/>
+<text x="16" y="431" font-family="sans-serif" font-size="12" fill="#F0E6D3" font-weight="bold">影分身</text>
+<text x="16" y="445" font-family="sans-serif" font-size="9" fill="#706850">B类 · 直接生效 · 创造替身</text>
+<rect x="180" y="421" width="22" height="18" fill="#102030" stroke="#4A8CC9" rx="2"/>
+<text x="191" y="434" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7ABCE8" font-weight="bold">1</text>
+
+<!-- Terrain + range info -->
+<rect x="8" y="462" width="202" height="30" fill="#182A18" stroke="#3A6030" rx="3"/>
+<text x="14" y="477" font-family="sans-serif" font-size="11" fill="#8A8494">地形: </text>
+<text x="54" y="477" font-family="sans-serif" font-size="11" fill="#7ABC50" font-weight="bold">要塞</text>
+<text x="100" y="477" font-family="sans-serif" font-size="10" fill="#5A9C40">驻守受伤减半</text>
+<rect x="8" y="498" width="202" height="28" fill="#2A1A1E" stroke="#5A3040" rx="3"/>
+<text x="14" y="513" font-family="sans-serif" font-size="11" fill="#8A8494">攻击距离: </text>
+<text x="92" y="513" font-family="sans-serif" font-size="11" fill="#F07070" font-weight="bold">2格</text>
+<text x="116" y="513" font-family="sans-serif" font-size="10" fill="#8A5050">(废墟+1)</text>
+
+<!-- Phase hint -->
+<rect x="8" y="534" width="202" height="52" fill="#0A1A28" stroke="#2A5070" rx="4"/>
+<text x="109" y="552" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7ABCE8" font-weight="bold">行动阶段</text>
+<text x="109" y="568" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#4A7090">移动阶段已完成 ✓</text>
+<text x="109" y="581" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#3A5060">从下方三选一</text>
+
+<!-- ── CENTER: HEX MAP ── -->
+<rect x="220" y="50" width="840" height="570" fill="#0D0B16"/>
+<rect x="220" y="50" width="840" height="570" fill="url(#hexbg)"/>
+<rect x="220" y="50" width="840" height="570" fill="none" stroke="#3A2A4C" stroke-width="1"/>
+<text x="640" y="78" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#3A2A50">圣杯战争地图 · 当前缩圈半径: 未激活</text>
+
+<!-- ── Hex tiles (pointy-top, radius≈34) ── -->
+<!-- Grail center -->
+<polygon points="640,306 667,322 667,354 640,370 613,354 613,322" fill="#1A1428" stroke="#C9A84C" stroke-width="2.5"/>
+<text x="640" y="341" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#C9A84C" font-weight="bold">圣杯台座</text>
+
+<!-- Fortress (鸣人 is here) -->
+<polygon points="572,268 599,284 599,316 572,332 545,316 545,284" fill="#241818" stroke="#7A3A3A" stroke-width="2"/>
+<text x="572" y="304" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#9A5050">要塞</text>
+
+<!-- Highland (佐助 is here) -->
+<polygon points="708,268 735,284 735,316 708,332 681,316 681,284" fill="#222018" stroke="#6A6030" stroke-width="1.5"/>
+<text x="708" y="304" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#9A9050">高地</text>
+
+<!-- Forest upper -->
+<polygon points="640,230 667,246 667,278 640,294 613,278 613,246" fill="#182618" stroke="#3A6030" stroke-width="1.5"/>
+<text x="640" y="266" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#5A8A4A">森林</text>
+
+<!-- Mountain left -->
+<polygon points="504,268 531,284 531,316 504,332 477,316 477,284" fill="#222018" stroke="#5A4A30" stroke-width="1.5"/>
+<text x="504" y="304" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#7A6A50">山脉</text>
+
+<!-- Snow right -->
+<polygon points="776,268 803,284 803,316 776,332 749,316 749,284" fill="#1C1C28" stroke="#4A4A6A" stroke-width="1.5"/>
+<text x="776" y="304" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#8A8ABA">雪地</text>
+
+<!-- Desert below grail -->
+<polygon points="640,382 667,398 667,430 640,446 613,430 613,398" fill="#282018" stroke="#7A6040" stroke-width="1.5"/>
+<text x="640" y="418" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#9A7A40">沙漠</text>
+
+<!-- Plain bottom-left (樱) -->
+<polygon points="572,344 599,360 599,392 572,408 545,392 545,360" fill="#161428" stroke="#2A2040" stroke-width="1"/>
+<text x="572" y="380" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#3A2A50">平原</text>
+
+<!-- Plain bottom-right -->
+<polygon points="708,344 735,360 735,392 708,408 681,392 681,360" fill="#161428" stroke="#2A2040" stroke-width="1"/>
+<text x="708" y="380" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#3A2A50">平原</text>
+
+<!-- More plain/void hexes for atmosphere -->
+<polygon points="504,192 531,208 531,240 504,256 477,240 477,208" fill="#0E0C1A" stroke="#2A2040" stroke-width="1"/>
+<polygon points="776,192 803,208 803,240 776,256 749,240 749,208" fill="#0E0C1A" stroke="#2A2040" stroke-width="1"/>
+<polygon points="436,230 463,246 463,278 436,294 409,278 409,246" fill="#0E0C1A" stroke="#2A2040" stroke-width="1"/>
+<polygon points="844,230 871,246 871,278 844,294 817,278 817,246" fill="#0E0C1A" stroke="#2A2040" stroke-width="1"/>
+
+<!-- ── Player tokens ── -->
+<!-- 鸣人 (current player, gold ring) -->
+<circle cx="572" cy="300" r="18" fill="#C9A84C" stroke="#FAC775" stroke-width="3"/>
+<text x="572" y="306" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#12101A" font-weight="bold">鸣</text>
+
+<!-- 佐助 (enemy) -->
+<circle cx="708" cy="300" r="16" fill="#4C5CC8" stroke="#8090F0" stroke-width="2"/>
+<text x="708" y="306" text-anchor="middle" font-family="sans-serif" font-size="14" fill="white" font-weight="bold">佐</text>
+
+<!-- 樱 (enemy) -->
+<circle cx="572" cy="376" r="16" fill="#C84C7A" stroke="#F07090" stroke-width="2"/>
+<text x="572" y="382" text-anchor="middle" font-family="sans-serif" font-size="14" fill="white" font-weight="bold">樱</text>
+
+<!-- Seal 1 marker on mountain -->
+<circle cx="504" cy="290" r="11" fill="#3A1010" stroke="#C84C4C" stroke-width="2"/>
+<text x="504" y="294" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#F07070" font-weight="bold">S1</text>
+
+<!-- Seal 2 marker on snow -->
+<circle cx="776" cy="290" r="11" fill="#101830" stroke="#4A8CC9" stroke-width="2"/>
+<text x="776" y="294" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#7ABCE8" font-weight="bold">S2</text>
+
+<!-- ── Movement range (green dashed) ── -->
+<polygon points="640,230 667,246 667,278 640,294 613,278 613,246" fill="rgba(90,252,154,0.06)" stroke="#5AFC9A" stroke-width="2" stroke-dasharray="5,3"/>
+<polygon points="504,268 531,284 531,316 504,332 477,316 477,284" fill="rgba(90,252,154,0.04)" stroke="#5AFC9A" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+<polygon points="640,382 667,398 667,430 640,446 613,430 613,398" fill="rgba(90,252,154,0.04)" stroke="#5AFC9A" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+<polygon points="708,344 735,360 735,392 708,408 681,392 681,360" fill="rgba(90,252,154,0.04)" stroke="#5AFC9A" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.5"/>
+
+<!-- ── Attack range (red dashed,佐助 in range) ── -->
+<polygon points="708,268 735,284 735,316 708,332 681,316 681,284" fill="rgba(248,80,80,0.08)" stroke="#F07070" stroke-width="2" stroke-dasharray="4,3"/>
+<polygon points="640,306 667,322 667,354 640,370 613,354 613,322" fill="rgba(248,80,80,0.05)" stroke="#F07070" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+<!-- Attack range label -->
+<rect x="672" y="228" width="86" height="22" fill="#3A1010" stroke="#C84C4C" rx="3" opacity="0.9"/>
+<text x="715" y="243" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#F07070">攻击范围内 !</text>
+<line x1="715" y1="250" x2="708" y2="268" stroke="#F07070" stroke-width="1.2" stroke-dasharray="3,2"/>
+
+<!-- Map legend strip -->
+<rect x="220" y="608" width="840" height="12" fill="#12101A"/>
+<circle cx="255" cy="614" r="5" fill="#C9A84C" stroke="#FAC775" stroke-width="1"/>
+<text x="265" y="618" font-family="sans-serif" font-size="10" fill="#8A8494">当前玩家</text>
+<circle cx="325" cy="614" r="5" fill="#4C5CC8"/>
+<text x="335" y="618" font-family="sans-serif" font-size="10" fill="#8A8494">其他玩家</text>
+<line x1="400" y1="614" x2="418" y2="614" stroke="#5AFC9A" stroke-width="2" stroke-dasharray="4,2"/>
+<text x="426" y="618" font-family="sans-serif" font-size="10" fill="#8A8494">可移动范围</text>
+<line x1="510" y1="614" x2="528" y2="614" stroke="#F07070" stroke-width="2" stroke-dasharray="4,2"/>
+<text x="536" y="618" font-family="sans-serif" font-size="10" fill="#8A8494">攻击范围</text>
+<circle cx="625" cy="614" r="7" fill="#3A1010" stroke="#C84C4C" stroke-width="1.5"/>
+<text x="625" y="618" text-anchor="middle" font-family="sans-serif" font-size="8" fill="#F07070">S1</text>
+<text x="638" y="618" font-family="sans-serif" font-size="10" fill="#8A8494">封印位置</text>
+
+<!-- ── BOTTOM ACTION BAR ── -->
+<rect x="220" y="620" width="840" height="100" fill="#181228" stroke="#4A3A5C" stroke-width="1"/>
+<text x="640" y="640" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#4A3A5C">── 行动阶段 · 三选一 ──</text>
+
+<!-- Attack button -->
+<rect x="248" y="646" width="240" height="64" fill="#280E0E" stroke="#C84C4C" stroke-width="2" rx="5"/>
+<text x="368" y="672" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#F07070" font-weight="bold">⚔  攻击</text>
+<text x="368" y="690" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7A4A4A">消耗1气 · 发起猜拳</text>
+<text x="368" y="704" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#5A3A3A">命中后选择并释放技能</text>
+
+<!-- Charge button -->
+<rect x="520" y="646" width="240" height="64" fill="#08182A" stroke="#4A8CC9" stroke-width="2" rx="5"/>
+<text x="640" y="672" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#7ABCE8" font-weight="bold">✦  聚气</text>
+<text x="640" y="690" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#4A7090">+ 1气，本回合不可攻击</text>
+<text x="640" y="704" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3A5060">与攻击行动互斥</text>
+
+<!-- Skip button -->
+<rect x="792" y="646" width="240" height="64" fill="#14111E" stroke="#3A2A4C" stroke-width="1" rx="5"/>
+<text x="912" y="672" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#5A5070" font-weight="bold">─  跳过</text>
+<text x="912" y="690" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#3A3050">不行动，结束本回合</text>
+
+<!-- ── RIGHT PANEL (other players + seals) ── -->
+<rect x="1060" y="50" width="220" height="670" fill="#1A1425" stroke="#4A3A5C" stroke-width="1"/>
+<text x="1170" y="74" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#C9A84C" font-weight="bold">其他玩家</text>
+
+<!-- 佐助 card -->
+<rect x="1067" y="82" width="205" height="80" fill="#1C1830" stroke="#4A3A5C" rx="3"/>
+<rect x="1072" y="90" width="54" height="54" fill="#16122A" stroke="#3A2A50" rx="2"/>
+<text x="1099" y="124" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#4C5CC8">佐</text>
+<text x="1145" y="100" font-family="sans-serif" font-size="12" fill="#F0E6D3" font-weight="bold">宇智波佐助</text>
+<text x="1145" y="114" font-family="sans-serif" font-size="10" fill="#8A8494">法师 · 高地</text>
+<rect x="1145" y="120" width="118" height="10" fill="#2A1030" rx="2"/>
+<rect x="1145" y="120" width="98" height="10" fill="#C84C4C" rx="2"/>
+<text x="1204" y="129" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#F0E6D3">HP 5/6</text>
+<circle cx="1148" cy="148" r="6" fill="#4A8CC9"/>
+<circle cx="1161" cy="148" r="6" fill="#4A8CC9"/>
+<circle cx="1174" cy="148" r="6" fill="#4A8CC9"/>
+<circle cx="1187" cy="148" r="6" fill="#4A8CC9"/>
+<circle cx="1200" cy="148" r="6" fill="#2A1F40" stroke="#3A2A50" stroke-width="1"/>
+<text x="1216" y="152" font-family="sans-serif" font-size="11" fill="#7ABCE8">4气</text>
+
+<!-- 樱 card -->
+<rect x="1067" y="168" width="205" height="80" fill="#1C1830" stroke="#4A3A5C" rx="3"/>
+<rect x="1072" y="176" width="54" height="54" fill="#16122A" stroke="#3A2A50" rx="2"/>
+<text x="1099" y="210" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#C84C7A">樱</text>
+<text x="1145" y="186" font-family="sans-serif" font-size="12" fill="#F0E6D3" font-weight="bold">春野樱</text>
+<text x="1145" y="200" font-family="sans-serif" font-size="10" fill="#8A8494">坦克 · 森林(隐藏)</text>
+<rect x="1145" y="206" width="118" height="10" fill="#2A1030" rx="2"/>
+<rect x="1145" y="206" width="118" height="10" fill="#C84C4C" rx="2"/>
+<text x="1204" y="215" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#F0E6D3">HP 8/8</text>
+<circle cx="1148" cy="234" r="6" fill="#4A8CC9"/>
+<circle cx="1161" cy="234" r="6" fill="#4A8CC9"/>
+<circle cx="1174" cy="234" r="6" fill="#2A1F40" stroke="#3A2A50" stroke-width="1"/>
+<circle cx="1187" cy="234" r="6" fill="#2A1F40" stroke="#3A2A50" stroke-width="1"/>
+<text x="1203" y="238" font-family="sans-serif" font-size="11" fill="#7ABCE8">2气</text>
+
+<!-- Divider -->
+<line x1="1067" y1="258" x2="1272" y2="258" stroke="#4A3A5C" stroke-width="1"/>
+<text x="1170" y="276" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#C9A84C" font-weight="bold">封印状态</text>
+
+<!-- Seal 1: 野怪 -->
+<text x="1072" y="298" font-family="sans-serif" font-size="11" fill="#F0E6D3">封印1 · 野怪</text>
+<rect x="1072" y="304" width="188" height="10" fill="#2A1030" rx="2"/>
+<rect x="1072" y="304" width="113" height="10" fill="#C84C4C" rx="2"/>
+<text x="1170" y="313" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#F0E6D3">HP  12 / 20</text>
+<text x="1072" y="328" font-family="sans-serif" font-size="9" fill="#8A8494">最多伤害: 鸣人 (3pt) → 单体目标</text>
+
+<!-- Seal 2: 祭坛 -->
+<text x="1072" y="350" font-family="sans-serif" font-size="11" fill="#F0E6D3">封印2 · 祭坛</text>
+<text x="1072" y="365" font-family="sans-serif" font-size="10" fill="#8A8494">佐助</text>
+<rect x="1096" y="358" width="100" height="8" fill="#2A1530" rx="2"/>
+<rect x="1096" y="358" width="67" height="8" fill="#4A8CC9" rx="2"/>
+<text x="1204" y="366" font-family="sans-serif" font-size="9" fill="#7ABCE8">2/3</text>
+<text x="1072" y="380" font-family="sans-serif" font-size="10" fill="#8A8494">鸣人</text>
+<rect x="1096" y="373" width="100" height="8" fill="#2A1530" rx="2"/>
+<rect x="1096" y="373" width="33" height="8" fill="#4A8CC9" rx="2"/>
+<text x="1204" y="381" font-family="sans-serif" font-size="9" fill="#7ABCE8">1/3</text>
+<text x="1072" y="395" font-family="sans-serif" font-size="10" fill="#8A8494">樱</text>
+<rect x="1096" y="388" width="100" height="8" fill="#2A1530" rx="2"/>
+<text x="1204" y="396" font-family="sans-serif" font-size="9" fill="#5A5070">0/3</text>
+
+<!-- Seal 3: 废墟 (UNLOCKED) -->
+<rect x="1067" y="404" width="205" height="30" fill="#0E1C0E" stroke="#2A6A2A" rx="3"/>
+<text x="1072" y="418" font-family="sans-serif" font-size="11" fill="#5AFC9A" font-weight="bold">封印3 · 废墟  ✓ 已解封</text>
+<text x="1072" y="430" font-family="sans-serif" font-size="9" fill="#3AC47A">奖励：拾取者攻击距离永久+1</text>
+
+<!-- Divider -->
+<line x1="1067" y1="442" x2="1272" y2="442" stroke="#4A3A5C" stroke-width="1"/>
+<text x="1170" y="460" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#C9A84C" font-weight="bold">圣杯台座</text>
+
+<!-- Grail status -->
+<rect x="1067" y="466" width="205" height="50" fill="#1A1410" stroke="#6A5020" rx="3"/>
+<text x="1170" y="486" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#8A7050">未开启</text>
+<text x="1170" y="502" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#6A5840">需再解除 1 个封印</text>
+
+<!-- Shrink ring -->
+<line x1="1067" y1="524" x2="1272" y2="524" stroke="#4A3A5C" stroke-width="1"/>
+<text x="1170" y="542" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#8A8494">缩圈 · 未激活</text>
+<text x="1170" y="557" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#5A5464">圣杯开启后激活</text>
+<text x="1170" y="570" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#5A5464">每3回合收缩1格</text>
+</svg>

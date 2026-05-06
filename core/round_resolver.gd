@@ -1,6 +1,10 @@
+## 回合结算器 — 纯静态工具类，无状态，所有方法均为静态函数
+## 负责手势胜负判定和技能效果执行，可复用于网络对战等场景
 class_name RoundResolver
 
-# 猜拳结算：过滤 SKIP 玩家，返回 { winners, losers, is_draw }
+## 猜拳结算：过滤 SKIP 玩家，按石头剪刀布规则判定胜负
+## 特殊规则：仅1人出有效手势 → 直接胜出；全部跳过 → all_skipped 标记
+## 返回 {winners: Array[int], losers: Array[int], is_draw: bool, [all_skipped]: bool}
 static func resolve_gestures(gestures: Dictionary) -> Dictionary:
 	var result: Dictionary = { "winners": [], "losers": [], "is_draw": false }
 
@@ -49,7 +53,7 @@ static func resolve_gestures(gestures: Dictionary) -> Dictionary:
 
 	return result
 
-# 技能可用性校验（含距离检查）
+## 技能可用性校验：检查能量是否足够 且 目标在技能射程内
 static func can_use_skill(
 	attacker: PlayerState,
 	skill: SkillData,
@@ -61,8 +65,8 @@ static func can_use_skill(
 	var dist := distance_system.get_distance(attacker.player_id, target.player_id)
 	return dist >= skill.min_range and dist <= skill.max_range
 
-# 执行技能所有效果，返回效果日志
-# splash_targets：ENEMY_SPLASH 目标，由 GameManager 按距离预先计算后传入
+## 执行技能的所有效果，返回效果结算日志数组
+## splash_targets 由 GameManager 按 splash_range 预计算后传入，避免重复计算
 static func apply_effects(
 	attacker: PlayerState,
 	skill: SkillData,
@@ -112,6 +116,7 @@ static func apply_effects(
 
 	return logs
 
+## 应用单个技能效果到目标，处理伤害吸收链：影分身 → 无限盾 → 数值盾 → HP
 static func _apply_single_effect(
 	effect: SkillEffect,
 	attacker: PlayerState,
