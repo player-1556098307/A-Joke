@@ -40,13 +40,19 @@ func _ready() -> void:
 		$GameUI.is_spectating = true
 
 func _init_network_mode(is_host: bool) -> void:
-	# 客户端才需要 NetworkGameClient；主机直接用 GameManager
+	# 权威服务器模型中所有客户端都是 is_host=false，此分支保留以兼容旧逻辑
 	if is_host:
 		return
 
+	var config = SceneManager.last_game_config
+	var room_code: String = config.get("room_code", "")
+
 	_net_client = NetworkGameClient.new()
-	_net_client.name = "CurrentGameHost"
-	NetworkManager.add_child(_net_client)
+	# 节点名与服务器端 NetworkGameHost 保持一致，保证 RPC 路径匹配
+	# 服务器：/root/RoomManager/Room_XXXXXX  客户端：/root/RoomManager/Room_XXXXXX
+	_net_client.name = "Room_" + room_code if room_code != "" else "CurrentGameHost"
+	RoomManager.add_child(_net_client)
+
 	$GameUI.net_client = _net_client
 	_net_client.phase_changed.connect($GameUI._on_phase_changed)
 	_net_client.gesture_decided.connect($GameUI._mark_decided)
@@ -56,8 +62,6 @@ func _init_network_mode(is_host: bool) -> void:
 	_net_client.state_hash_received.connect($GameUI._on_state_hash_received)
 	_net_client.game_over_received.connect($GameUI._on_game_over_result)
 
-	# my_player_id 由 room.gd 通过 rpc_room_game_starting 传入
-	var config = SceneManager.last_game_config
 	if config.has("my_player_id"):
 		_net_client.my_player_id = config["my_player_id"]
 

@@ -504,6 +504,8 @@ func _end_round() -> void:
 	for player in _players:
 		if player.paralyze_turns > 0 and player.current_gesture == PlayerState.Gesture.SKIP:
 			player.paralyze_turns -= 1
+			if player.paralyze_turns == 0:
+				player_paralyzed.emit(player.player_id, 0)
 		player.reset_round_data()
 	_enter_phase(GamePhase.GESTURE_INPUT)
 

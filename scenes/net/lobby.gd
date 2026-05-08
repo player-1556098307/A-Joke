@@ -245,10 +245,12 @@ func _on_join_room(data: Dictionary) -> void:
 	if NetworkManager._session != null:
 		player_name = NetworkManager._session.username
 	SceneManager.last_game_config = {
-		"mode": data.get("mode","ffa"), "max_players": data.get("max_players",8),
-		"team_size": data.get("team_size",0), "is_network": true, "is_host": false,
-		"player_name": player_name, "host_ip": data.get("host_ip","8.130.49.62"),
-		"port": data.get("port",7777),
+		"mode":        data.get("mode", "ffa"),
+		"max_players": data.get("max_players", 8),
+		"is_network":  true,
+		"is_host":     false,
+		"player_name": player_name,
+		"room_code":   data.get("room_code", ""),
 	}
 	SceneManager.go_to("res://scenes/net/room.tscn")
 

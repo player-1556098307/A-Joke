@@ -1,10 +1,6 @@
-## Room — 房间内页，主机创建/客户端加入/角色选择/准备/开始
+## Room — 纯客户端房间页，通过 RoomManager RPC 与 ECS 权威服务器交互
 extends Control
 
-## 游戏模式定义表：key = 模式 ID，value = 配置字典
-## min_players: 开始所需最少玩家数（含 AI）
-## max_players: 房间上限人数
-## team_count:  队伍数（0 = 自由混战，无队伍）
 const GAME_MODES := {
 	"ffa": {"label": "自由对战", "min_players": 2, "max_players": 4, "team_count": 0},
 	"2v2": {"label": "2v2 团队", "min_players": 4, "max_players": 4, "team_count": 2},
@@ -31,19 +27,18 @@ const C_BLUE_BG      := Color("#eef4fb")
 const C_BLUE_TEXT    := Color("#2a6ab0")
 
 # ── State ──
-var is_host: bool = false
-var is_spectator: bool = false
 var mode: String = ""
 var max_players: int = 8
 var team_size: int = 0
 var room_code: String = ""
 
+var _is_host: bool = false     # derived from server sync
+var _host_peer_id: int = 0     # from server sync
 var _my_name: String = ""
 var _my_char: String = ""
 var _my_ready: bool = false
 var _slots: Array[Dictionary] = []
 var _selected_char_id: String = ""
-var _create_btn: Button
 var _card_nodes: Array = []
 
 # ── UI refs (from room.tscn) ──
@@ -77,17 +72,45 @@ func _ready() -> void:
 	var mode_cfg: Dictionary = GAME_MODES.get(mode, GAME_MODES["ffa"])
 	max_players = config.get("max_players", mode_cfg["max_players"])
 	team_size = mode_cfg["team_count"]
-	is_host = config.get("is_host", false)
 	var _name_from_config: String = config.get("player_name", "")
 	_my_name = _name_from_config if _name_from_config != "" else _default_name()
 
 	_nickname_input.text = _my_name
 	_connect_signals()
 
-	if is_host:
-		_setup_host()
+	# 隐藏所有操作按钮，等待服务器 sync
+	_start_btn.visible = false
+	_ready_btn.visible = false
+	_btn_add_ai.visible = false
+	_btn_spectate.visible = false
+	_status_label.text = "正在连接服务器..."
+
+	_build_character_grid()
+
+	# 连接 RoomManager 信号
+	RoomManager.lobby_sync_received.connect(_on_lobby_sync)
+	RoomManager.game_starting.connect(_on_game_starting)
+	RoomManager.join_failed.connect(_on_join_failed)
+	RoomManager.chat_received.connect(_on_chat_received)
+
+	# 连接到 ECS 游戏服务器
+	if NetworkManager.is_connected_to_game:
+		_on_server_connected()
 	else:
-		_auto_connect_or_show_entry()
+		NetworkManager.connected_to_game_server.connect(_on_server_connected, CONNECT_ONE_SHOT)
+		NetworkManager.disconnected_from_game_server.connect(_on_server_disconnected, CONNECT_ONE_SHOT)
+		NetworkManager.connect_to_game_server(NetworkManager.GAME_SERVER_IP, NetworkManager.GAME_SERVER_PORT, "")
+
+func _exit_tree() -> void:
+	# 显式断开 RoomManager 信号，防止场景切换后残留无效回调
+	if RoomManager.lobby_sync_received.is_connected(_on_lobby_sync):
+		RoomManager.lobby_sync_received.disconnect(_on_lobby_sync)
+	if RoomManager.game_starting.is_connected(_on_game_starting):
+		RoomManager.game_starting.disconnect(_on_game_starting)
+	if RoomManager.join_failed.is_connected(_on_join_failed):
+		RoomManager.join_failed.disconnect(_on_join_failed)
+	if RoomManager.chat_received.is_connected(_on_chat_received):
+		RoomManager.chat_received.disconnect(_on_chat_received)
 
 # ─────────────────────────────────────────────────────────────
 # Signals
@@ -109,8 +132,6 @@ func _connect_signals() -> void:
 		if w > 0:
 			_char_grid.columns = max(3, int(w / 84))
 	)
-	multiplayer.peer_connected.connect(_on_peer_connected)
-	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 # ─────────────────────────────────────────────────────────────
 # Helpers
@@ -195,7 +216,6 @@ func _make_character_card(data: Dictionary) -> Control:
 	inner.add_theme_constant_override("separation", 0)
 	card.add_child(inner)
 
-	# Top accent strip
 	var accent := ColorRect.new()
 	accent.name = "TopAccent"
 	accent.color = C_BORDER
@@ -203,7 +223,6 @@ func _make_character_card(data: Dictionary) -> Control:
 	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inner.add_child(accent)
 
-	# Avatar area — Panel（非 Container）支持绝对定位子节点
 	var av := Panel.new()
 	av.name = "AvatarRect"
 	av.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -211,7 +230,6 @@ func _make_character_card(data: Dictionary) -> Control:
 	av.add_theme_stylebox_override("panel", _make_flat(bg_color, Color(color, 0.25), 0, 2))
 	inner.add_child(av)
 
-	# 加载 CharacterData 头像贴图
 	var res_path: String = data.get("res_path", "")
 	var char_res: CharacterData = null
 	if res_path != "":
@@ -236,7 +254,6 @@ func _make_character_card(data: Dictionary) -> Control:
 		avl.anchor_right = 1.0; avl.anchor_bottom = 1.0
 		av.add_child(avl)
 
-	# 职业徽章：覆盖在头像底部（14px 半透明色条）
 	var role: String = data.get("role", "")
 	if role != "":
 		var role_bg := ColorRect.new()
@@ -256,7 +273,6 @@ func _make_character_card(data: Dictionary) -> Control:
 		role_lbl.anchor_right = 1.0; role_lbl.anchor_bottom = 1.0
 		role_bg.add_child(role_lbl)
 
-	# Name bar (colored bg strip at card bottom)
 	var nbar := ColorRect.new()
 	nbar.name = "NameBar"
 	nbar.color = color
@@ -307,16 +323,11 @@ func _on_char_selected(char_id: String) -> void:
 		card.add_theme_stylebox_override("panel", s)
 		card.get_node("Inner/TopAccent").color = color if selected else C_BORDER
 
-	# Toggle to detail view
 	_char_grid_scroll.visible = false
 	_detail_panel.visible = true
 	_update_detail_panel(char_id)
 
-	if is_host:
-		_set_my_slot_char(char_id)
-		_sync_all_slots()
-	else:
-		rpc_id(1, "rpc_request_select_character", char_id)
+	RoomManager.rpc_id(1, "select_character", char_id)
 
 func _on_back_to_grid() -> void:
 	_char_grid_scroll.visible = true
@@ -336,7 +347,6 @@ func _make_skill_row_detail(skill: SkillData, is_unlocked: bool = false) -> Cont
 	row_s.set_border_width_all(1); row_s.set_corner_radius_all(3)
 	row.add_theme_stylebox_override("panel", row_s)
 
-	# Skill name (top half when description exists, centered otherwise)
 	var name_lbl := Label.new()
 	name_lbl.text = skill.skill_name
 	name_lbl.add_theme_font_size_override("font_size", 10)
@@ -352,7 +362,6 @@ func _make_skill_row_detail(skill: SkillData, is_unlocked: bool = false) -> Cont
 		name_lbl.offset_left = 8.0; name_lbl.offset_right = -80.0
 	row.add_child(name_lbl)
 
-	# Description (bottom half, only when non-empty)
 	if has_desc:
 		var desc_lbl := Label.new()
 		desc_lbl.text = skill.description
@@ -365,7 +374,6 @@ func _make_skill_row_detail(skill: SkillData, is_unlocked: bool = false) -> Cont
 		desc_lbl.clip_text = true
 		row.add_child(desc_lbl)
 
-	# Cost badge (right side)
 	var cost_str: String
 	if is_unlocked:
 		cost_str = "解锁技"
@@ -406,13 +414,11 @@ func _update_detail_panel(char_id: String) -> void:
 	dp_s.set_corner_radius_all(5)
 	_detail_panel.add_theme_stylebox_override("panel", dp_s)
 
-	# Load CharacterData (portrait + real skills)
 	var res_path: String = data.get("res_path", "")
 	var char_res: CharacterData = null
 	if res_path != "":
 		char_res = load(res_path) as CharacterData
 
-	# Update avatar panel style and portrait
 	_detail_avatar.add_theme_stylebox_override("panel", _make_flat(bg, color, 1, 4))
 	var portrait_rect := _detail_avatar.get_node_or_null("PortraitRect") as TextureRect
 	if portrait_rect == null:
@@ -438,33 +444,28 @@ func _update_detail_panel(char_id: String) -> void:
 	_detail_role_label.text = "HP%d  ·  %s" % [data.get("hp", 0), data.get("role", "")]
 	_detail_role_label.add_theme_color_override("font_color", C_TEXT_DARK)
 
-	# Rebuild skill rows from CharacterData
 	for child in _skill_vbox.get_children():
 		child.queue_free()
 	var unlocked_skills: Array[SkillData] = []
 	if char_res != null:
 		for skill in char_res.skills:
 			_skill_vbox.add_child(_make_skill_row_detail(skill as SkillData))
-			# Scan for unlockable skills
 			for effect in skill.effects:
 				if effect.effect_type == SkillEffect.EffectType.UNLOCK_SKILL and effect.unlock_skill != null:
 					var us := effect.unlock_skill as SkillData
 					if us != null:
 						unlocked_skills.append(us)
 
-	# Show unlocked skills section with header
 	if unlocked_skills.size() > 0:
 		var sep := HSeparator.new()
 		sep.custom_minimum_size = Vector2(0, 1)
 		_skill_vbox.add_child(sep)
-
 		var uc_hdr := Label.new()
 		uc_hdr.text = "解锁技能"
 		uc_hdr.add_theme_color_override("font_color", C_BLUE_TEXT)
 		uc_hdr.add_theme_font_size_override("font_size", 10)
 		uc_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_skill_vbox.add_child(uc_hdr)
-
 		for us in unlocked_skills:
 			_skill_vbox.add_child(_make_skill_row_detail(us, true))
 
@@ -482,9 +483,10 @@ func _update_slot_display() -> void:
 	if _player_count_label:
 		_player_count_label.text = "%d / %d 人" % [_slots.size(), max_players]
 
-	_btn_add_ai.visible = is_host and _slots.size() < max_players
-	if is_host:
-		_start_btn.disabled = _slots.size() < 2
+	_btn_add_ai.visible = _is_host and _slots.size() < max_players
+	if _is_host:
+		var min_needed: int = (GAME_MODES.get(mode, GAME_MODES["ffa"]) as Dictionary)["min_players"]
+		_start_btn.disabled = _slots.size() < min_needed
 
 func _make_slot_card(idx: int) -> Control:
 	var is_occupied := idx < _slots.size()
@@ -496,7 +498,8 @@ func _make_slot_card(idx: int) -> Control:
 
 	if is_occupied:
 		var is_ready: bool = slot.get("is_ready", false)
-		var slot_color: Color = C_GREEN_BORDER if is_ready else (C_GOLD if idx == 0 else C_BLUE_TEXT)
+		var is_host_slot: bool = slot.get("peer_id", 0) == _host_peer_id
+		var slot_color: Color = C_GREEN_BORDER if is_ready else (C_GOLD if is_host_slot else C_BLUE_TEXT)
 		var slot_bg: Color = C_GREEN_BG if is_ready else C_WHITE
 		var s := StyleBoxFlat.new()
 		s.bg_color = slot_bg
@@ -523,14 +526,12 @@ func _make_slot_card(idx: int) -> Control:
 		var av_color: Color = Color(char_data.get("color", "#c8860a")) if not char_data.is_empty() else C_GOLD
 		var av_bg: Color = Color(char_data.get("bg_color", "#fdf6e8")) if not char_data.is_empty() else C_GOLD_BG
 
-		# Avatar box — Panel for absolute child positioning
 		var av := Panel.new()
 		av.custom_minimum_size = Vector2(36, 36)
 		av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		av.add_theme_stylebox_override("panel", _make_flat(av_bg, Color(av_color, 0.25), 0, 2))
 		row.add_child(av)
 
-		# Load CharacterData for portrait
 		var res_path: String = char_data.get("res_path", "")
 		var char_res: CharacterData = null
 		if res_path != "":
@@ -555,7 +556,6 @@ func _make_slot_card(idx: int) -> Control:
 			avl.anchor_right = 1.0; avl.anchor_bottom = 1.0
 			av.add_child(avl)
 
-		# Class badge overlay (bottom strip)
 		var role: String = char_data.get("role", "")
 		if role != "":
 			var role_bg := ColorRect.new()
@@ -575,7 +575,6 @@ func _make_slot_card(idx: int) -> Control:
 			role_lbl.anchor_right = 1.0; role_lbl.anchor_bottom = 1.0
 			role_bg.add_child(role_lbl)
 
-		# Info column
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -583,7 +582,6 @@ func _make_slot_card(idx: int) -> Control:
 		info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(info)
 
-		# Name + badges row
 		var name_row := HBoxContainer.new()
 		name_row.add_theme_constant_override("separation", 4)
 		name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -596,12 +594,11 @@ func _make_slot_card(idx: int) -> Control:
 		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		name_row.add_child(name_lbl)
 
-		if idx == 0:
+		if slot.get("peer_id", 0) == _host_peer_id:
 			name_row.add_child(_make_badge("房主", C_GOLD_BG, C_GOLD, C_GOLD))
 		if slot.get("is_ai", false):
 			name_row.add_child(_make_badge("AI", C_BLUE_BG, C_BLUE_TEXT, C_BLUE_TEXT))
 
-		# Character / role
 		if not char_data.is_empty():
 			var ch_lbl := Label.new()
 			ch_lbl.text = "%s · %s" % [char_data.get("name", ""), char_data.get("role", "")]
@@ -610,7 +607,6 @@ func _make_slot_card(idx: int) -> Control:
 			ch_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			info.add_child(ch_lbl)
 
-		# Ready / waiting badge on right
 		var badge: Control
 		if slot.get("is_ready", false):
 			badge = _make_badge("✓ 已准备", C_GREEN_BG, C_GREEN_BORDER, C_GREEN_TEXT)
@@ -618,7 +614,6 @@ func _make_slot_card(idx: int) -> Control:
 			badge = _make_badge("… 等待中", Color("#fdf0f0"), Color("#d4a0a0"), C_TEXT_MID)
 		row.add_child(badge)
 	else:
-		# Empty slot: centered placeholder text
 		var sp1 := Control.new()
 		sp1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sp1.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -659,14 +654,7 @@ func _on_send_chat() -> void:
 	_chat_input.text = ""
 	var my_name := _my_name if _my_name != "" else "我"
 	_add_chat_line(my_name + "：" + msg, C_TEXT_DARK)
-
-	if is_host:
-		for slot in _slots:
-			var peer_id = slot.get("peer_id", -1)
-			if peer_id > 1:
-				rpc_id(peer_id, "rpc_chat_message", my_name, msg)
-	else:
-		rpc_id(1, "rpc_chat_message", my_name, msg)
+	RoomManager.rpc_id(1, "send_chat", my_name, msg)
 
 func _add_chat_line(text: String, color: Color) -> void:
 	var lbl := Label.new()
@@ -680,460 +668,114 @@ func _add_chat_line(text: String, color: Color) -> void:
 	if vbar:
 		_chat_scroll.scroll_vertical = vbar.max_value
 
-@rpc("any_peer", "reliable")
-func rpc_chat_message(sender_name: String, message: String) -> void:
-	_add_chat_line(sender_name + "：" + message, C_TEXT_DARK)
-	if is_host:
-		var sender_id = multiplayer.get_remote_sender_id()
-		for slot in _slots:
-			var peer_id = slot.get("peer_id", -1)
-			if peer_id > 1 and peer_id != sender_id:
-				rpc_id(peer_id, "rpc_chat_message", sender_name, message)
-
 # ─────────────────────────────────────────────────────────────
-# Name
+# 服务器连接
 # ─────────────────────────────────────────────────────────────
 
-func _on_name_changed(new_name: String) -> void:
-	_my_name = new_name.strip_edges()
-	if _my_name == "":
-		_my_name = _default_name()
-	if is_host:
-		if _slots.size() > 0:
-			_slots[0]["player_name"] = _my_name
-		_sync_all_slots()
+func _on_server_connected() -> void:
+	var config = SceneManager.last_game_config
+	var creating: bool = config.get("is_host", false)
+	_status_label.text = "已连接，正在%s..." % ("创建房间" if creating else "加入房间")
+
+	if creating:
+		RoomManager.rpc_id(1, "create_room", {
+			"mode":        mode,
+			"max_players": max_players,
+			"player_name": _my_name,
+		})
 	else:
-		rpc_id(1, "rpc_request_set_name", _my_name)
-
-# ─────────────────────────────────────────────────────────────
-# Host Setup
-# ─────────────────────────────────────────────────────────────
-
-func _setup_host() -> void:
-	_status_label.text = "正在启动房间..."
-	_room_title_label.text = "我的房间"
-	_room_id_label.text = ""
-	_room_info_label.text = "模式：%s  |  最大玩家：%d" % [mode, max_players]
-
-	_btn_spectate.visible = false
-	_ready_btn.visible = false
-	_btn_add_ai.visible = true
-	_start_btn.visible = true
-
-	var err = NetworkManager.start_game_server()
-	if err != OK:
-		_status_label.text = "启动房间失败！端口被占用"
-		return
-
-	var ip = NetworkManager.get_local_ip()
-	room_code = _gen_code()
-	_room_id_label.text = "RM-%s" % room_code
-	_room_info_label.text = "模式：%s  |  最大玩家：%d  |  IP：%s:7777  |  房间码：%s" % [mode, max_players, ip, room_code]
-
-	_add_slot(1, _my_name)
-	_status_label.text = "等待其他玩家加入..."
-	_update_slot_display()
-	_build_character_grid()
-
-	if not NetworkManager.is_authenticated():
-		await NetworkManager.login_device()
-	await NetworkManager.publish_room(room_code, {
-		"host_ip": ip,
-		"port": 7777,
-		"mode": mode,
-		"name": "我的房间",
-		"player_count": 1,
-		"max_players": max_players,
-		"room_code": room_code,
-		"status": "waiting",
-	})
-
-func _add_slot(peer_id: int, player_name: String) -> void:
-	_slots.append({
-		"peer_id": peer_id,
-		"player_name": player_name,
-		"character": "",
-		"is_ready": false,
-		"is_ai": false,
-	})
-
-func _set_my_slot_char(char_id: String) -> void:
-	if _slots.size() > 0:
-		_slots[0]["character"] = char_id
-
-# ─────────────────────────────────────────────────────────────
-# Client Setup
-# ─────────────────────────────────────────────────────────────
-
-func _auto_connect_or_show_entry() -> void:
-	var host_ip: String = SceneManager.last_game_config.get("host_ip", "")
-	if host_ip != "":
-		_status_label.text = "正在连接 %s..." % host_ip
-		_btn_spectate.visible = true
-		_ready_btn.visible = true
-		_start_btn.visible = false
-		_btn_add_ai.visible = false
-		NetworkManager.connect_to_game_server(host_ip, 7777, "")
-		await NetworkManager.connected_to_game_server
-		_connected_to_host()
-	else:
-		_setup_client()
-
-func _setup_client() -> void:
-	_status_label.text = "输入房主 IP 地址加入房间"
-	_room_title_label.text = "加入房间"
-	_room_id_label.text = ""
-	_room_info_label.text = ""
-
-	_start_btn.visible = false
-	_btn_add_ai.visible = false
-	_ready_btn.visible = false
-	_btn_spectate.visible = false
-
-	var join_panel := PanelContainer.new()
-	join_panel.name = "JoinPanel"
-	join_panel.anchor_left = 0.5; join_panel.anchor_right = 0.5
-	join_panel.anchor_top = 0.5; join_panel.anchor_bottom = 0.5
-	join_panel.offset_left = -300; join_panel.offset_top = -70
-	join_panel.offset_right = 300; join_panel.offset_bottom = 70
-	join_panel.add_theme_stylebox_override("panel", _make_flat(C_WHITE, C_BORDER, 1, 6))
-	add_child(join_panel)
-
-	var jv := VBoxContainer.new()
-	jv.add_theme_constant_override("separation", 10)
-	jv.anchor_right = 1.0; jv.anchor_bottom = 1.0
-	jv.offset_left = 20; jv.offset_top = 16
-	jv.offset_right = -20; jv.offset_bottom = -16
-	join_panel.add_child(jv)
-
-	var jl := Label.new()
-	jl.text = "加入房间"
-	jl.add_theme_color_override("font_color", C_TEXT_DARK)
-	jl.add_theme_font_size_override("font_size", 16)
-	jl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	jv.add_child(jl)
-
-	var ip_row := HBoxContainer.new()
-	ip_row.add_theme_constant_override("separation", 8)
-	jv.add_child(ip_row)
-
-	var ip_input := LineEdit.new()
-	ip_input.name = "IpInput"
-	ip_input.placeholder_text = "输入主机 IP 地址..."
-	ip_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ip_input.add_theme_font_size_override("font_size", 13)
-	ip_row.add_child(ip_input)
-
-	var connect_btn := Button.new()
-	connect_btn.text = "连接"
-	connect_btn.focus_mode = Control.FOCUS_NONE
-	connect_btn.custom_minimum_size = Vector2(80, 0)
-	connect_btn.add_theme_stylebox_override("normal", _make_flat(C_BLUE_BG, C_BLUE_TEXT, 1, 4))
-	connect_btn.add_theme_color_override("font_color", C_BLUE_TEXT)
-	connect_btn.add_theme_font_size_override("font_size", 13)
-	connect_btn.pressed.connect(func():
-		var ip = ip_input.text.strip_edges()
-		if ip == "":
+		var join_code: String = config.get("room_code", "")
+		if join_code == "":
+			_status_label.text = "错误：房间码为空"
 			return
-		_status_label.text = "正在连接 %s..." % ip
-		NetworkManager.connect_to_game_server(ip, 7777, "")
-		await NetworkManager.connected_to_game_server
-		join_panel.queue_free()
-		_connected_to_host()
-	)
-	ip_row.add_child(connect_btn)
-
-	var hint := Label.new()
-	hint.text = "输入房主的 IP 地址后点击连接"
-	hint.add_theme_color_override("font_color", C_TEXT_LIGHT)
-	hint.add_theme_font_size_override("font_size", 10)
-	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	jv.add_child(hint)
-
-	_create_btn = Button.new()
-	_create_btn.name = "BtnCreateRoom"
-	_create_btn.text = "创建房间"
-	_create_btn.focus_mode = Control.FOCUS_NONE
-	_create_btn.anchor_left = 0.5; _create_btn.anchor_right = 0.5
-	_create_btn.anchor_top = 0.5; _create_btn.anchor_bottom = 0.5
-	_create_btn.offset_left = -300; _create_btn.offset_top = 80
-	_create_btn.offset_right = 300; _create_btn.offset_bottom = 140
-	_style_accent_btn(_create_btn, C_GOLD, C_GOLD, C_GOLD_BG)
-	_create_btn.pressed.connect(_on_create_room_pressed)
-	add_child(_create_btn)
-
-func _on_connect_pressed() -> void:
-	pass
-
-func _connected_to_host() -> void:
-	_btn_spectate.visible = true
-	_ready_btn.visible = true
-	_status_label.text = "已连接！选择角色并准备"
-	_build_character_grid()
-	rpc_id(1, "rpc_request_set_name", _my_name)
-
-func _on_create_room_pressed() -> void:
-	is_host = true
-	for child in get_children():
-		if child.name == "JoinPanel" or child.name == "BtnCreateRoom":
-			child.queue_free()
-	if _create_btn:
-		_create_btn.queue_free()
-		_create_btn = null
-	_setup_host()
+		RoomManager.rpc_id(1, "join_room", join_code, _my_name)
 
 # ─────────────────────────────────────────────────────────────
-# Host Peer Management
+# RoomManager 信号处理
 # ─────────────────────────────────────────────────────────────
 
-func _on_peer_connected(peer_id: int) -> void:
-	if not is_host:
-		return
-	if _slots.size() >= max_players:
-		rpc_id(peer_id, "rpc_room_full")
-		return
-	_add_slot(peer_id, "")
-	_status_label.text = "玩家加入 (%d/%d)" % [_slots.size(), max_players]
-	_update_slot_display()
+func _on_lobby_sync(data: Dictionary) -> void:
+	room_code    = data.get("room_code", "")
+	mode         = data.get("mode", "ffa")
+	max_players  = data.get("max_players", 4)
+	_host_peer_id = data.get("host_peer_id", 0)
+	_is_host     = (_host_peer_id == multiplayer.get_unique_id())
 
-func _on_peer_disconnected(peer_id: int) -> void:
-	if not is_host:
-		return
-	for i in range(_slots.size()):
-		if _slots[i]["peer_id"] == peer_id:
-			_slots.remove_at(i)
-			break
-	_sync_all_slots()
-	_status_label.text = "玩家离开 (%d/%d)" % [_slots.size(), max_players]
-	_update_slot_display()
-
-# ─────────────────────────────────────────────────────────────
-# Host RPC Receivers
-# ─────────────────────────────────────────────────────────────
-
-@rpc("any_peer", "reliable")
-func rpc_request_set_name(name: String) -> void:
-	if not is_host:
-		return
-	var peer_id = multiplayer.get_remote_sender_id()
-	for slot in _slots:
-		if slot["peer_id"] == peer_id:
-			slot["player_name"] = name
-			break
-	_update_slot_display()
-	_sync_all_slots()
-
-@rpc("any_peer", "reliable")
-func rpc_request_select_character(char_id: String) -> void:
-	if not is_host:
-		return
-	var peer_id = multiplayer.get_remote_sender_id()
-	for slot in _slots:
-		if slot["peer_id"] == peer_id:
-			slot["character"] = char_id
-			break
-	_sync_all_slots()
-
-@rpc("any_peer", "reliable")
-func rpc_request_toggle_ready() -> void:
-	if not is_host:
-		return
-	var peer_id = multiplayer.get_remote_sender_id()
-	for slot in _slots:
-		if slot["peer_id"] == peer_id:
-			slot["is_ready"] = not slot["is_ready"]
-			break
-	_sync_all_slots()
-
-@rpc("any_peer", "reliable")
-func rpc_request_spectate() -> void:
-	if not is_host:
-		return
-	var peer_id = multiplayer.get_remote_sender_id()
-	rpc_id(peer_id, "rpc_spectate_ack", {"mode": mode, "max_players": max_players})
-
-# ─────────────────────────────────────────────────────────────
-# Client RPC Receivers
-# ─────────────────────────────────────────────────────────────
-
-@rpc("authority", "reliable")
-func rpc_room_sync(data: Dictionary) -> void:
 	_slots.clear()
-	mode = data.get("mode", "ffa")
-	max_players = data.get("max_players", 8)
 	for s in data.get("slots", []):
 		_slots.append(s)
-	var code: String = data.get("room_code", "")
-	if code != "" and _room_id_label != null:
-		room_code = code
-		_room_id_label.text = "RM-%s" % code
-	_update_slot_display()
 
-@rpc("authority", "reliable")
-func rpc_room_game_starting(config: Dictionary) -> void:
+	if _room_id_label:
+		_room_id_label.text = "RM-%s" % room_code if room_code != "" else ""
+	if _room_info_label:
+		_room_info_label.text = "模式：%s  |  最大玩家：%d" % [mode, max_players]
+	if _room_title_label:
+		_room_title_label.text = "游戏房间"
+
+	_start_btn.visible   = _is_host
+	_ready_btn.visible   = not _is_host
+	_btn_add_ai.visible  = _is_host
+	_btn_spectate.visible = false  # 暂不支持观战
+
+	_update_slot_display()
+	_status_label.text = "%d / %d 人就绪" % [_slots.size(), max_players]
+
+func _on_game_starting(config: Dictionary) -> void:
 	SceneManager.last_game_config = config
 	SceneManager.go_to("res://scenes/main.tscn")
 
-@rpc("authority", "reliable")
-func rpc_room_full() -> void:
-	_status_label.text = "房间已满！"
-	NetworkManager.disconnect_from_game()
+func _on_server_disconnected() -> void:
+	_status_label.text = "连接断开，返回大厅..."
+	get_tree().create_timer(2.0).timeout.connect(func():
+		SceneManager.go_to("res://scenes/net/lobby.tscn")
+	, CONNECT_ONE_SHOT)
 
-@rpc("authority", "reliable")
-func rpc_spectate_ack(_info: Dictionary) -> void:
-	pass
+func _on_join_failed(reason: String) -> void:
+	_status_label.text = "加入失败：" + reason
+	get_tree().create_timer(2.0).timeout.connect(func():
+		NetworkManager.disconnect_from_game()
+		SceneManager.go_to("res://scenes/net/lobby.tscn")
+	, CONNECT_ONE_SHOT)
+
+func _on_chat_received(sender_name: String, message: String) -> void:
+	_add_chat_line(sender_name + "：" + message, C_TEXT_DARK)
 
 # ─────────────────────────────────────────────────────────────
-# Button Handlers
+# 按钮处理
 # ─────────────────────────────────────────────────────────────
 
 func _on_ready_pressed() -> void:
 	_my_ready = not _my_ready
-	if _slots.size() > 0:
-		_slots[0]["is_ready"] = _my_ready
 	if _my_ready:
 		_style_btn(_ready_btn, C_GREEN_BORDER, C_GREEN_TEXT)
 		_ready_btn.text = "✓ 已准备"
 	else:
 		_style_btn(_ready_btn, C_GREEN_BORDER, C_TEXT_MID)
 		_ready_btn.text = "准 备"
-	if is_host:
-		_sync_all_slots()
-	else:
-		rpc_id(1, "rpc_request_toggle_ready")
+	RoomManager.rpc_id(1, "toggle_ready")
 
 func _on_spectate_pressed() -> void:
-	is_spectator = true
-	_btn_spectate.visible = false
-	_ready_btn.visible = false
-	_status_label.text = "观战模式 — 等待主机开始游戏"
-	rpc_id(1, "rpc_request_spectate")
+	_status_label.text = "暂不支持观战模式"
 
 func _on_add_ai_pressed() -> void:
-	if not is_host or _slots.size() >= max_players:
+	if not _is_host:
 		return
-	var ai_name = "AI-%d" % (_slots.size() + 1)
-	var ai_char = Characters.LIST[randi() % Characters.LIST.size()]["id"]
-	_slots.append({
-		"peer_id": -(_slots.size() + 10),
-		"player_name": ai_name,
-		"character": ai_char,
-		"is_ready": true,
-		"is_ai": true,
-	})
-	_sync_all_slots()
-	_update_slot_display()
-	_status_label.text = "已添加 %s (%d/%d)" % [ai_name, _slots.size(), max_players]
+	RoomManager.rpc_id(1, "add_ai")
 
 func _on_start_pressed() -> void:
-	if not is_host:
+	if not _is_host:
 		return
-	var min_needed: int = GAME_MODES.get(mode, GAME_MODES["ffa"])["min_players"]
-	if _slots.size() < min_needed:
-		_status_label.text = "模式 [%s] 需要至少 %d 名玩家" % [mode, min_needed]
-		return
-	if not _all_ready():
-		_status_label.text = "等待所有玩家准备就绪..."
-		return
-
-	var players = []
-	for i in range(_slots.size()):
-		var slot = _slots[i]
-		var char_data = Characters.get_by_id(slot["character"])
-		if char_data.is_empty():
-			char_data = Characters.LIST[randi() % Characters.LIST.size()]
-		var char_res = load(char_data.get("res_path", "")) if char_data.get("res_path", "") != "" else null
-		if char_res == null:
-			char_res = load(Characters.LIST[0]["res_path"])
-		var team_id := 0
-		var tc: int = GAME_MODES.get(mode, GAME_MODES["ffa"])["team_count"]
-		if tc > 0:
-			var per_team: int = max(1, max_players / tc)
-			team_id = (i / per_team) + 1
-		players.append({
-			"id": i,
-			"name": slot["player_name"],
-			"is_human": not slot["is_ai"],
-			"character": char_res,
-			"team_id": team_id,
-			"peer_id": slot["peer_id"],
-		})
-
-	var game_config = {
-		"mode": mode,
-		"max_players": max_players,
-		"players": players,
-		"is_network": true,
-		"is_host": true,
-	}
-
-	for i in range(_slots.size()):
-		var slot = _slots[i]
-		if slot["peer_id"] > 1:
-			var client_config = game_config.duplicate(true)
-			client_config["my_player_id"] = i
-			client_config["is_host"] = false
-			rpc_id(slot["peer_id"], "rpc_room_game_starting", client_config)
-
-	var old_host = NetworkManager.get_node_or_null("CurrentGameHost")
-	if old_host:
-		old_host.queue_free()
-		await get_tree().process_frame
-
-	var host = preload("res://core/net/NetworkGameHost.gd").new()
-	host.name = "CurrentGameHost"
-	host.room_config = game_config
-	NetworkManager.add_child(host)
-
-	SceneManager.last_game_config = game_config
-	SceneManager.go_to("res://scenes/main.tscn")
+	_start_btn.disabled = true
+	_status_label.text = "正在开始游戏..."
+	RoomManager.rpc_id(1, "start_game")
 
 func _on_back_pressed() -> void:
-	if is_host:
-		NetworkManager.stop_game_server()
-		NetworkManager.unpublish_room(room_code)
-	else:
-		NetworkManager.disconnect_from_game()
+	RoomManager.rpc_id(1, "leave_room")
+	NetworkManager.disconnect_from_game()
 	SceneManager.go_to("res://scenes/net/lobby.tscn")
 
-# ─────────────────────────────────────────────────────────────
-# Slot / Sync Helpers
-# ─────────────────────────────────────────────────────────────
-
-func _all_ready() -> bool:
-	var min_needed: int = GAME_MODES.get(mode, GAME_MODES["ffa"])["min_players"]
-	if _slots.size() < min_needed:
-		return false
-	for slot in _slots:
-		if slot["peer_id"] == 1:
-			continue
-		if not slot["is_ready"] and not slot["is_ai"]:
-			return false
-	return true
-
-func _sync_all_slots() -> void:
-	if not is_host:
-		return
-	_update_slot_display()
-	for slot in _slots:
-		var peer_id = slot["peer_id"]
-		if peer_id > 1:
-			rpc_id(peer_id, "rpc_room_sync", _serialize_slots())
-
-func _serialize_slots() -> Dictionary:
-	var result = {"slots": [], "mode": mode, "max_players": max_players, "room_code": room_code}
-	for slot in _slots:
-		result["slots"].append({
-			"player_name": slot["player_name"],
-			"character": slot["character"],
-			"is_ready": slot["is_ready"],
-			"is_ai": slot["is_ai"],
-		})
-	return result
-
-func _gen_code() -> String:
-	const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	var code = ""
-	for i in 6:
-		code += CHARS[randi() % CHARS.length()]
-	return code
+func _on_name_changed(new_name: String) -> void:
+	_my_name = new_name.strip_edges()
+	if _my_name == "":
+		_my_name = _default_name()
+	RoomManager.rpc_id(1, "set_player_name", _my_name)

@@ -23,6 +23,7 @@ SettingsManager="*res://core/settings_manager.gd"
 NetworkManager="*res://core/net/NetworkManager.gd"
 Nakama="*res://addons/com.heroiclabs.nakama/Nakama.gd"
 Characters="*res://data/characters.gd"
+RoomManager="*res://core/net/RoomManager.gd"
 
 [display]
 

@@ -30,6 +30,7 @@ func _connect_signals() -> void:
 	_game_manager.round_resolved.connect(_on_round_resolved)
 	_game_manager.action_required.connect(_on_action_required)
 	_game_manager.skill_applied.connect(_on_skill_applied)
+	_game_manager.player_paralyzed.connect(_on_player_paralyzed_broadcast)
 	_game_manager.player_charged.connect(_on_player_charged)
 	_game_manager.player_eliminated.connect(_on_player_eliminated)
 	_game_manager.game_over.connect(_on_game_over)
@@ -106,15 +107,12 @@ func initialize_from_config(config: Dictionary) -> void:
 	for i in range(config["players"].size()):
 		var pc = config["players"][i]
 		var peer_id: int = pc.get("peer_id", -1)
-		# AI: 使用 config 中的负 peer_id
+		# AI: 强制负数标记，不占真实 peer slot
 		if not pc["is_human"]:
 			peer_id = -1
-		# Host: peer_id 1
-		elif peer_id <= 0 and i == 0:
-			peer_id = 1
-		# Client: 使用 config 中的 peer_id，或回退到 i+1
-		elif peer_id <= 0:
-			peer_id = i + 1
+		# 人类玩家：peer_id >= 2（服务器是 peer 1，不参与游戏）
+		elif peer_id <= 1:
+			peer_id = i + 2  # 安全回退，正常情况不应触发
 		_peer_to_player[peer_id] = i
 		_player_to_peer[i] = peer_id
 		var token = _make_token(peer_id)
@@ -281,6 +279,11 @@ func _on_action_required(player_id: int) -> void:
 func _on_skill_applied(logs: Array[Dictionary]) -> void:
 	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
 		{"type": "skill", "logs": logs}, _spectator_peers)
+
+func _on_player_paralyzed_broadcast(player_id: int, turns: int) -> void:
+	if turns == 0:
+		_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+			{"type": "paralyze", "player_id": player_id, "turns": 0}, _spectator_peers)
 
 func _on_player_charged(player_id: int, new_energy: int) -> void:
 	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,

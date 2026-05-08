@@ -1,5 +1,6 @@
-// Nakama 服务端模块 — 匹配器规则
+// Nakama 服务端模块 — 匹配器 + 房间列表
 // 编译：npx tsc --outDir . index.ts  → 生成 index.js
+// Fixed: updateTime is a Unix epoch seconds number, multiply by 1000 for ms comparison
 
 function InitModule(ctx: nkruntime.Context, logger: nkruntime.Logger,
                    nk: nkruntime.Nakama, initializer: nkruntime.Initializer): void {
@@ -8,26 +9,40 @@ function InitModule(ctx: nkruntime.Context, logger: nkruntime.Logger,
   initializer.registerRpc("list_rooms", rpcListRooms);
 }
 
+var ROOM_STALE_MS = 600000; // 10 分钟无心跳视为死房间
+
 // 列出所有用户的房间（服务端上下文可跨用户查询 storage）
 const rpcListRooms: nkruntime.RpcFunction =
   (ctx, logger, nk, _payload) => {
     const result = nk.storageList(null as unknown as string, "rooms", 100);
     const now = Date.now();
-    const TWO_HOURS = 7200000;
-    const rooms = result.objects
-      .filter(obj => {
-        const updateTime = obj.updateTime
-          ? new Date(obj.updateTime).getTime()
-          : 0;
-        return (now - updateTime) < TWO_HOURS;
-      })
-      .map(obj => {
+    const live: Record<string, unknown>[] = [];
+    const stale: { collection: string; key: string; userId: string }[] = [];
+
+    result.objects.forEach(obj => {
+      const updateTimeMs: number = obj.updateTime
+        ? (obj.updateTime as unknown as number) * 1000
+        : 0;
+      if ((now - updateTimeMs) < ROOM_STALE_MS) {
         const val: Record<string, unknown> = obj.value as unknown as Record<string, unknown>;
         val["room_code"] = obj.key;
         val["host_user_id"] = obj.userId;
-        return val;
-      });
-    return JSON.stringify(rooms);
+        live.push(val);
+      } else {
+        stale.push({ collection: "rooms", key: obj.key, userId: obj.userId });
+      }
+    });
+
+    if (stale.length > 0) {
+      try {
+        nk.storageDelete(stale);
+        logger.info("Cleaned up %d stale rooms", stale.length);
+      } catch (e) {
+        logger.error("Failed to clean stale rooms: %s", e);
+      }
+    }
+
+    return JSON.stringify(live);
   };
 
 // 匹配完成后：创建一个关联的 Nakama match，把游戏服务器地址写入 match metadata

@@ -241,35 +241,6 @@ func _generate_room_code() -> String:
 		code += CHARS[randi() % CHARS.length()]
 	return code
 
-# ─────────────────────────────────────────────────────────────
-# 主机模式（Host-Client 模型）
-# ─────────────────────────────────────────────────────────────
-
-var is_hosting: bool = false
-
-func start_game_server(port: int = 7777, max_peers: int = 8) -> int:
-	stop_game_server()
-	_enet_peer = ENetMultiplayerPeer.new()
-	var err = _enet_peer.create_server(port, max_peers)
-	if err != OK:
-		push_error("Failed to start game server: %d" % err)
-		return err
-	get_tree().get_multiplayer().multiplayer_peer = _enet_peer
-	is_connected_to_game = true
-	is_hosting = true
-	return OK
-
-func stop_game_server() -> void:
-	if _enet_peer != null:
-		_enet_peer.close()
-	is_connected_to_game = false
-	is_hosting = false
-	get_tree().get_multiplayer().multiplayer_peer = null
-	# 清理上一局的 NetworkGameHost / NetworkGameClient 节点
-	for child in get_children():
-		if child.name == "CurrentGameHost":
-			child.queue_free()
-
 ## 客户端断开游戏连接并清理状态
 func disconnect_from_game() -> void:
 	if _enet_peer != null:

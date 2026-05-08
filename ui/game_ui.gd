@@ -1300,7 +1300,7 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 				right_header_label.text = "选择手势"
 			var human   := GameManager.get_player(_human_player_id)
 			var alive   := human != null and human.is_alive
-			var skipped := human != null and human.current_gesture == PlayerState.Gesture.SKIP
+			var skipped := human != null and (human.current_gesture == PlayerState.Gesture.SKIP or human.paralyze_turns > 0)
 			gesture_panel.visible = (_human_player_id >= 0 and alive and not skipped and not is_spectating)
 			action_panel.hide()
 			target_panel.hide()

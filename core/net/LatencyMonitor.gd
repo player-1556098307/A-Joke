@@ -14,7 +14,7 @@ var _ping_timer: float = 0.0
 var _client  # NetworkGameClient
 
 func _process(delta: float) -> void:
-	if _client == null or not NetworkManager.is_connected_to_game or NetworkManager.is_hosting:
+	if _client == null or not NetworkManager.is_connected_to_game:
 		return
 	_ping_timer += delta
 	if _ping_timer >= PING_INTERVAL:
