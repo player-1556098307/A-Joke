@@ -150,7 +150,6 @@ offset_left = 610.0
 offset_top = 226.0
 offset_right = 906.0
 offset_bottom = 306.0
-disabled = true
 
 [node name="BtnHGW" type="Button" parent="."]
 layout_mode = 0

@@ -8,3 +8,14 @@ var energy: int               ## 当前能量
 var has_shield: bool          ## 是否有护盾
 var paralyze_turns: int       ## 剩余麻痹回合数
 var is_alive: bool            ## 是否存活
+
+## 序列化为字典（网络传输用）
+func to_dict() -> Dictionary:
+	return {
+		"player_id": player_id,
+		"hp": hp,
+		"energy": energy,
+		"has_shield": has_shield,
+		"paralyze_turns": paralyze_turns,
+		"is_alive": is_alive,
+	}

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dcl1hmwqeotj6" path="res://ui/game_ui.gd" id="1_gui"]
 
-[node name="GameUI" type="Control"]
+[node name="GameUI" type="Control" unique_id=1263229439]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,70 +11,65 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_gui")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1806683865]
 layout_mode = 0
 offset_right = 960.0
 offset_bottom = 540.0
-color = Color(1, 0.992157, 0.960784, 1)
 mouse_filter = 2
+color = Color(1, 0.992157, 0.960784, 1)
 
-[node name="TopBarBg" type="ColorRect" parent="."]
+[node name="TopBarBg" type="ColorRect" parent="." unique_id=1086491701]
 layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 956.0
 offset_bottom = 48.0
-color = Color(0.172549, 0.172549, 0.164706, 1)
 mouse_filter = 2
+color = Color(0.172549, 0.172549, 0.164706, 1)
 
-[node name="RoundLabel" type="Label" parent="."]
+[node name="RoundLabel" type="Label" parent="." unique_id=888668750]
 layout_mode = 0
 offset_left = 16.0
 offset_top = 10.0
 offset_right = 280.0
 offset_bottom = 42.0
-theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
-vertical_alignment = 1
+theme_override_font_sizes/font_size = 13
 text = "第 ? 回合"
-mouse_filter = 2
+vertical_alignment = 1
 
-[node name="PhaseLabel" type="Label" parent="."]
+[node name="PhaseLabel" type="Label" parent="." unique_id=470712868]
 layout_mode = 0
 offset_left = 200.0
 offset_top = 10.0
 offset_right = 760.0
 offset_bottom = 42.0
-theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(1, 0.992157, 0.960784, 1)
+theme_override_font_sizes/font_size = 13
 horizontal_alignment = 1
 vertical_alignment = 1
-text = ""
-mouse_filter = 2
 
-[node name="TimerBadge" type="ColorRect" parent="."]
+[node name="TimerBadge" type="ColorRect" parent="." unique_id=1298775489]
 layout_mode = 0
 offset_left = 840.0
 offset_top = 10.0
 offset_right = 948.0
 offset_bottom = 34.0
-color = Color(0.325490, 0.227451, 0.717647, 0.85)
 mouse_filter = 2
+color = Color(0.32549, 0.227451, 0.717647, 0.85)
 
-[node name="TimerLabel" type="Label" parent="."]
+[node name="TimerLabel" type="Label" parent="." unique_id=642646816]
 layout_mode = 0
 offset_left = 840.0
 offset_top = 10.0
 offset_right = 948.0
 offset_bottom = 34.0
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.933333, 0.929412, 0.996078, 1)
+theme_override_font_sizes/font_size = 12
 horizontal_alignment = 1
 vertical_alignment = 1
-text = ""
-mouse_filter = 2
 
-[node name="LogPanelBg" type="Panel" parent="."]
+[node name="LogPanelBg" type="Panel" parent="." unique_id=1965416500]
 layout_mode = 0
 offset_left = 8.0
 offset_top = 52.0
@@ -82,41 +77,40 @@ offset_right = 196.0
 offset_bottom = 532.0
 mouse_filter = 2
 
-[node name="LogHeaderBg" type="ColorRect" parent="."]
+[node name="LogHeaderBg" type="ColorRect" parent="." unique_id=2118455902]
 layout_mode = 0
 offset_left = 8.0
 offset_top = 52.0
 offset_right = 196.0
 offset_bottom = 80.0
-color = Color(0.172549, 0.172549, 0.164706, 1)
 mouse_filter = 2
+color = Color(0.172549, 0.172549, 0.164706, 1)
 
-[node name="LogHeaderLabel" type="Label" parent="."]
+[node name="LogHeaderLabel" type="Label" parent="." unique_id=75309743]
 layout_mode = 0
 offset_left = 8.0
 offset_top = 52.0
 offset_right = 196.0
 offset_bottom = 80.0
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+theme_override_font_sizes/font_size = 12
+text = "战斗日志"
 horizontal_alignment = 1
 vertical_alignment = 1
-text = "战斗日志"
-mouse_filter = 2
 
-[node name="LogScroll" type="ScrollContainer" parent="."]
+[node name="LogScroll" type="ScrollContainer" parent="." unique_id=1404035438]
 layout_mode = 0
 offset_left = 14.0
 offset_top = 102.0
 offset_right = 190.0
 offset_bottom = 532.0
 
-[node name="LogVBox" type="VBoxContainer" parent="LogScroll"]
+[node name="LogVBox" type="VBoxContainer" parent="LogScroll" unique_id=1204681621]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
-[node name="RightPanelBg" type="Panel" parent="."]
+[node name="RightPanelBg" type="Panel" parent="." unique_id=1962276742]
 layout_mode = 0
 offset_left = 764.0
 offset_top = 52.0
@@ -124,90 +118,86 @@ offset_right = 956.0
 offset_bottom = 532.0
 mouse_filter = 2
 
-[node name="RightHeaderBg" type="ColorRect" parent="."]
+[node name="RightHeaderBg" type="ColorRect" parent="." unique_id=1635943250]
 layout_mode = 0
 offset_left = 764.0
 offset_top = 52.0
 offset_right = 956.0
 offset_bottom = 80.0
-color = Color(0.172549, 0.172549, 0.164706, 1)
 mouse_filter = 2
+color = Color(0.172549, 0.172549, 0.164706, 1)
 
-[node name="RightHeaderLabel" type="Label" parent="."]
+[node name="RightHeaderLabel" type="Label" parent="." unique_id=428458724]
 layout_mode = 0
 offset_left = 764.0
 offset_top = 52.0
 offset_right = 956.0
 offset_bottom = 80.0
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.980392, 0.780392, 0.458824, 1)
+theme_override_font_sizes/font_size = 12
+text = "选择手势"
 horizontal_alignment = 1
 vertical_alignment = 1
-text = "选择手势"
-mouse_filter = 2
 
-[node name="GesturePanel" type="VBoxContainer" parent="."]
+[node name="GesturePanel" type="VBoxContainer" parent="." unique_id=145830324]
+visible = false
 layout_mode = 0
 offset_left = 774.0
 offset_top = 88.0
 offset_right = 946.0
 offset_bottom = 532.0
 theme_override_constants/separation = 8
+
+[node name="BtnRock" type="Button" parent="GesturePanel" unique_id=845745550]
+custom_minimum_size = Vector2(172, 52)
+layout_mode = 2
+focus_mode = 0
+
+[node name="BtnScissors" type="Button" parent="GesturePanel" unique_id=1813484878]
+custom_minimum_size = Vector2(172, 52)
+layout_mode = 2
+focus_mode = 0
+
+[node name="BtnPaper" type="Button" parent="GesturePanel" unique_id=862030773]
+custom_minimum_size = Vector2(172, 52)
+layout_mode = 2
+focus_mode = 0
+
+[node name="ActionPanel" type="VBoxContainer" parent="." unique_id=753588355]
 visible = false
-
-[node name="BtnRock" type="Button" parent="GesturePanel"]
-custom_minimum_size = Vector2(172, 52)
-layout_mode = 2
-focus_mode = 0
-text = ""
-
-[node name="BtnScissors" type="Button" parent="GesturePanel"]
-custom_minimum_size = Vector2(172, 52)
-layout_mode = 2
-focus_mode = 0
-text = ""
-
-[node name="BtnPaper" type="Button" parent="GesturePanel"]
-custom_minimum_size = Vector2(172, 52)
-layout_mode = 2
-focus_mode = 0
-text = ""
-
-[node name="ActionPanel" type="VBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 774.0
 offset_top = 88.0
 offset_right = 946.0
 offset_bottom = 532.0
 theme_override_constants/separation = 8
-visible = false
 
-[node name="BtnCharge" type="Button" parent="ActionPanel"]
+[node name="BtnCharge" type="Button" parent="ActionPanel" unique_id=1370560024]
 custom_minimum_size = Vector2(172, 44)
 layout_mode = 2
 focus_mode = 0
 text = "聚气 +1"
 
-[node name="SkillsContainer" type="VBoxContainer" parent="ActionPanel"]
+[node name="SkillsContainer" type="VBoxContainer" parent="ActionPanel" unique_id=169106615]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TargetPanel" type="VBoxContainer" parent="."]
+[node name="TargetPanel" type="VBoxContainer" parent="." unique_id=2098565999]
+visible = false
 layout_mode = 0
 offset_left = 774.0
 offset_top = 88.0
 offset_right = 946.0
 offset_bottom = 532.0
 theme_override_constants/separation = 8
-visible = false
 
-[node name="PlayersContainer" type="Control" parent="."]
-layout_mode = 0
+[node name="PlayersContainer" type="Control" parent="." unique_id=2103263014]
+anchors_preset = 0
 offset_right = 960.0
 offset_bottom = 540.0
 mouse_filter = 2
 
-[node name="BorderFrame" type="Panel" parent="."]
+[node name="BorderFrame" type="Panel" parent="." unique_id=863666053]
 layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0

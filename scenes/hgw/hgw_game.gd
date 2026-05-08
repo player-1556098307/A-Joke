@@ -560,9 +560,9 @@ func _update_tooltip(screen_pos: Vector2) -> void:
 	lines.append(_terrain_display_name(cell.terrain))
 	lines.append("坐标 (%d, %d)" % [cell.q, cell.r])
 	lines.append("海拔 %.2f · 湿度 %.2f" % [cell.elevation, cell.moisture])
-		var effect_text := _terrain_effect_description(cell.terrain)
-		if effect_text != "":
-			lines.append(effect_text)
+	var effect_text := _terrain_effect_description(cell.terrain)
+	if effect_text != "":
+		lines.append(effect_text)
 
 	var flags: Array[String] = []
 	if cell.is_grail:    flags.append("圣杯台座")

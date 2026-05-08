@@ -78,6 +78,8 @@ var _current_snapshot: RoundSnapshot
 ## 调试开关：AI强制出剪刀
 var _debug_force_scissors: bool = false
 
+## 联机模式标志（服务器设置为 true，关闭单机"人类死亡即结束"逻辑）
+var _is_network_game: bool = false
 func _ready() -> void:
 	_ai_controller = AIController.new()
 	_resolve_timer = Timer.new()
@@ -105,6 +107,8 @@ func setup_game(config: Dictionary) -> void:
 	for i in range(player_configs.size()):
 		var pc: Dictionary = player_configs[i]
 		var state := PlayerState.new(i, pc["name"], pc["character"], pc["is_human"])
+		if pc.has("team_id"):
+			state.team_id = pc["team_id"]
 		_players.append(state)
 
 	_distance_system = DistanceSystem.new()
@@ -301,7 +305,9 @@ func _resolve_tiebreak() -> void:
 ## 启动行动选择阶段：人类玩家显示UI，AI自动决策
 func _start_action_input() -> void:
 	var winner := get_player(_sole_winner_id)
+	print("[GameManager] _start_action_input _sole_winner_id=%d winner=%s is_human=%s" % [_sole_winner_id, winner.player_name if winner else "null", winner.is_human if winner else "N/A"])
 	if winner == null or not winner.is_alive:
+		print("[GameManager] _start_action_input: winner dead/null, skipping to APPLYING")
 		_enter_phase(GamePhase.APPLYING)
 		return
 
@@ -309,6 +315,7 @@ func _start_action_input() -> void:
 
 	if not winner.is_human:
 		var decision := _ai_controller.decide_action(winner, get_alive_players(), _distance_system)
+		print("[GameManager] _start_action_input: AI winner auto-decides action=%d skill=%d target=%d" % [decision["action"], decision["skill_index"], decision["target_id"]])
 		submit_action(_sole_winner_id, decision["action"], decision["skill_index"], decision["target_id"])
 
 ## 执行胜者行动：CHARGE充能（含影分身加成）或 USE_SKILL释放技能
@@ -352,6 +359,7 @@ func _apply_actions() -> void:
 			for entry in logs:
 				_emit_effect_signals(entry)
 			skill_applied.emit(logs)
+			player_charged.emit(_sole_winner_id, winner.energy)
 			_record_action(winner, skill, logs)
 
 	_enter_phase(GamePhase.ELIMINATION)
@@ -439,10 +447,20 @@ func _check_elimination() -> void:
 				es.elimination_reason = "HP归零"
 
 	var alive := get_alive_players()
-	if alive.size() <= 1 or _is_human_dead():
+	if alive.size() <= 1:
 		_enter_phase(GamePhase.GAME_OVER)
-	else:
-		_enter_phase(GamePhase.ROUND_END)
+		return
+	# 团队模式：所有存活者属于同一队则该队获胜
+	if alive.any(func(p): return p.team_id != 0):
+		var first_team: int = alive[0].team_id
+		if alive.all(func(p): return p.team_id == first_team):
+			_enter_phase(GamePhase.GAME_OVER)
+			return
+	# 保留原有"人类死亡则结束"逻辑（单机模式用）
+	if _is_human_dead() and not _is_network_game:
+		_enter_phase(GamePhase.GAME_OVER)
+		return
+	_enter_phase(GamePhase.ROUND_END)
 
 func _is_human_dead() -> bool:
 	for player in _players:
@@ -465,7 +483,19 @@ func _end_round() -> void:
 				es2.elimination_round = _current_round_number
 				es2.elimination_reason = "延迟伤害"
 	var alive := get_alive_players()
-	if alive.size() <= 1 or _is_human_dead():
+	if alive.size() <= 1:
+		for player in _players:
+			player.reset_round_data()
+		_enter_phase(GamePhase.GAME_OVER)
+		return
+	if alive.any(func(p): return p.team_id != 0):
+		var first_team: int = alive[0].team_id
+		if alive.all(func(p): return p.team_id == first_team):
+			for player in _players:
+				player.reset_round_data()
+			_enter_phase(GamePhase.GAME_OVER)
+			return
+	if _is_human_dead() and not _is_network_game:
 		for player in _players:
 			player.reset_round_data()
 		_enter_phase(GamePhase.GAME_OVER)
@@ -650,6 +680,18 @@ func _record_action(winner: PlayerState, skill: SkillData, logs: Array[Dictionar
 
 ## ── 公开方法 ───────────────────────────────────────────────────────────────────
 ## 提交手势（由UI调用）：仅在 GESTURE_INPUT 阶段有效，全部提交后自动进入结算
+# 立即处理所有待提交的 AI 手势（跳过 timer 延时）
+func _flush_pending_ai_gestures() -> void:
+	if _current_phase != GamePhase.GESTURE_INPUT:
+		return
+	for p in _players:
+		if p.is_alive and not p.is_human and p.current_gesture == PlayerState.Gesture.NONE:
+			var g := _ai_controller.decide_gesture(p)
+			p.current_gesture = g
+			gesture_submitted.emit(p.player_id, g)
+	if _all_gestures_submitted():
+		_enter_phase(GamePhase.RESOLVING)
+
 func submit_gesture(player_id: int, gesture: PlayerState.Gesture) -> void:
 	if _current_phase != GamePhase.GESTURE_INPUT:
 		return
@@ -660,8 +702,22 @@ func submit_gesture(player_id: int, gesture: PlayerState.Gesture) -> void:
 	gesture_submitted.emit(player_id, gesture)
 	if _all_gestures_submitted():
 		_enter_phase(GamePhase.RESOLVING)
+	elif player.is_human:
+		_flush_pending_ai_gestures()
 
 ## 提交加赛手势：仅在 TIEBREAK_INPUT 阶段有效，仅加赛候选玩家可提交
+func _flush_pending_ai_tiebreak_gestures() -> void:
+	if _current_phase != GamePhase.TIEBREAK_INPUT:
+		return
+	for tid in _tiebreak_candidates:
+		var p := get_player(tid)
+		if p != null and p.is_alive and not p.is_human and p.current_gesture == PlayerState.Gesture.NONE:
+			var g := _ai_controller.decide_gesture(p)
+			p.current_gesture = g
+			gesture_submitted.emit(p.player_id, g)
+	if _all_tiebreak_gestures_submitted():
+		_enter_phase(GamePhase.TIEBREAK_RESOLVING)
+
 func submit_tiebreak_gesture(player_id: int, gesture: PlayerState.Gesture) -> void:
 	if _current_phase != GamePhase.TIEBREAK_INPUT:
 		return
@@ -674,17 +730,23 @@ func submit_tiebreak_gesture(player_id: int, gesture: PlayerState.Gesture) -> vo
 	gesture_submitted.emit(player_id, gesture)
 	if _all_tiebreak_gestures_submitted():
 		_enter_phase(GamePhase.TIEBREAK_RESOLVING)
+	elif player.is_human:
+		_flush_pending_ai_tiebreak_gestures()
 
 ## 提交行动选择（由UI调用）：仅在 ACTION_INPUT 阶段有效，立即进入 APPLYING
 func submit_action(player_id: int, action: PlayerState.ActionType, skill_index: int, target_id: int) -> void:
+	print("[GameManager] submit_action player_id=%d action=%d skill=%d target=%d phase=%d" % [player_id, action, skill_index, target_id, _current_phase])
 	if _current_phase != GamePhase.ACTION_INPUT:
+		print("[GameManager] submit_action REJECT: not in ACTION_INPUT")
 		return
 	var player := get_player(player_id)
 	if player == null:
+		print("[GameManager] submit_action REJECT: player not found")
 		return
 	player.pending_action      = action
 	player.pending_skill_index = skill_index
 	player.skill_target_id     = target_id
+	print("[GameManager] submit_action ACCEPT: entering APPLYING")
 	_enter_phase(GamePhase.APPLYING)
 
 ## 获取所有存活玩家的数组

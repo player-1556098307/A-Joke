@@ -20,6 +20,7 @@ func _ready() -> void:
 	_style_quit_button()
 	_style_tips_panel()
 	btn_pve.pressed.connect(_on_pve_pressed)
+	btn_pvp.pressed.connect(_on_pvp_pressed)
 	btn_hgw.pressed.connect(_on_hgw_pressed)
 	btn_settings.pressed.connect(_on_settings_pressed)
 	btn_quit.pressed.connect(get_tree().quit)
@@ -116,28 +117,13 @@ func _style_pve_button() -> void:
 func _style_pvp_button() -> void:
 	btn_pvp.text = ""
 	btn_pvp.focus_mode = Control.FOCUS_NONE
-	var s := _make_flat(Color("#F1EFE8"), Color("#D3D1C7"), 2, 8)
-	btn_pvp.add_theme_stylebox_override("normal",   s)
-	btn_pvp.add_theme_stylebox_override("hover",    s)
-	btn_pvp.add_theme_stylebox_override("disabled", s)
-	_add_left_bar(btn_pvp, Color("#D3D1C7"))
+	btn_pvp.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#C9A84C"), 2, 8))
+	btn_pvp.add_theme_stylebox_override("hover",  _make_flat(Color("#F5F2E8"), Color("#D4B35A"), 2, 8))
+	btn_pvp.add_theme_stylebox_override("pressed",_make_flat(Color("#E8E3D5"), Color("#BA962E"), 2, 8))
+	_add_left_bar(btn_pvp, Color("#FAC775"))
 	_add_two_line_labels(btn_pvp,
-		"PvP 联机", Color("#B4B2A9"), 18,
-		"开发中，敬请期待...", Color("#D3D1C7"), 11)
-
-	var lock := Label.new()
-	lock.text = "🔒"
-	lock.add_theme_font_size_override("font_size", 14)
-	lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lock.anchor_left = 1.0
-	lock.anchor_top = 0.0
-	lock.anchor_right = 1.0
-	lock.anchor_bottom = 0.0
-	lock.offset_left = -44.0
-	lock.offset_top = 8.0
-	lock.offset_right = -4.0
-	lock.offset_bottom = 34.0
-	btn_pvp.add_child(lock)
+		"PvP 联机", Color("#2C2C2A"), 18,
+		"创建或加入房间", Color("#5F5E5A"), 11)
 
 func _style_hgw_button() -> void:
 	btn_hgw.text = ""
@@ -176,6 +162,9 @@ func _style_tips_panel() -> void:
 
 func _on_pve_pressed() -> void:
 	SceneManager.go_to("res://scenes/character_select.tscn")
+
+func _on_pvp_pressed() -> void:
+	SceneManager.go_to("res://scenes/net/lobby.tscn")
 
 func _on_hgw_pressed() -> void:
 	SceneManager.go_to("res://scenes/hgw/hgw_character_select.tscn")

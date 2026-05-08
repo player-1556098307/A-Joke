@@ -9,3 +9,15 @@ var skill_name: String                   ## 技能名称
 var target_names: Array[String] = []     ## 目标名称列表
 var total_damage: int = 0                ## 造成的总伤害
 var effects_summary: String = ""         ## 效果摘要文本
+
+## 序列化为字典（网络传输用）
+func to_dict() -> Dictionary:
+	return {
+		"round_number": round_number,
+		"actor_id": actor_id,
+		"actor_name": actor_name,
+		"skill_name": skill_name,
+		"target_names": target_names,
+		"total_damage": total_damage,
+		"effects_summary": effects_summary,
+	}

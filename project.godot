@@ -20,6 +20,9 @@ config/icon="res://icon.svg"
 GameManager="*res://core/game_manager.gd"
 SceneManager="*uid://c4r65luqih7wo"
 SettingsManager="*res://core/settings_manager.gd"
+NetworkManager="*res://core/net/NetworkManager.gd"
+Nakama="*res://addons/com.heroiclabs.nakama/Nakama.gd"
+Characters="*res://data/characters.gd"
 
 [display]
 

@@ -151,7 +151,7 @@ static func _apply_single_effect(
 
 		SkillEffect.EffectType.PARALYZE:
 			target.paralyze_turns += effect.value
-			return { "turns": effect.value }
+			return { "turns": target.paralyze_turns }
 
 		SkillEffect.EffectType.CHANGE_DISTANCE:
 			distance_system.modify_distance(attacker.player_id, target.player_id, effect.value)
@@ -175,6 +175,7 @@ static func _apply_single_effect(
 			if effect.unlock_skill != null and not attacker.unlocked_skills.has(effect.unlock_skill):
 				attacker.unlocked_skills.append(effect.unlock_skill)
 			var sname: String = effect.unlock_skill.skill_name if effect.unlock_skill != null else ""
-			return { "skill_name": sname }
+			var spath: String = effect.unlock_skill.resource_path if effect.unlock_skill != null else ""
+			return { "skill_name": sname, "skill_path": spath }
 
 	return {}

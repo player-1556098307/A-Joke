@@ -2,19 +2,69 @@
 ## 从 SceneManager 读取游戏配置并初始化 GameManager，或使用调试回退配置
 extends Node
 
+var _net_client: NetworkGameClient
+
 func _ready() -> void:
-	# 从 character_select 或 game_over 重玩时，config 已存储在 SceneManager 中
-	if not SceneManager.last_game_config.is_empty():
-		GameManager.setup_game(SceneManager.last_game_config)
-	# 直接运行 main.tscn 时的调试回退配置
+	var config = SceneManager.last_game_config
+	var is_network = config.get("is_network", false)
+	var is_host = config.get("is_host", false)
+
+	# 联机模式
+	if is_network:
+		_init_network_mode(is_host)
+		# 主机：在 GameUI 就绪后再初始化 GameManager
+		if is_host:
+			var host = NetworkManager.get_node_or_null("CurrentGameHost")
+			if host:
+				host.initialize_from_config(config)
+			$GameUI.setup_players(GameManager.get_alive_players())
+	# 单机模式
+	elif not config.is_empty():
+		GameManager.setup_game(config)
+	# 调试回退
 	elif GameManager.get_alive_players().is_empty():
-		var config := {
+		var debug_cfg := {
 			"players": [
 				{ "name": "佐助",        "is_human": true,  "character": preload("res://resources/characters/宇智波佐助.tres") },
 				{ "name": "AI-疾风佐助", "is_human": false, "character": preload("res://resources/characters/宇智波佐助（疾风传）.tres") },
 				{ "name": "AI-佐助",     "is_human": false, "character": preload("res://resources/characters/宇智波佐助.tres") },
 			]
 		}
-		GameManager.setup_game(config)
+		GameManager.setup_game(debug_cfg)
+
 	# setup_players 在 setup_game 延迟触发第一阶段之前执行，确保 UI 就绪
-	$GameUI.setup_players(GameManager.get_alive_players())
+	if not is_network:
+		$GameUI.setup_players(GameManager.get_alive_players())
+
+	if config.get("is_spectator", false):
+		$GameUI.is_spectating = true
+
+func _init_network_mode(is_host: bool) -> void:
+	# 客户端才需要 NetworkGameClient；主机直接用 GameManager
+	if is_host:
+		return
+
+	_net_client = NetworkGameClient.new()
+	_net_client.name = "CurrentGameHost"
+	NetworkManager.add_child(_net_client)
+	$GameUI.net_client = _net_client
+	_net_client.phase_changed.connect($GameUI._on_phase_changed)
+	_net_client.gesture_decided.connect($GameUI._mark_decided)
+	_net_client.gestures_revealed.connect($GameUI._on_gestures_revealed)
+	_net_client.action_result.connect($GameUI._on_action_result)
+	_net_client.full_state_received.connect($GameUI._on_full_state_sync)
+	_net_client.state_hash_received.connect($GameUI._on_state_hash_received)
+	_net_client.game_over_received.connect($GameUI._on_game_over_result)
+
+	# my_player_id 由 room.gd 通过 rpc_room_game_starting 传入
+	var config = SceneManager.last_game_config
+	if config.has("my_player_id"):
+		_net_client.my_player_id = config["my_player_id"]
+
+func _exit_tree() -> void:
+	if _net_client != null and is_instance_valid(_net_client):
+		_net_client.queue_free()
+		_net_client = null
+	var host_node = NetworkManager.get_node_or_null("CurrentGameHost")
+	if host_node and host_node is NetworkGameHost:
+		host_node.queue_free()

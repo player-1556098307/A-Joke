@@ -57,8 +57,19 @@ func _ready() -> void:
 	_apply_styling()
 	_style_action_buttons()
 
-	btn_replay.pressed.connect(_on_replay_pressed)
-	btn_reselect.pressed.connect(_on_reselect_pressed)
+	var config: Dictionary = SceneManager.last_game_config
+	var is_network: bool = config.get("is_network", false)
+	var is_host: bool = config.get("is_host", false)
+
+	if is_network:
+		# 联机模式：替换"再来一局"为"返回房间"，隐藏"更换角色"
+		btn_replay.text = "返回房间"
+		btn_replay.pressed.connect(_on_return_room_pressed)
+		btn_reselect.visible = false
+	else:
+		btn_replay.pressed.connect(_on_replay_pressed)
+		btn_reselect.pressed.connect(_on_reselect_pressed)
+
 	btn_main_menu.pressed.connect(_on_main_menu_pressed)
 
 	var result: Dictionary = SceneManager.pending_game_result
@@ -933,6 +944,21 @@ func _set_skill_mode(mode: String) -> void:
 	if _by_char_scroll: _by_char_scroll.visible = (mode == "by_char")
 
 # ── Navigation ──────────────────────────────────────────────────────────────
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
+		var config: Dictionary = SceneManager.last_game_config
+		if config.get("is_host", false) and NetworkManager.current_room_id != "":
+			NetworkManager.unpublish_room(NetworkManager.current_room_id)
+
+func _on_return_room_pressed() -> void:
+	var config: Dictionary = SceneManager.last_game_config
+	if config.get("is_host", false):
+		NetworkManager.stop_game_server()
+		NetworkManager.unpublish_room(NetworkManager.current_room_id)
+	else:
+		NetworkManager.disconnect_from_game()
+	SceneManager.go_to("res://scenes/net/lobby.tscn")
 
 func _on_replay_pressed() -> void:
 	SceneManager.go_to("res://scenes/main.tscn")

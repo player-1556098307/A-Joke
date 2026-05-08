@@ -30,6 +30,10 @@ var _current_round: int = 0
 var _elimination_log: Array[Dictionary] = []
 var _elim_order: int = 0
 var _is_draw_reentry: bool = false
+## 联机模式客户端引用（非 null 时走网络通道）
+var net_client: NetworkGameClient = null
+var is_spectating: bool = false
+var _spectator_view_idx: int = 0
 
 const ARENA_CENTER := Vector2(480.0, 295.0)
 const ARENA_RADIUS := 155.0
@@ -241,7 +245,15 @@ func _on_menu_pressed() -> void:
 	leave_btn.pressed.connect(func():
 		backdrop.queue_free()
 		panel.queue_free()
-		SceneManager.go_to("res://scenes/main_menu.tscn")
+		var config = SceneManager.last_game_config
+		if config.get("is_network", false):
+			if config.get("is_host", false):
+				NetworkManager.stop_game_server()
+			else:
+				NetworkManager.disconnect_from_game()
+			SceneManager.go_to("res://scenes/net/lobby.tscn")
+		else:
+			SceneManager.go_to("res://scenes/main_menu.tscn")
 	)
 	btn_row.add_child(leave_btn)
 
@@ -508,8 +520,9 @@ func _build_player_card(player: PlayerState) -> Control:
 
 	var name_lbl := Label.new()
 	name_lbl.name = "NameLabel"
-	var suffix := "（你）" if player.is_human else " AI"
-	name_lbl.text = player.character.character_name + suffix
+	var is_me := player.player_id == _human_player_id and _human_player_id >= 0
+	var suffix: String = "（你）" if is_me else ("" if player.is_human else " AI")
+	name_lbl.text = player.player_name + suffix
 	name_lbl.add_theme_font_size_override("font_size", 8)
 	name_lbl.add_theme_color_override("font_color", Color("#FFFDF5"))
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -725,21 +738,14 @@ func _set_thinking(player_id: int, active: bool) -> void:
 
 	if active:
 		bar.show(); fill.show(); lbl.show()
+		var total := maxf(1.0, _timer_total_seconds)
+		var pct := clampf(_turn_seconds_left / total, 0.0, 1.0)
+		fill.size.x = pct * 94.0
+		fill.color = Color("#FAC775") if pct > 0.33 else Color("#E24B4A")
 		if player_id == _human_player_id:
-			var total := maxf(1.0, _timer_total_seconds)
-			var pct := clampf(_turn_seconds_left / total, 0.0, 1.0)
-			fill.size.x = pct * 94.0
-			fill.color = Color("#FAC775") if pct > 0.33 else Color("#E24B4A") if pct > 0.16 else Color("#E24B4A")
 			lbl.text = "决定中..."
 		else:
-			fill.size.x = 0.0
-			fill.color = Color("#888780")
 			lbl.text = "思考中..."
-			var tw := create_tween()
-			tw.set_loops(0)
-			tw.tween_property(fill, "size:x", 94.0, 1.2)
-			tw.tween_property(fill, "size:x", 0.0, 1.2).set_delay(0.2)
-			_think_tweens[player_id] = tw
 	else:
 		var old_tw: Tween = _think_tweens.get(player_id)
 		if old_tw != null:
@@ -1102,6 +1108,7 @@ func _restore_card_styles() -> void:
 # ── Target panel ──────────────────────────────────────────────────────────────
 
 func _show_target_panel(skill_index: int, skill: SkillData) -> void:
+	print("[game_ui] _show_target_panel skill=%s idx=%d, _current_action_player_id=%d" % [skill.skill_name, skill_index, _current_action_player_id])
 	for child in target_panel.get_children():
 		child.queue_free()
 
@@ -1225,9 +1232,9 @@ func _update_timer_label() -> void:
 		timer_badge.color = Color("#E24B4A")
 	timer_badge.show()
 	timer_label.show()
-	# Update human thinking bar fill
-	if _human_player_id >= 0:
-		var card: Control = _player_cards.get(_human_player_id)
+	# Update all thinking bar fills
+	for pid in _player_cards:
+		var card: Control = _player_cards[pid]
 		if card:
 			var fill: ColorRect = card.get_node_or_null("ThinkFill")
 			if fill and fill.visible:
@@ -1246,10 +1253,19 @@ func _on_turn_timer_tick() -> void:
 		_turn_seconds_left = 0
 		_update_timer_label()
 		_turn_timer.stop()
-		if _human_player_id >= 0:
+		if _human_player_id >= 0 and not is_spectating:
 			var human := GameManager.get_player(_human_player_id)
 			if human != null and human.is_alive:
-				if _current_phase_for_timer == GameManager.GamePhase.ACTION_INPUT:
+				if net_client:
+					if _current_phase_for_timer == GameManager.GamePhase.ACTION_INPUT and _human_player_id == _current_action_player_id:
+						net_client.submit_action(PlayerState.ActionType.CHARGE, -1, -1)
+					else:
+						var gestures: Array[PlayerState.Gesture] = [PlayerState.Gesture.ROCK, PlayerState.Gesture.SCISSORS, PlayerState.Gesture.PAPER]
+						var rng := RandomNumberGenerator.new()
+						rng.randomize()
+						var g: PlayerState.Gesture = gestures[rng.randi() % 3]
+						net_client.submit_gesture(g)
+				elif _current_phase_for_timer == GameManager.GamePhase.ACTION_INPUT and _human_player_id == _current_action_player_id:
 					GameManager.submit_action(_human_player_id, PlayerState.ActionType.CHARGE, -1, -1)
 				else:
 					var gestures: Array[PlayerState.Gesture] = [PlayerState.Gesture.ROCK, PlayerState.Gesture.SCISSORS, PlayerState.Gesture.PAPER]
@@ -1265,7 +1281,7 @@ func _on_turn_timer_tick() -> void:
 
 # ── Phase changes ─────────────────────────────────────────────────────────────
 
-func _on_phase_changed(phase: GameManager.GamePhase) -> void:
+func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> void:
 	_current_phase_for_timer = phase
 	match phase:
 		GameManager.GamePhase.GESTURE_INPUT:
@@ -1278,11 +1294,14 @@ func _on_phase_changed(phase: GameManager.GamePhase) -> void:
 			round_label.text = "第 %d 回合" % _current_round
 			phase_label.text = "出拳阶段 — 请选择手势"
 			phase_label.add_theme_color_override("font_color", Color("#FFFDF5"))
-			right_header_label.text = "选择手势"
+			if is_spectating:
+				right_header_label.text = "观战中"
+			else:
+				right_header_label.text = "选择手势"
 			var human   := GameManager.get_player(_human_player_id)
 			var alive   := human != null and human.is_alive
 			var skipped := human != null and human.current_gesture == PlayerState.Gesture.SKIP
-			gesture_panel.visible = (_human_player_id >= 0 and alive and not skipped)
+			gesture_panel.visible = (_human_player_id >= 0 and alive and not skipped and not is_spectating)
 			action_panel.hide()
 			target_panel.hide()
 			_pending_reveals.clear()
@@ -1303,7 +1322,15 @@ func _on_phase_changed(phase: GameManager.GamePhase) -> void:
 			right_header_label.text = "加赛出拳"
 			phase_label.text = "⚔ 加赛 — 请出拳"
 			phase_label.add_theme_color_override("font_color", Color("#E24B4A"))
-			if _human_player_id in _tiebreak_candidate_ids:
+			# 客户端通过 data["candidates"] 获取加赛候选人（主机由 _on_tiebreak_started 直接设置）
+			if data.has("candidates") and not (data["candidates"] as Array).is_empty():
+				var cands: Array[int] = []
+				for c in data["candidates"]:
+					cands.append(int(c))
+				_in_tiebreak = true
+				_tiebreak_candidate_ids = cands
+				_apply_tiebreak_card_styles(cands)
+			if _human_player_id in _tiebreak_candidate_ids and not is_spectating:
 				gesture_panel.show()
 			else:
 				gesture_panel.hide()
@@ -1322,12 +1349,28 @@ func _on_phase_changed(phase: GameManager.GamePhase) -> void:
 			_stop_turn_timer()
 			right_header_label.text = "选择行动"
 			phase_label.text = "行动阶段"
-			_start_turn_timer()
+			var wid = data.get("winner_id", -1)
+			print("[game_ui] _on_phase_changed ACTION_INPUT wid=%d, _human_player_id=%d, _current_action_player_id=%d" % [wid, _human_player_id, _current_action_player_id])
+			if wid >= 0:
+				_current_action_player_id = -1
+				_on_action_required(wid)
 
-		GameManager.GamePhase.APPLYING, GameManager.GamePhase.ELIMINATION:
+		GameManager.GamePhase.APPLYING:
 			_stop_turn_timer()
 			action_panel.hide()
 			target_panel.hide()
+
+		GameManager.GamePhase.ELIMINATION:
+			_stop_turn_timer()
+			action_panel.hide()
+			target_panel.hide()
+			var elim_id: int = data.get("player_id", -1)
+			if elim_id >= 0 and net_client:
+				_on_player_eliminated(elim_id)
+
+		GameManager.GamePhase.ROUND_END:
+			if net_client:
+				ClientStateSync.tick_delayed_damages()
 
 		_:
 			pass
@@ -1426,9 +1469,12 @@ func _on_round_resolved(result: Dictionary) -> void:
 		_append_log("多人获胜（%s），进入加赛" % ", ".join(PackedStringArray(names)), LT_WIN)
 
 func _on_action_required(player_id: int) -> void:
+	print("[game_ui] _on_action_required called player_id=%d, _human_player_id=%d" % [player_id, _human_player_id])
 	if player_id != _human_player_id:
+		print("[game_ui] _on_action_required SKIP: player_id != _human_player_id")
 		return
 	_current_action_player_id = player_id
+	print("[game_ui] _on_action_required OK: showing action panel for player %d" % player_id)
 	var player := GameManager.get_player(player_id)
 	if player == null:
 		return
@@ -1456,9 +1502,15 @@ func _on_action_required(player_id: int) -> void:
 		skills_container.add_child(_make_skill_button(skill, i, can_use))
 
 	action_panel.show()
+	_start_turn_timer()
 
 func _on_gesture_pressed(gesture: PlayerState.Gesture) -> void:
 	gesture_panel.hide()
+	if net_client:
+		net_client.submit_gesture(gesture)
+		_mark_decided(_human_player_id)
+		_stop_turn_timer()
+		return
 	if _in_tiebreak:
 		GameManager.submit_tiebreak_gesture(_human_player_id, gesture)
 	else:
@@ -1467,9 +1519,14 @@ func _on_gesture_pressed(gesture: PlayerState.Gesture) -> void:
 func _on_charge_pressed() -> void:
 	action_panel.hide()
 	target_panel.hide()
+	print("[game_ui] _on_charge_pressed: net_client=%s" % (net_client != null))
+	if net_client:
+		net_client.submit_action(PlayerState.ActionType.CHARGE, -1, -1)
+		return
 	GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.CHARGE, -1, -1)
 
 func _on_skill_button_pressed(skill_index: int, skill: SkillData) -> void:
+	print("[game_ui] _on_skill_button_pressed skill=%s idx=%d, net_client=%s, _current_action_player_id=%d" % [skill.skill_name, skill_index, net_client != null, _current_action_player_id])
 	var needs_target := false
 	for effect in skill.effects:
 		if effect.target == SkillEffect.EffectTarget.ENEMY_SINGLE \
@@ -1480,12 +1537,20 @@ func _on_skill_button_pressed(skill_index: int, skill: SkillData) -> void:
 		_show_target_panel(skill_index, skill)
 	else:
 		action_panel.hide()
-		GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, -1)
+		if net_client:
+			net_client.submit_action(PlayerState.ActionType.USE_SKILL, skill_index, -1)
+		else:
+			GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, -1)
 
 func _on_target_selected(target_id: int, skill_index: int) -> void:
 	target_panel.hide()
+	print("[game_ui] _on_target_selected target_id=%d skill_index=%d, net_client=%s" % [target_id, skill_index, net_client != null])
+	if net_client:
+		net_client.submit_action(PlayerState.ActionType.USE_SKILL, skill_index, target_id)
+		return
 	GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, target_id)
 
+## 纯 UI 渲染：状态已由 RoundResolver（主机）或 ClientStateSync（客户端）更新
 func _on_skill_applied(logs: Array[Dictionary]) -> void:
 	for entry in logs:
 		var target := GameManager.get_player(entry["target_id"])
@@ -1539,6 +1604,8 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 
 func _on_player_charged(player_id: int, new_energy: int) -> void:
 	var player := GameManager.get_player(player_id)
+	if player:
+		player.energy = new_energy
 	var hint   := "（影分身+%d）" % player.clone_count if (player != null and player.clone_count > 0) else ""
 	_append_log("%s 聚气%s，气槽: %d" % [player.player_name if player else str(player_id), hint, new_energy], LT_STATUS, player_id)
 	_refresh_player_card(player_id)
@@ -1546,6 +1613,8 @@ func _on_player_charged(player_id: int, new_energy: int) -> void:
 
 func _on_player_eliminated(player_id: int) -> void:
 	var player := GameManager.get_player(player_id)
+	if player:
+		player.is_alive = false
 	_elim_order += 1
 	_elimination_log.append({
 		"order":       _elim_order,
@@ -1592,10 +1661,16 @@ func _on_tiebreak_resolved(winner_id: int) -> void:
 	var p := GameManager.get_player(winner_id)
 	_append_log("── 加赛胜出：%s ──" % (p.player_name if p else str(winner_id)), LT_WIN)
 
-func _on_player_shielded(player_id: int, _shield_value: int) -> void:
+func _on_player_shielded(player_id: int, shield_value: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.shield = shield_value
 	_refresh_player_card(player_id)
 
-func _on_player_paralyzed(player_id: int, _turns: int) -> void:
+func _on_player_paralyzed(player_id: int, turns: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.paralyze_turns = turns
 	_refresh_player_card(player_id)
 
 func _on_distance_changed(_from_id: int, _to_id: int, _new_distance: int) -> void:
@@ -1609,6 +1684,8 @@ func _on_player_skipped(player_id: int) -> void:
 
 func _on_delayed_damage_triggered(player_id: int, damage: int, remaining_hp: int) -> void:
 	var player := GameManager.get_player(player_id)
+	if player:
+		player.hp = remaining_hp
 	var p_name := player.player_name if player else str(player_id)
 	if damage > 0:
 		_append_log("⏰ %s 延迟伤害触发，受 %d 伤，剩余HP %d" % [p_name, damage, remaining_hp], LT_DAMAGE, player_id)
@@ -1626,3 +1703,169 @@ func _on_skill_unlocked(player_id: int, skill_name: String) -> void:
 	var player := GameManager.get_player(player_id)
 	_append_log("✦ %s 永久解锁技能【%s】" % [player.player_name if player else str(player_id), skill_name], LT_WIN, player_id)
 	_refresh_player_card(player_id)
+
+
+# ── 联机信号处理 ────────────────────────────────────────────────────────────
+
+func _on_gestures_revealed(gestures: Dictionary, result: Dictionary) -> void:
+	# 客户端：从网络数据填充 _pending_reveals，确保出拳日志和动画正常显示
+	var gesture_names: PackedStringArray = ["无", "石头", "剪刀", "布", "跳过"]
+	for pid in gestures:
+		var g: int = gestures[pid]
+		var player := GameManager.get_player(pid)
+		var p_name := player.player_name if player else str(pid)
+		var gname: String = gesture_names[g] if g < gesture_names.size() else str(g)
+		var prefix := "[加赛] " if _in_tiebreak else ""
+		_pending_reveals.append({"player_id": pid, "gesture": g, "p_name": p_name, "gname": gname, "prefix": prefix})
+	_play_all_gesture_reveals()
+	_on_round_resolved(result)
+
+func _on_action_result(data: Dictionary) -> void:
+	print("[game_ui] _on_action_result type=%s" % data.get('type', '?'))
+	# 客户端：先将状态写入 GameManager，再渲染 UI（主机端状态由 RoundResolver 直接更新）
+	ClientStateSync.apply_action_result(data)
+	var action_type: String = data.get('type', '')
+	match action_type:
+		'skill':
+			var raw_logs: Array = data.get('logs', [])
+			var typed_logs: Array[Dictionary] = []
+			for l in raw_logs:
+				typed_logs.append(l)
+			_on_skill_applied(typed_logs)
+		'charge':
+			_on_player_charged(data.get('player_id', -1), data.get('energy', 0))
+		'paralyze':
+			var pid: int = data.get('player_id', -1)
+			_on_player_paralyzed(pid, data.get('turns', 0))
+		'shield':
+			var pid: int = data.get('player_id', -1)
+			_on_player_shielded(pid, data.get('value', 0))
+		'clone_destroyed':
+			_on_clone_destroyed(data.get('player_id', -1))
+		'skill_unlocked':
+			var pid: int = data.get('player_id', -1)
+			_on_skill_unlocked(pid, data.get('skill', ''))
+		'delayed_damage':
+			var pid: int = data.get('player_id', -1)
+			_on_delayed_damage_triggered(pid, data.get('damage', 0), data.get('hp', 0))
+		'distance':
+			_on_distance_changed(data.get('from', -1), data.get('to', -1), data.get('dist', 0))
+		'tiebreak_winner':
+			_in_tiebreak = false
+			_tiebreak_candidate_ids.clear()
+			_restore_card_styles()
+			phase_label.add_theme_color_override("font_color", Color("#FFFDF5"))
+			var pid: int = data.get('player_id', -1)
+			var p := GameManager.get_player(pid)
+			_append_log('── 加赛胜出：%s ──' % (p.player_name if p else str(pid)), LT_WIN)
+
+func _on_full_state_sync(players: Array, phase: int, round: int) -> void:
+	_current_round = round
+	if _player_cards.is_empty():
+		_setup_from_sync(players)
+		# PHASE_ENTER 先于 FULL_STATE_SYNC 到达时 _human_player_id 尚未设置，
+		# 导致手势面板未显示。此处补充更新 UI 状态。
+		if _human_player_id >= 0 and not is_spectating:
+			var human_alive := false
+			for ps_data in players:
+				if ps_data["id"] == _human_player_id and ps_data["alive"]:
+					human_alive = true
+					break
+			if human_alive:
+				gesture_panel.show()
+		_show_all_thinking()
+	else:
+		ClientStateSync.apply_full_sync(players)
+		for ps_data in players:
+			_refresh_player_card(ps_data["id"])
+		_refresh_all_distances()
+		_rebuild_distance_labels()
+
+func _on_state_hash_received(expected_hash: int) -> void:
+	var local_hash := _compute_local_state_hash()
+	if local_hash != expected_hash:
+		push_warning("[GameUI] 状态不同步（本地: %d，服务器: %d），请求全量同步" % [local_hash, expected_hash])
+		if net_client:
+			net_client.rpc_id(1, "client_request_sync")
+
+func _compute_local_state_hash() -> int:
+	var parts: Array[String] = []
+	for p in GameManager._players:
+		parts.append("%d:%d:%d:%d:%d:%d" % [
+			p.player_id, p.hp, p.energy, p.shield,
+			p.clone_count, p.paralyze_turns
+		])
+	parts.sort()
+	return hash(",".join(PackedStringArray(parts)))
+
+func _setup_from_sync(players_data: Array) -> void:
+	for child in players_container.get_children():
+		child.queue_free()
+	_player_cards.clear()
+	_elimination_log.clear()
+	_elim_order = 0
+
+	var my_pid = net_client.my_player_id if net_client else -1
+	var player_states: Array[PlayerState] = []
+	for data in players_data:
+		var char_res = load(data["char_id"]) as CharacterData
+		if char_res == null:
+			continue
+		var ps = PlayerState.new(data["id"], data["name"], char_res, data.get("is_human", data["id"] == my_pid))
+		ps.team_id = data.get("team", 0)
+		ps.hp = data["hp"]
+		ps.energy = data["energy"]
+		ps.shield = data["shield"]
+		ps.paralyze_turns = data["paralyze"]
+		ps.clone_count = data["clone"]
+		ps.is_alive = data["alive"]
+		ps.delayed_damages = data.get("delayed_dmg", [])
+		for path in data.get("unlocked_skills", []):
+			var skill_res := load(path) as SkillData
+			if skill_res and not ps.unlocked_skills.has(skill_res):
+				ps.unlocked_skills.append(skill_res)
+		player_states.append(ps)
+		if data["id"] == my_pid:
+			_human_player_id = my_pid
+
+	# 客户端：将同步的玩家状态写入 GameManager，使 get_player() 可用
+	GameManager._players.clear()
+	for ps in player_states:
+		GameManager._players.append(ps)
+
+	# 客户端初始化 DistanceSystem，使 get_distance() / _refresh_player_card 可用
+	GameManager._distance_system = DistanceSystem.new()
+	var seat_order: Array[int] = []
+	for ps2 in player_states:
+		seat_order.append(ps2.player_id)
+	GameManager._distance_system.setup(seat_order)
+
+	var count := player_states.size()
+	for i in count:
+		var ps := player_states[i]
+		var angle := -PI / 2.0 + i * (TAU / count)
+		var cx := ARENA_CENTER.x + ARENA_RADIUS * cos(angle)
+		var cy := ARENA_CENTER.y + ARENA_RADIUS * sin(angle)
+		var card := _build_player_card(ps)
+		card.position = Vector2(cx - 52.0, cy - 55.0)
+		players_container.add_child(card)
+		_player_cards[ps.player_id] = card
+
+	_refresh_all_distances()
+	_rebuild_distance_labels()
+
+	for ps in player_states:
+		_add_filter_button(ps.character.character_name, ps.player_id)
+
+func _on_game_over_result(winner_id: int, match_data: Dictionary = {}) -> void:
+	gesture_panel.hide()
+	action_panel.hide()
+	target_panel.hide()
+	var record = MatchRecord.from_dict(match_data) if not match_data.is_empty() else null
+	SceneManager.pending_game_result = {
+		'winner_id': winner_id,
+		'elimination_log': _elimination_log.duplicate(true),
+		'match_record': record,
+		'round': _current_round,
+	}
+	SceneManager.go_to('res://scenes/game_over.tscn')

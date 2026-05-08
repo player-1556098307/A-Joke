@@ -18,6 +18,10 @@ var paralyze_turns: int = 0           ## 剩余麻痹回合数（自动跳过出
 var is_alive: bool                    ## 是否存活
 var is_human: bool                    ## 是否人类玩家
 
+## 团队 ID：0 = FFA（无队伍），1/2 = 团队编号
+var team_id: int = 0
+## 是否当前由 AI 托管（断线替补）
+var is_ai_controlled: bool = false
 ## ── 持续状态字段（跨回合保留）─────────────────────────────────────────────────
 ## 延迟伤害队列 [{damage, trigger_in(剩余回合), attacker_id}]
 var delayed_damages: Array[Dictionary] = []

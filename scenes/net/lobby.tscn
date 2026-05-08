@@ -1,0 +1,419 @@
+[gd_scene format=3 uid="uid://v923mev6w5m"]
+
+[ext_resource type="Script" uid="uid://c5m8n2k9p7w1" path="res://scenes/net/lobby.gd" id="1_lobby"]
+
+[sub_resource type="Shader" id="Shader_bg"]
+code = "shader_type canvas_item;
+void fragment() {
+	COLOR = mix(vec4(0.239, 0.196, 0.157, 1.0), vec4(0.961, 0.941, 0.898, 1.0), UV.y);
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMat_bg"]
+shader = SubResource("Shader_bg")
+
+[sub_resource type="StyleBoxFlat" id="SB_topbar"]
+bg_color = Color(0.165, 0.141, 0.094, 1)
+border_color = Color(0.784, 0.525, 0.039, 1)
+border_width_left = 5
+border_width_bottom = 3
+
+[sub_resource type="StyleBoxFlat" id="SB_input_normal"]
+bg_color = Color(1, 1, 1, 1)
+border_color = Color(0.871, 0.855, 0.816, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 6.0
+content_margin_right = 6.0
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="SB_input_focus"]
+bg_color = Color(1, 1, 1, 1)
+border_color = Color(0.784, 0.525, 0.039, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 6.0
+content_margin_right = 6.0
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="SB_btn_create"]
+bg_color = Color(0.992, 0.965, 0.910, 1)
+border_color = Color(0.784, 0.525, 0.039, 1)
+border_width_left = 4
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="SB_btn_plain"]
+bg_color = Color(1, 1, 1, 1)
+border_color = Color(0.871, 0.855, 0.816, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="SB_filter_btn"]
+bg_color = Color(0, 0, 0, 0)
+border_color = Color(0.784, 0.525, 0.039, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="SB_list_header"]
+bg_color = Color(0.929, 0.914, 0.878, 1)
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 2.0
+content_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxEmpty" id="SB_empty"]
+
+[sub_resource type="StyleBoxFlat" id="SB_empty_row"]
+bg_color = Color(0.980, 0.973, 0.957, 1)
+border_color = Color(0.871, 0.855, 0.816, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="SB_bottom_bar"]
+bg_color = Color(1, 1, 1, 1)
+border_color = Color(0.871, 0.855, 0.816, 1)
+border_width_top = 1
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="SB_btn_back"]
+bg_color = Color(0.992, 0.941, 0.941, 1)
+border_color = Color(0.600, 0.208, 0.337, 1)
+border_width_left = 4
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[node name="Lobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lobby")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 540.0
+mouse_filter = 2
+material = SubResource("ShaderMat_bg")
+color = Color(0.239, 0.196, 0.157, 1)
+
+[node name="TopBar" type="Panel" parent="."]
+layout_mode = 0
+offset_right = 960.0
+offset_bottom = 64.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("SB_topbar")
+
+[node name="TitleVBox" type="VBoxContainer" parent="TopBar"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 10.0
+offset_right = 340.0
+offset_bottom = 54.0
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="TitleLabel" type="Label" parent="TopBar/TitleVBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.961, 0.784, 0.259, 1)
+theme_override_font_sizes/font_size = 22
+text = "房间大厅"
+
+[node name="SubtitleLabel" type="Label" parent="TopBar/TitleVBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.627, 0.596, 0.471, 1)
+theme_override_font_sizes/font_size = 11
+text = "ROOM LOBBY"
+
+[node name="FilterRow" type="HBoxContainer" parent="TopBar"]
+layout_mode = 0
+offset_left = 400.0
+offset_top = 16.0
+offset_right = 848.0
+offset_bottom = 48.0
+theme_override_constants/separation = 8
+
+[node name="BtnAll" type="Button" parent="TopBar/FilterRow"]
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.784, 0.525, 0.039, 1)
+theme_override_styles/normal = SubResource("SB_filter_btn")
+theme_override_styles/hover = SubResource("SB_filter_btn")
+text = "全部"
+
+[node name="BtnFFA" type="Button" parent="TopBar/FilterRow"]
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.784, 0.525, 0.039, 1)
+theme_override_styles/normal = SubResource("SB_filter_btn")
+theme_override_styles/hover = SubResource("SB_filter_btn")
+text = "自由对战"
+
+[node name="Btn2v2" type="Button" parent="TopBar/FilterRow"]
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.784, 0.525, 0.039, 1)
+theme_override_styles/normal = SubResource("SB_filter_btn")
+theme_override_styles/hover = SubResource("SB_filter_btn")
+text = "2v2团队"
+
+[node name="SearchRow" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 70.0
+offset_right = 920.0
+offset_bottom = 108.0
+theme_override_constants/separation = 8
+
+[node name="SearchLabel" type="Label" parent="SearchRow"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.165, 0.141, 0.094, 1)
+theme_override_font_sizes/font_size = 12
+text = "查找房间"
+
+[node name="SearchInput" type="LineEdit" parent="SearchRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("SB_input_normal")
+theme_override_styles/focus = SubResource("SB_input_focus")
+placeholder_text = "搜索房间名..."
+
+[node name="BtnSearch" type="Button" parent="SearchRow"]
+layout_mode = 2
+focus_mode = 0
+custom_minimum_size = Vector2(64, 0)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("SB_btn_plain")
+text = "搜索"
+
+[node name="BtnCreate" type="Button" parent="SearchRow"]
+layout_mode = 2
+focus_mode = 0
+custom_minimum_size = Vector2(110, 0)
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.784, 0.525, 0.039, 1)
+theme_override_styles/normal = SubResource("SB_btn_create")
+text = "+ 创建房间"
+
+[node name="ListHeader" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 114.0
+offset_right = 920.0
+offset_bottom = 138.0
+theme_override_styles/panel = SubResource("SB_list_header")
+
+[node name="HeaderHBox" type="HBoxContainer" parent="ListHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="ColName" type="Label" parent="ListHeader/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.5
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_font_sizes/font_size = 11
+text = "房间名称"
+
+[node name="ColHost" type="Label" parent="ListHeader/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.5
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_font_sizes/font_size = 11
+text = "房主"
+
+[node name="ColMode" type="Label" parent="ListHeader/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_font_sizes/font_size = 11
+text = "模式"
+
+[node name="ColPlayers" type="Label" parent="ListHeader/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.8
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_font_sizes/font_size = 11
+text = "人数"
+
+[node name="ColStatus" type="Label" parent="ListHeader/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_font_sizes/font_size = 11
+text = "状态"
+
+[node name="ColAction" type="Label" parent="ListHeader/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.8
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_font_sizes/font_size = 11
+text = "操作"
+
+[node name="RoomListScroll" type="ScrollContainer" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 142.0
+offset_right = 920.0
+offset_bottom = 468.0
+horizontal_scroll_mode = 0
+theme_override_styles/panel = SubResource("SB_empty")
+
+[node name="ListVBox" type="VBoxContainer" parent="RoomListScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="EmptyRow" type="PanelContainer" parent="RoomListScroll/ListVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("SB_empty_row")
+
+[node name="EmptyLabel" type="Label" parent="RoomListScroll/ListVBox/EmptyRow"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.871, 0.855, 0.816, 1)
+theme_override_font_sizes/font_size = 12
+text = "暂无房间，点击「+ 创建房间」建立一个"
+
+[node name="BottomBar" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_top = 468.0
+offset_right = 960.0
+offset_bottom = 540.0
+theme_override_styles/panel = SubResource("SB_bottom_bar")
+
+[node name="BtnRow" type="HBoxContainer" parent="BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="BtnBack" type="Button" parent="BottomBar/BtnRow"]
+layout_mode = 2
+focus_mode = 0
+custom_minimum_size = Vector2(140, 0)
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.600, 0.208, 0.337, 1)
+theme_override_styles/normal = SubResource("SB_btn_back")
+text = "◄  返回主菜单"
+
+[node name="StatusLabel" type="Label" parent="BottomBar/BtnRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.627, 0.596, 0.471, 1)
+theme_override_font_sizes/font_size = 11
+
+[node name="PaginationRow" type="HBoxContainer" parent="BottomBar/BtnRow"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 4
+
+[node name="BtnPrev" type="Button" parent="BottomBar/BtnRow/PaginationRow"]
+layout_mode = 2
+focus_mode = 0
+custom_minimum_size = Vector2(32, 0)
+theme_override_styles/normal = SubResource("SB_btn_plain")
+text = "◀"
+
+[node name="PageLabel" type="Label" parent="BottomBar/BtnRow/PaginationRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+size_flags_vertical = 4
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.627, 0.596, 0.471, 1)
+theme_override_font_sizes/font_size = 11
+text = "第 1 / 1 页"
+
+[node name="BtnNext" type="Button" parent="BottomBar/BtnRow/PaginationRow"]
+layout_mode = 2
+focus_mode = 0
+custom_minimum_size = Vector2(32, 0)
+theme_override_styles/normal = SubResource("SB_btn_plain")
+text = "▶"
+
+[node name="BtnRefresh" type="Button" parent="BottomBar/BtnRow"]
+layout_mode = 2
+focus_mode = 0
+custom_minimum_size = Vector2(80, 0)
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.533, 0.518, 0.502, 1)
+theme_override_styles/normal = SubResource("SB_btn_plain")
+text = "↻ 刷新"
