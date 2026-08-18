@@ -1723,6 +1723,9 @@ func _on_backtrack_made(player_id: int, use_backtrack: bool) -> void:
 		return
 	if use_backtrack:
 		_apply_backtrack(player)
+	else:
+		# 跳过：本次回溯机会已消耗，清空上回合快照，防止 _process_prep_next 轮询回自己时再次触发回溯弹窗
+		_prev_round_pre_snapshot = {}
 	# 无论回溯/跳过，继续推进准备阶段
 	_process_prep_next()
 

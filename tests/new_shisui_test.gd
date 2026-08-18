@@ -270,6 +270,45 @@ func _ready() -> void:
 	_assert(bt_perf.size() == 1, "9l: backtrack_performed信号已发射（实际=%d）" % bt_perf.size())
 	_assert(gm.get("_current_phase") == GameManager.GamePhase.ACTION_INPUT, "9m: 回溯后进入行动阶段（实际=%d）" % gm.get("_current_phase"))
 
+	# ═════════ 测试 9.5：回溯可跳过（点击跳过不再循环弹窗） ═════════
+	# 独立 setup：新止水第1回合鸣人胜→普攻，第2回合新止水胜→准备阶段触发回溯
+	# 点击"跳过"后：上回合快照被清空 + 进入行动阶段（不再反复弹窗）
+	gm.setup_game({
+		"players": [
+			{"name": "新止水", "character": new_shisui_char, "is_human": true},
+			{"name": "鸣人", "character": naruto_char, "is_human": true},
+			{"name": "佐助", "character": sasuke_char, "is_human": true},
+		]
+	})
+	await get_tree().process_frame
+	ns = gm.get_player(0)
+	nar = gm.get_player(1)
+	sas = gm.get_player(2)
+	# 第1回合：鸣人胜 → 普攻佐助
+	ns.current_gesture = PlayerState.Gesture.SCISSORS
+	nar.current_gesture = PlayerState.Gesture.ROCK
+	sas.current_gesture = PlayerState.Gesture.SCISSORS
+	gm.call("_resolve_round")
+	nar.energy = 1
+	gm.submit_action(1, PlayerState.ActionType.USE_SKILL, _find_skill_index(nar, "普攻"), 2)
+	# 第2回合：新止水胜 → 回溯弹窗触发
+	ns.current_gesture = PlayerState.Gesture.ROCK
+	nar.current_gesture = PlayerState.Gesture.SCISSORS
+	sas.current_gesture = PlayerState.Gesture.SCISSORS
+	var bt_req95: Array = []
+	gm.backtrack_required.connect(func(pid: int): bt_req95.append(pid))
+	ns.energy = 1
+	gm.call("_resolve_round")
+	_assert(gm.get("_sole_winner_id") == 0, "95a: 第2回合新止水胜（实际=%d）" % gm.get("_sole_winner_id"))
+	_assert(bt_req95.size() == 1, "95b: 回溯弹窗已触发（实际=%d）" % bt_req95.size())
+	_assert(not gm.get("_prev_round_pre_snapshot").is_empty(), "95c: 上回合快照存在")
+	# 点击"跳过" → 快照清空、进入行动阶段、不再次触发弹窗
+	gm.submit_backtrack_decision(0, false)
+	_assert(gm.get("_prev_round_pre_snapshot").is_empty(), "95d: 跳过回溯后快照已清空（不循环）")
+	_assert(gm.get("_current_phase") == GameManager.GamePhase.ACTION_INPUT, "95e: 跳过回溯直接进入行动阶段（实际=%d）" % gm.get("_current_phase"))
+	_assert(ns.energy == 1, "95f: 跳过不消耗气（实际=%d）" % ns.energy)
+	_assert(bt_req95.size() == 1, "95g: 不再重复触发回溯弹窗（实际=%d）" % bt_req95.size())
+
 	# ═════════ 测试 10：回溯不可用（上回合是自己） ═════════
 	# 第3回合：新止水再胜 → 上回合主=自己 → 不可回溯 → 直接行动
 	ns.current_gesture = PlayerState.Gesture.ROCK
