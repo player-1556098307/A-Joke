@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_slxz"]
+script = ExtResource("1_effect")
+effect_type = 10
+value = 10
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "双龙戏珠"
+description = "限定技：与分身同时对一名玩家释放夜凯，造成 10 点真实伤害，然后分身消失。与夜凯共用限定技名额。可使用生命值代替气支付。"
+energy_cost = 5
+min_range = 1
+max_range = 1
+is_limited = true
+is_passive = true
+can_pay_with_hp = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_slxz")])

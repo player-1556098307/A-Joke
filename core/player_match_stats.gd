@@ -7,11 +7,11 @@ var player_name: String                  ## 玩家名称
 var character: CharacterData             ## 使用的角色数据
 var is_human: bool                       ## 是否为人类玩家
 
-var final_hp: int                        ## 最终生命值
-var max_hp: int                          ## 最大生命值
-var total_damage_dealt: int = 0          ## 造成的总伤害
-var total_damage_taken: int = 0          ## 承受的总伤害
-var total_healing: int = 0               ## 总治疗量
+var final_hp: float                        ## 最终生命值
+var max_hp: float                          ## 最大生命值
+var total_damage_dealt: float = 0.0       ## 造成的总伤害
+var total_damage_taken: float = 0.0       ## 承受的总伤害
+var total_healing: float = 0.0             ## 总治疗量
 var skill_use_count: int = 0             ## 使用技能次数
 var charge_count: int = 0                ## 充能次数
 var win_count: int = 0                   ## 猜拳胜出次数

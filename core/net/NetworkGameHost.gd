@@ -31,6 +31,7 @@ func _connect_signals() -> void:
 	_game_manager.action_required.connect(_on_action_required)
 	_game_manager.skill_applied.connect(_on_skill_applied)
 	_game_manager.player_paralyzed.connect(_on_player_paralyzed_broadcast)
+	_game_manager.player_knocked_down.connect(_on_player_knocked_down_broadcast)
 	_game_manager.player_charged.connect(_on_player_charged)
 	_game_manager.player_eliminated.connect(_on_player_eliminated)
 	_game_manager.game_over.connect(_on_game_over)
@@ -39,6 +40,45 @@ func _connect_signals() -> void:
 	_game_manager.distance_changed.connect(_on_distance_changed)
 	_game_manager.tiebreak_started.connect(_on_tiebreak_started)
 	_game_manager.tiebreak_resolved.connect(_on_tiebreak_resolved)
+	_game_manager.bell_gained.connect(_on_bell_gained)
+	_game_manager.counter_stance_entered.connect(_on_counter_stance_entered)
+	_game_manager.counter_stance_triggered.connect(_on_counter_stance_triggered)
+	_game_manager.counter_stance_ended.connect(_on_counter_stance_ended)
+	_game_manager.skill_disabled.connect(_on_skill_disabled_broadcast)
+	_game_manager.end_phase_bell_decision_required.connect(_on_end_phase_bell_decision_required)
+	_game_manager.player_invincible.connect(_on_player_invincible)
+	_game_manager.player_burning.connect(_on_player_burning)
+	_game_manager.player_berserker.connect(_on_player_berserker)
+	_game_manager.gate_changed.connect(_on_gate_changed)
+	_game_manager.eighth_gate_opened.connect(_on_eighth_gate_opened)
+	_game_manager.skill_lost.connect(_on_skill_lost)
+	_game_manager.burn_damage_triggered.connect(_on_burn_damage_triggered)
+	_game_manager.hp_payment_made.connect(_on_hp_payment_made)
+	_game_manager.ftg_marks_changed.connect(_on_ftg_marks_changed)
+	_game_manager.ftg_mark_applied.connect(_on_ftg_mark_applied)
+	_game_manager.ftg_mark_removed.connect(_on_ftg_mark_removed)
+	_game_manager.ftg_swap_triggered.connect(_on_ftg_swap_triggered)
+	_game_manager.ftg_dodge_triggered.connect(_on_ftg_dodge_triggered)
+	_game_manager.nine_tails_stage_changed.connect(_on_nine_tails_stage_changed)
+	_game_manager.nine_tails_invincible_started.connect(_on_nine_tails_invincible_started)
+	_game_manager.nine_tails_invincible_ended.connect(_on_nine_tails_invincible_ended)
+	_game_manager.nine_tails_attack.connect(_on_nine_tails_attack)
+	_game_manager.ftg_intercept_required.connect(_on_ftg_intercept_required)
+	_game_manager.rasengan_counter_required.connect(_on_rasengan_counter_required)
+	# ── 卫宫信号 ──
+	_game_manager.project_skill_required.connect(_on_project_skill_required)
+	_game_manager.project_skill_made.connect(_on_project_skill_made)
+	_game_manager.binding_field_started.connect(_on_binding_field_started)
+	_game_manager.binding_field_ended.connect(_on_binding_field_ended)
+	_game_manager.projected_skill_gained.connect(_on_projected_skill_gained)
+	_game_manager.projected_skill_lost.connect(_on_projected_skill_lost)
+	# ── 新止水（天劫）信号 ──
+	_game_manager.phantom_dodge_required.connect(_on_phantom_dodge_required)
+	_game_manager.backtrack_required.connect(_on_backtrack_required)
+	_game_manager.hiroari_targets_required.connect(_on_hiroari_targets_required)
+	_game_manager.phantom_changed.connect(_on_phantom_changed)
+	_game_manager.hiroari_used.connect(_on_hiroari_used)
+	_game_manager.backtrack_performed.connect(_on_backtrack_performed)
 
 # ─────────────────────────────────────────────────────────────
 # 玩家加入/断线
@@ -139,10 +179,10 @@ func client_submit_gesture(gesture: int) -> void:
 		_game_manager.submit_gesture(player_id, gesture as PlayerState.Gesture)
 
 @rpc("any_peer", "reliable")
-func client_submit_action(action: int, skill_index: int, target_id: int) -> void:
+func client_submit_action(action: int, skill_index: int, target_id: int, hp_paid: int = 0) -> void:
 	var peer_id = multiplayer.get_remote_sender_id()
 	var player_id: int = _peer_to_player.get(peer_id, -1)
-	print("[NetHost] client_submit_action peer_id=%d player_id=%d action=%d skill_index=%d target_id=%d" % [peer_id, player_id, action, skill_index, target_id])
+	print("[NetHost] client_submit_action peer_id=%d player_id=%d action=%d skill_index=%d target_id=%d hp_paid=%d" % [peer_id, player_id, action, skill_index, target_id, hp_paid])
 	if player_id < 0:
 		print("[NetHost] client_submit_action REJECT: unknown peer")
 		return
@@ -171,7 +211,7 @@ func client_submit_action(action: int, skill_index: int, target_id: int) -> void
 				return
 	print("[NetHost] client_submit_action ACCEPT: calling GameManager.submit_action")
 	_game_manager.submit_action(player_id,
-		action as PlayerState.ActionType, skill_index, target_id)
+		action as PlayerState.ActionType, skill_index, target_id, hp_paid)
 
 @rpc("any_peer", "unreliable")
 func client_ping(ts: float) -> void:
@@ -242,6 +282,64 @@ func client_request_sync() -> void:
 		{"player_id": player_id, "token": token, "room_id": room_id})
 	_send_full_sync(peer_id)
 
+@rpc("any_peer", "reliable")
+func client_submit_bell_decision(player_id: int, use_bell: bool) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	if _game_manager._current_phase != GameManager.GamePhase.END_PHASE:
+		return
+	GameManager.submit_bell_decision(player_id, use_bell)
+
+@rpc("any_peer", "reliable")
+func client_submit_ftg_intercept(player_id: int, choice: int, swap_target_id: int) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	GameManager.submit_ftg_intercept(player_id, choice, swap_target_id)
+
+@rpc("any_peer", "reliable")
+func client_submit_rasengan_counter(player_id: int, use_counter: bool) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	GameManager.submit_rasengan_counter(player_id, use_counter)
+
+@rpc("any_peer", "reliable")
+func client_submit_project_skill(player_id: int, target_id: int, skill_path: String) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	GameManager.submit_project_skill(player_id, target_id, skill_path)
+
+@rpc("any_peer", "reliable")
+func client_submit_phantom_dodge(player_id: int, dodge: bool) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	GameManager.submit_phantom_dodge(player_id, dodge)
+
+@rpc("any_peer", "reliable")
+func client_submit_backtrack_decision(player_id: int, use_backtrack: bool) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	GameManager.submit_backtrack_decision(player_id, use_backtrack)
+
+@rpc("any_peer", "reliable")
+func client_submit_hiroari_targets(player_id: int, targets: Array[int]) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != player_id:
+		return
+	GameManager.submit_hiroari_targets(player_id, targets)
+
 # ─────────────────────────────────────────────────────────────
 # GameManager 信号 → RPC 广播
 # ─────────────────────────────────────────────────────────────
@@ -285,6 +383,11 @@ func _on_player_paralyzed_broadcast(player_id: int, turns: int) -> void:
 		_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
 			{"type": "paralyze", "player_id": player_id, "turns": 0}, _spectator_peers)
 
+func _on_player_knocked_down_broadcast(player_id: int, turns: int) -> void:
+	if turns == 0:
+		_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+			{"type": "knockdown", "player_id": player_id, "turns": 0}, _spectator_peers)
+
 func _on_player_charged(player_id: int, new_energy: int) -> void:
 	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
 		{"type": "charge", "player_id": player_id, "energy": new_energy},
@@ -306,7 +409,7 @@ func _on_skill_unlocked(player_id: int, skill_name: String) -> void:
 		{"type": "skill_unlocked", "player_id": player_id, "skill": skill_name},
 		_spectator_peers)
 
-func _on_delayed_damage(player_id: int, damage: int, remaining_hp: int) -> void:
+func _on_delayed_damage(player_id: int, damage: float, remaining_hp: float) -> void:
 	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
 		{"type": "delayed_damage", "player_id": player_id,
 		 "damage": damage, "hp": remaining_hp}, _spectator_peers)
@@ -324,6 +427,218 @@ func _on_tiebreak_started(candidates: Array[int]) -> void:
 func _on_tiebreak_resolved(winner_id: int) -> void:
 	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
 		{"type": "tiebreak_winner", "player_id": winner_id}, _spectator_peers)
+
+func _on_bell_gained(player_id: int, bell_count: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "bell_gained", "player_id": player_id, "bell_count": bell_count},
+		_spectator_peers)
+
+func _on_counter_stance_entered(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "counter_stance", "player_id": player_id}, _spectator_peers)
+
+func _on_counter_stance_triggered(target_id: int, attacker_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "counter_triggered", "target_id": target_id, "attacker_id": attacker_id},
+		_spectator_peers)
+
+func _on_counter_stance_ended(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "counter_ended", "player_id": player_id}, _spectator_peers)
+
+func _on_skill_disabled_broadcast(player_id: int, turns: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "skill_disabled", "player_id": player_id, "turns": turns},
+		_spectator_peers)
+
+func _on_end_phase_bell_decision_required(player_id: int, bell_count: int) -> void:
+	# 仅通知有钟机制的玩家（人类玩家才需要弹UI）
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.END_PHASE_BELL,
+			{"player_id": player_id, "bell_count": bell_count})
+
+func _on_player_invincible(player_id: int, turns: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "invincible", "player_id": player_id, "turns": turns}, _spectator_peers)
+
+func _on_player_burning(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "burning", "player_id": player_id}, _spectator_peers)
+
+func _on_player_berserker(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "berserker", "player_id": player_id}, _spectator_peers)
+
+func _on_gate_changed(player_id: int, gate_count: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "gate_changed", "player_id": player_id, "gate_count": gate_count}, _spectator_peers)
+
+func _on_eighth_gate_opened(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "eighth_gate", "player_id": player_id}, _spectator_peers)
+
+func _on_skill_lost(player_id: int, skill_name: String) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "skill_lost", "player_id": player_id, "skill_name": skill_name}, _spectator_peers)
+
+func _on_burn_damage_triggered(player_id: int, damage: float, remaining_hp: float, reason: String) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "burn_damage", "player_id": player_id, "damage": damage, "hp": remaining_hp, "reason": reason}, _spectator_peers)
+
+## 血付广播：客户端需同步 HP 扣减与气增加
+func _on_hp_payment_made(player_id: int, hp_paid: float) -> void:
+	var p := _game_manager.get_player(player_id)
+	if p == null:
+		return
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "hp_payment", "player_id": player_id, "hp_paid": hp_paid,
+		 "hp": p.hp, "energy": p.energy}, _spectator_peers)
+
+# ── 波风水门信号广播 ──
+
+func _on_ftg_marks_changed(player_id: int, marks: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "ftg_marks_changed", "player_id": player_id, "marks": marks}, _spectator_peers)
+
+func _on_ftg_mark_applied(target_id: int, attacker_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "ftg_mark_applied", "target_id": target_id, "attacker_id": attacker_id}, _spectator_peers)
+
+func _on_ftg_mark_removed(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "ftg_mark_removed", "player_id": player_id}, _spectator_peers)
+
+func _on_ftg_swap_triggered(swapper_id: int, swapped_id: int, original_target_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "ftg_swap", "swapper_id": swapper_id, "swapped_id": swapped_id, "original_target_id": original_target_id}, _spectator_peers)
+
+func _on_ftg_dodge_triggered(player_id: int, attacker_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "ftg_dodge", "player_id": player_id, "attacker_id": attacker_id}, _spectator_peers)
+
+func _on_nine_tails_stage_changed(player_id: int, stage: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "nine_tails_stage", "player_id": player_id, "stage": stage}, _spectator_peers)
+
+func _on_nine_tails_invincible_started(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "nine_tails_invincible_started", "player_id": player_id}, _spectator_peers)
+
+func _on_nine_tails_invincible_ended(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "nine_tails_invincible_ended", "player_id": player_id}, _spectator_peers)
+
+func _on_nine_tails_attack(player_id: int, stage: int, damage: float, target_ids: Array[int]) -> void:
+	var hp_updates: Dictionary = {}
+	for tid in target_ids:
+		var tp := _game_manager.get_player(tid)
+		if tp:
+			hp_updates[str(tid)] = tp.hp
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "nine_tails_attack", "player_id": player_id, "stage": stage,
+			 "damage": damage, "target_ids": target_ids, "hp_updates": hp_updates}, _spectator_peers)
+
+## 飞雷神拦截决策请求：仅发给被拦截的水门玩家
+func _on_ftg_intercept_required(target_id: int, attacker_id: int, marked_player_ids: Array[int], attacker_is_marked: bool) -> void:
+	var peer_id: int = _player_to_peer.get(target_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.FTG_INTERCEPT,
+			{"target_id": target_id, "attacker_id": attacker_id,
+			 "marked_player_ids": marked_player_ids, "attacker_is_marked": attacker_is_marked})
+
+## 闪避后反击确认请求：仅发给闪避的水门玩家
+func _on_rasengan_counter_required(target_id: int, attacker_id: int, minato_energy: int) -> void:
+	var peer_id: int = _player_to_peer.get(target_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.FTG_COUNTER_CONFIRM,
+			{"target_id": target_id, "attacker_id": attacker_id, "minato_energy": minato_energy})
+
+# ── 卫宫信号广播 ──
+
+## 投影决策请求：仅发给被投影的人类玩家（AI 由 GameManager 自动决策）
+func _on_project_skill_required(player_id: int, target_ids: Array[int]) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.PROJECT_SKILL_REQUIRED,
+			{"player_id": player_id, "target_ids": target_ids})
+
+# ── 新止水（天劫）信号广播 ──
+
+## 幻影闪避决策请求：仅发给被攻击的新止水人类玩家
+func _on_phantom_dodge_required(player_id: int, attacker_id: int) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.PHANTOM_DODGE_REQUIRED,
+			{"player_id": player_id, "attacker_id": attacker_id})
+
+## 别天神回溯决策请求：仅发给新止水人类玩家（准备阶段）
+func _on_backtrack_required(player_id: int) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.BACKTRACK_REQUIRED,
+			{"player_id": player_id})
+
+## 日影舞目标选择请求：仅发给新止水人类玩家（行动阶段）
+func _on_hiroari_targets_required(player_id: int, target_ids: Array[int]) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.HIROARI_REQUIRED,
+			{"player_id": player_id, "target_ids": target_ids})
+
+## 幻影数量变化：广播给所有客户端（徽章刷新）
+func _on_phantom_changed(player_id: int, count: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "phantom_changed", "player_id": player_id, "count": count}, _spectator_peers)
+
+## 日影舞释放：广播给所有客户端（日志/UI）
+func _on_hiroari_used(player_id: int, target_ids: Array[int]) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "hiroari_used", "player_id": player_id, "target_ids": target_ids}, _spectator_peers)
+
+## 别天神回溯完成：广播给所有客户端（全体状态已恢复）
+## 回溯恢复的是快照状态，客户端无法用增量 ACTION_RESULT 表达，需全量同步 + 日志通知
+func _on_backtrack_performed(player_id: int, round: int) -> void:
+	# 先发日志通知（UI 显示），再发全量状态同步（恢复客户端状态）
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "backtrack_performed", "player_id": player_id, "round": round}, _spectator_peers)
+	var state = []
+	for p in _game_manager._players:
+		state.append(NetworkProtocol.serialize_player_state(p))
+	_broadcast(NetworkProtocol.SrvOp.FULL_STATE_SYNC,
+		{"players": state, "phase": _game_manager._current_phase,
+		 "round": _game_manager._current_round_number}, _spectator_peers)
+
+func _on_project_skill_made(player_id: int, target_id: int, skill_path: String) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "project_skill_made", "player_id": player_id, "target_id": target_id, "skill_path": skill_path},
+		_spectator_peers)
+
+func _on_binding_field_started(player_id: int, turns: int, target_ids: Array[int]) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "binding_field_started", "player_id": player_id, "turns": turns, "target_ids": target_ids},
+		_spectator_peers)
+
+func _on_binding_field_ended(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "binding_field_ended", "player_id": player_id}, _spectator_peers)
+
+func _on_projected_skill_gained(player_id: int, skill_name: String) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "projected_skill_gained", "player_id": player_id, "skill_name": skill_name},
+		_spectator_peers)
+
+func _on_projected_skill_lost(player_id: int, skill_name: String) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "projected_skill_lost", "player_id": player_id, "skill_name": skill_name},
+		_spectator_peers)
 
 # ─────────────────────────────────────────────────────────────
 # 广播工具
@@ -353,9 +668,21 @@ func _send_full_sync(peer_id: int) -> void:
 func _compute_state_hash() -> int:
 	var parts: Array[String] = []
 	for p in _game_manager._players:
-		parts.append("%d:%d:%d:%d:%d:%d" % [
+		# 卫宫字段追加：投影技能路径、投影已用标记、结界回合数、结界锁定目标数、结界技能数
+		# 新止水字段追加：幻影数量（phantom_count）
+		parts.append("%d:%.1f:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%s:%d:%d:%d:%d" % [
 			p.player_id, p.hp, p.energy, p.shield,
-			p.clone_count, p.paralyze_turns
+			p.clone_count, p.paralyze_turns, p.knockdown_turns, p.bell_count,
+			1 if p.counter_stance else 0, p.skill_disabled_turns,
+			p.gate_count, p.invincible_turns,
+			1 if p.burning else 0, 1 if p.berserker else 0,
+			p.ftg_marks, p.nine_tails_stage,
+			p.max_energy, p.stomp_active,
+			p.projected_skill.resource_path if p.projected_skill != null else "",
+			1 if p.projected_used_this_round else 0,
+			p.binding_field_turns,
+			p.binding_field_targets.size() + p.binding_field_skills.size(),
+			p.phantom_count,
 		])
 	parts.sort()
 	return hash(",".join(PackedStringArray(parts)))

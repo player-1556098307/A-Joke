@@ -292,7 +292,7 @@ func _add_mini_card(char_data: CharacterData) -> void:
 	hp_lbl.offset_top = 120.0
 	hp_lbl.offset_right = 90.0
 	hp_lbl.offset_bottom = 133.0
-	hp_lbl.text = "HP %d · %s" % [char_data.max_hp, cls]
+	hp_lbl.text = "HP %.1f · %s" % [char_data.max_hp, cls]
 	hp_lbl.add_theme_font_size_override("font_size", 10)
 	hp_lbl.add_theme_color_override("font_color", info_col)
 	hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

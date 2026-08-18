@@ -40,8 +40,35 @@ func modify_distance(from_id: int, to_id: int, delta: int) -> void:
 func remove_player(player_id: int) -> void:
 	_seat_order.erase(player_id)
 
+## 交换两名玩家在环形座位表中的位置（飞雷神换位用）
+func swap_seats(player_a: int, player_b: int) -> void:
+	var idx_a := _seat_order.find(player_a)
+	var idx_b := _seat_order.find(player_b)
+	if idx_a == -1 or idx_b == -1:
+		return
+	_seat_order[idx_a] = player_b
+	_seat_order[idx_b] = player_a
+
 ## 生成无方向的键："min_id:max_id"
 func _make_key(a: int, b: int) -> String:
 	if a < b:
 		return "%d:%d" % [a, b]
 	return "%d:%d" % [b, a]
+
+## 拍摄座位系统快照（用于新止水·别天神回溯）
+func capture_snapshot() -> Dictionary:
+	return {
+		"seat_order": _seat_order.duplicate(),
+		"distance_offsets": _distance_offsets.duplicate(),
+	}
+
+## 从快照恢复座位系统（用于新止水·别天神回溯）
+## 注意：回溯时被恢复为存活的玩家需要重新加入座位表（由 GameManager 处理）
+func restore_from_snapshot(snap: Dictionary) -> void:
+	if snap.is_empty():
+		return
+	_seat_order = (snap.get("seat_order", []) as Array).duplicate()
+	_distance_offsets.clear()
+	var offsets: Dictionary = snap.get("distance_offsets", {})
+	for key in offsets:
+		_distance_offsets[key] = offsets[key]

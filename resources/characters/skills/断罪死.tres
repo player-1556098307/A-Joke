@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_duz"]
+script = ExtResource("1_effect")
+effect_type = 17
+value = 7
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "第七圣典·断罪死"
+description = "无视距离与一名敌人进行7次猜拳：每次赢造成1伤，每次输自身回复1血；赢4次及以上则目标直接淘汰。"
+energy_cost = 6
+min_range = 1
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_duz")])

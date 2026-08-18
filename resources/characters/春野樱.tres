@@ -53,3 +53,4 @@ basic_attack_cost = 2
 portrait = ExtResource("1_mx7i2")
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_sk"), SubResource("SD_sk1"), SubResource("SD_sk2")])
 tags = Array[String](["坦克"])
+grade = "C"

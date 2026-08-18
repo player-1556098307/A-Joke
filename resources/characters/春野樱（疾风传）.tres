@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Texture2D" uid="uid://depgrn1uo6j8s" path="res://resources/portraits/sakura_fy.png" id="2_portrait"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="3_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="4_char"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 2
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("3_skill")
+skill_name = "普攻"
+description = "以怪力重击，造成 2 点伤害。"
+energy_cost = 3
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_gl"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 3
+target = 0
+
+[sub_resource type="Resource" id="SD_gl"]
+script = ExtResource("3_skill")
+skill_name = "怪力"
+description = "集中查克拉于拳头，对一名玩家造成 3 点伤害。"
+energy_cost = 4
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_gl")])
+
+[sub_resource type="Resource" id="SE_hf"]
+script = ExtResource("1_effect")
+effect_type = 4
+value = 2
+target = 2
+
+[sub_resource type="Resource" id="SD_hf"]
+script = ExtResource("3_skill")
+skill_name = "恢复"
+description = "运用医疗忍术恢复自身 2 点生命值。"
+energy_cost = 3
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_hf")])
+
+[resource]
+script = ExtResource("4_char")
+character_name = "春野樱（疾风传）"
+max_hp = 8
+basic_attack_cost = 3
+portrait = ExtResource("2_portrait")
+skills = Array[ExtResource("3_skill")]([SubResource("SD_ba"), SubResource("SD_gl"), SubResource("SD_hf")])
+tags = Array[String](["战士", "坦克"])
+grade = "B"

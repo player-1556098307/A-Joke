@@ -4,6 +4,7 @@ extends Control
 
 @onready var btn_back: Button           = $BtnBack
 @onready var character_list: VBoxContainer = $LeftList/CharacterList
+@onready var grade_filter_bar: HBoxContainer = $GradeFilterBar
 @onready var avatar_box: Panel          = $AvatarBox
 @onready var avatar_label: Label        = $AvatarBox/AvatarLabel
 @onready var stats_panel: Panel         = $StatsPanel
@@ -23,9 +24,16 @@ var ai_count: int = 2
 var debug_force_scissors: bool = false
 var all_characters: Array[CharacterData] = []
 var _card_buttons:    Array[Button] = []
+var _card_chars:      Array[CharacterData] = []   # 与 _card_buttons 平行的角色（排序后顺序）
 var _card_name_lbls:  Array[Label]  = []
 var _card_hp_lbls:    Array[Label]  = []
 var _card_sel_badges: Array[Panel]  = []
+var _grade_buttons:   Array[Button] = []
+var _grade_filter:    String = ""   # 当前筛选等级："" 全部 / "S" / "A" / "B" / "C"
+
+# 等级筛选排序权重（S=0, A=1, B=2, C=3）
+const GRADE_ORDER := { "S": 0, "A": 1, "B": 2, "C": 3 }
+const GRADE_BUTTONS := ["S", "A", "B", "C"]
 
 # ── Class colour maps ─────────────────────────────────────────────────────────
 
@@ -77,9 +85,10 @@ func _ready() -> void:
 	btn_start.pressed.connect(_on_start_pressed)
 	_setup_debug_toggle()
 	_load_all_characters()
+	_build_grade_filter()
 	_build_character_list()
-	if all_characters.size() > 0:
-		_select_character(all_characters[0])
+	if _card_chars.size() > 0:
+		_select_character(_card_chars[0])
 
 # ── Styling ───────────────────────────────────────────────────────────────────
 
@@ -164,6 +173,17 @@ const _CHARACTER_PRELOADS = [
 	preload("res://resources/characters/宇智波佐助.tres"),
 	preload("res://resources/characters/宇智波佐助（疾风传）.tres"),
 	preload("res://resources/characters/春野樱.tres"),
+	preload("res://resources/characters/千手柱间.tres"),
+	preload("res://resources/characters/迈特凯.tres"),
+	preload("res://resources/characters/波风水门.tres"),
+	preload("res://resources/characters/希耶尔.tres"),
+	preload("res://resources/characters/千手柱间（秽土转生）.tres"),
+	preload("res://resources/characters/卫宫.tres"),
+	preload("res://resources/characters/宇智波泉奈.tres"),
+	preload("res://resources/characters/宇智波止水（须佐能）.tres"),
+	preload("res://resources/characters/宇智波止水（天劫）.tres"),
+	preload("res://resources/characters/春野樱（疾风传）.tres"),
+	preload("res://resources/characters/漩涡鸣人（疾风传）.tres"),
 ]
 
 func _load_all_characters() -> void:
@@ -173,19 +193,105 @@ func _load_all_characters() -> void:
 
 # ── Character list ────────────────────────────────────────────────────────────
 
+## 构建等级筛选栏（S/A/B/C + 全部），互斥单选
+func _build_grade_filter() -> void:
+	for child in grade_filter_bar.get_children():
+		child.queue_free()
+	_grade_buttons.clear()
+
+	# "全部" 按钮（默认选中）
+	var all_btn := Button.new()
+	all_btn.text = "全部"
+	all_btn.focus_mode = Control.FOCUS_NONE
+	all_btn.custom_minimum_size = Vector2(56, 24)
+	all_btn.add_theme_font_size_override("font_size", 11)
+	all_btn.pressed.connect(func(): _set_grade_filter(""))
+	grade_filter_bar.add_child(all_btn)
+	_grade_buttons.append(all_btn)
+
+	for g in GRADE_BUTTONS:
+		var btn := Button.new()
+		btn.text = "%s级" % g
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.custom_minimum_size = Vector2(56, 24)
+		btn.add_theme_font_size_override("font_size", 11)
+		btn.pressed.connect(_set_grade_filter.bind(g))
+		grade_filter_bar.add_child(btn)
+		_grade_buttons.append(btn)
+
+	_refresh_grade_filter_style()
+
+func _set_grade_filter(grade: String) -> void:
+	if _grade_filter == grade:
+		return
+	_grade_filter = grade
+	_refresh_grade_filter_style()
+	_build_character_list()
+	# 筛选后仍选中原角色（若在当前筛选中）则保持，否则重置为列表第一个可见角色
+	if selected_character != null and _matches_filter(selected_character):
+		_update_list_selection()
+	else:
+		for i in _card_buttons.size():
+			if _card_buttons[i].visible:
+				_select_character(_card_chars[i])
+				return
+
+func _refresh_grade_filter_style() -> void:
+	for i in _grade_buttons.size():
+		var btn: Button = _grade_buttons[i]
+		var label: String = btn.text
+		var grade: String = label.replace("级", "") if label != "全部" else ""
+		var is_active := (grade == _grade_filter) or (label == "全部" and _grade_filter == "")
+		if is_active:
+			btn.add_theme_stylebox_override("normal",  _make_flat(Color("#3B6D11"), Color("#2C2C2A"), 2, 4))
+			btn.add_theme_stylebox_override("hover",   _make_flat(Color("#4A8A16"), Color("#2C2C2A"), 2, 4))
+			btn.add_theme_stylebox_override("pressed", _make_flat(Color("#27500A"), Color("#2C2C2A"), 2, 4))
+			btn.add_theme_color_override("font_color", Color("#EAF3DE"))
+		else:
+			btn.add_theme_stylebox_override("normal",  _make_flat(Color("#FFFDF5"), Color("#D3D1C7"), 1, 4))
+			btn.add_theme_stylebox_override("hover",   _make_flat(Color("#F5F3EC"), Color("#B4B2A9"), 1, 4))
+			btn.add_theme_stylebox_override("pressed", _make_flat(Color("#EAE8E1"), Color("#888780"), 1, 4))
+			btn.add_theme_color_override("font_color", Color("#2C2C2A"))
+
+func _matches_filter(char_data: CharacterData) -> bool:
+	return _grade_filter == "" or char_data.grade == _grade_filter
+
+## 获取按等级排序（S→A→B→C，同级保持上架顺序）后的角色数组
+func _sorted_characters() -> Array[CharacterData]:
+	var sorted: Array[CharacterData] = []
+	for c in all_characters:
+		sorted.append(c)
+	sorted.sort_custom(func(a: CharacterData, b: CharacterData) -> bool:
+		var ga: int = GRADE_ORDER.get(a.grade, 9)
+		var gb: int = GRADE_ORDER.get(b.grade, 9)
+		if ga != gb:
+			return ga < gb
+		return false)  # 同级保持原顺序（sort_custom 稳定）
+	return sorted
+
 func _build_character_list() -> void:
 	for child in character_list.get_children():
 		child.queue_free()
 	_card_buttons.clear()
+	_card_chars.clear()
 	_card_name_lbls.clear()
 	_card_hp_lbls.clear()
 	_card_sel_badges.clear()
 
-	for char_data in all_characters:
+	for char_data in _sorted_characters():
 		var card := _make_character_card(char_data)
 		character_list.add_child(card)
 		_card_buttons.append(card)
+		_card_chars.append(char_data)
 		card.pressed.connect(_select_character.bind(char_data))
+
+	_update_list_visibility()
+
+## 根据筛选隐藏/显示卡片（索引与 _card_chars 平行）
+func _update_list_visibility() -> void:
+	for i in _card_buttons.size():
+		var visible := _matches_filter(_card_chars[i])
+		_card_buttons[i].visible = visible
 
 func _make_character_card(char_data: CharacterData) -> Button:
 	var cls := _get_cls(char_data)
@@ -259,7 +365,8 @@ func _make_character_card(char_data: CharacterData) -> Button:
 	card.add_child(cb)
 
 	# Level badge (24×14 at x=126, y=30)
-	var lb := _make_inline_badge("C级", Color("#444441"), Color("#D3D1C7"), 24, 14, 126, 30)
+	var grade_text := "%s级" % char_data.grade
+	var lb := _make_inline_badge(grade_text, Color("#444441"), Color("#D3D1C7"), 24, 14, 126, 30)
 	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(lb)
 
@@ -268,7 +375,7 @@ func _make_character_card(char_data: CharacterData) -> Button:
 	hp_lbl.layout_mode = 0
 	hp_lbl.offset_left = 84.0; hp_lbl.offset_top = 50.0
 	hp_lbl.offset_right = 268.0; hp_lbl.offset_bottom = 64.0
-	hp_lbl.text = "HP %d" % char_data.max_hp
+	hp_lbl.text = "HP %.1f" % char_data.max_hp
 	hp_lbl.add_theme_font_size_override("font_size", 10)
 	hp_lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
 	hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -348,7 +455,7 @@ func _select_character(char_data: CharacterData) -> void:
 
 func _update_list_selection() -> void:
 	for i in _card_buttons.size():
-		var is_sel := all_characters[i] == selected_character
+		var is_sel := _card_chars[i] == selected_character
 		if is_sel:
 			_card_buttons[i].add_theme_stylebox_override("normal",
 				_make_flat(Color("#EAF3DE"), Color("#3B6D11"), 3, 6))
@@ -434,7 +541,7 @@ func _build_stats_panel(char_data: CharacterData) -> void:
 	var cls_bg: Color  = CLASS_BADGE_BG.get(cls,   Color("#185FA5"))
 	var cls_txt: Color = CLASS_BADGE_TEXT.get(cls,  Color("#E6F1FB"))
 	name_row.add_child(_make_inline_badge(cls, cls_bg, cls_txt, 36, 14, 0, 0))
-	name_row.add_child(_make_inline_badge("C级", Color("#444441"), Color("#D3D1C7"), 24, 14, 0, 0))
+	name_row.add_child(_make_inline_badge("%s级" % char_data.grade, Color("#444441"), Color("#D3D1C7"), 24, 14, 0, 0))
 
 	# Stat cells
 	var base_energy := char_data.basic_attack_cost

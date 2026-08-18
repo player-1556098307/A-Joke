@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_backtrack_a"]
+script = ExtResource("1_effect")
+effect_type = 29
+value = 0
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "别天神"
+description = "自己回合准备阶段消耗1气：全体玩家状态回滚到上一行动玩家回合开始前（上回合不能是自己）。每回合准备阶段均可使用。"
+energy_cost = 1
+min_range = 1
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_backtrack_a")])

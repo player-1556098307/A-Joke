@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_nn_a"]
+script = ExtResource("1_effect")
+effect_type = 26
+value = 1
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "须佐能乎·九十九"
+description = "对一名玩家造成4段各1点伤害，本回合进入无敌状态。"
+energy_cost = 2
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_nn_a")])

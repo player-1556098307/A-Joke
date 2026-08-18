@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_gl_a"]
+script = ExtResource("1_effect")
+effect_type = 21
+value = 2
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "宇智波的荣耀"
+description = "被动解锁技：持有4个气时自动解锁。在他人回合准备阶段触发，使回合主本回合失去所有技能并受到2点伤害，本回合行动权归泉奈。释放消耗4气，需再次聚满4气重新解锁。"
+energy_cost = 4
+min_range = 1
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_gl_a")])

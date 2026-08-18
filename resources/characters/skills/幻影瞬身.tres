@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_phantom_a"]
+script = ExtResource("1_effect")
+effect_type = 31
+value = 0
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "幻影瞬身"
+description = "被动：普攻命中后获得1个幻影（至多3个）；每个幻影使普攻伤害+0.5；被攻击时可消耗1气+1幻影闪避本次伤害。"
+energy_cost = 0
+min_range = 1
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_phantom_a")])

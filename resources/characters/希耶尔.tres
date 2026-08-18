@@ -1,0 +1,66 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://1mg34mdx34px" path="res://resources/portraits/xiye_qiye.png" id="4_p1"]
+[ext_resource type="Resource" path="res://resources/characters/skills/断头台.tres" id="5_duantou"]
+[ext_resource type="Resource" path="res://resources/characters/skills/断罪死.tres" id="6_duanzui"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成1点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_daixz"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_daixz"]
+script = ExtResource("2_skill")
+skill_name = "代行者"
+description = "被动：对带有秽土转生/死徒/法师标签的敌人，你造成的所有伤害+1。"
+energy_cost = 0
+min_range = 1
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_daixz")])
+
+[sub_resource type="Resource" id="SE_xiangwei"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_xiangwei"]
+script = ExtResource("2_skill")
+skill_name = "相位滑剑"
+description = "被动：自身造成所有伤害时：满血则伤害x2；没气则获得1气；伤害致目标濒死(HP归零)时，下次伤害50%概率暴击x2。三条件可叠加。"
+energy_cost = 0
+min_range = 1
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_xiangwei")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "希耶尔"
+max_hp = 6
+portrait = ExtResource("4_p1")
+avatar_emoji = "希"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_daixz"), SubResource("SD_xiangwei"), ExtResource("5_duantou"), ExtResource("6_duanzui")])
+tags = Array[String](["战士", "刺客"])
+grade = "S"
+metadata/_custom_type_script = "uid://dx561rntxjbhw"

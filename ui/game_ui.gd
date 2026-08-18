@@ -14,7 +14,7 @@ extends Control
 @onready var btn_paper: Button               = $GesturePanel/BtnPaper
 @onready var action_panel: VBoxContainer     = $ActionPanel
 @onready var btn_charge: Button              = $ActionPanel/BtnCharge
-@onready var skills_container: VBoxContainer = $ActionPanel/SkillsContainer
+@onready var skills_container: VBoxContainer = $ActionPanel/SkillsScroll/SkillsContainer
 @onready var target_panel: VBoxContainer     = $TargetPanel
 @onready var players_container: Control      = $PlayersContainer
 @onready var right_header_label: Label       = $RightHeaderLabel
@@ -109,11 +109,57 @@ func _ready() -> void:
 	GameManager.tiebreak_resolved.connect(_on_tiebreak_resolved)
 	GameManager.player_shielded.connect(_on_player_shielded)
 	GameManager.player_paralyzed.connect(_on_player_paralyzed)
+	GameManager.player_knocked_down.connect(_on_player_knocked_down)
 	GameManager.distance_changed.connect(_on_distance_changed)
 	GameManager.player_skipped.connect(_on_player_skipped)
 	GameManager.delayed_damage_triggered.connect(_on_delayed_damage_triggered)
 	GameManager.clone_destroyed.connect(_on_clone_destroyed)
 	GameManager.skill_unlocked.connect(_on_skill_unlocked)
+	GameManager.bell_gained.connect(_on_bell_gained)
+	GameManager.counter_stance_entered.connect(_on_counter_stance_entered)
+	GameManager.counter_stance_triggered.connect(_on_counter_stance_triggered)
+	GameManager.counter_stance_ended.connect(_on_counter_stance_ended)
+	GameManager.skill_disabled.connect(_on_skill_disabled)
+	GameManager.end_phase_bell_decision_required.connect(_on_end_phase_bell_decision_required)
+	GameManager.player_invincible.connect(_on_player_invincible)
+	GameManager.player_burning.connect(_on_player_burning)
+	GameManager.player_berserker.connect(_on_player_berserker)
+	GameManager.gate_changed.connect(_on_gate_changed)
+	GameManager.eighth_gate_opened.connect(_on_eighth_gate_opened)
+	GameManager.skill_lost.connect(_on_skill_lost)
+	GameManager.burn_damage_triggered.connect(_on_burn_damage_triggered)
+	GameManager.hp_payment_made.connect(_on_hp_payment_made)
+	# ── 波风水门专属信号 ──
+	GameManager.ftg_marks_changed.connect(_on_ftg_marks_changed)
+	GameManager.ftg_mark_applied.connect(_on_ftg_mark_applied)
+	GameManager.ftg_mark_removed.connect(_on_ftg_mark_removed)
+	GameManager.ftg_swap_triggered.connect(_on_ftg_swap_triggered)
+	GameManager.ftg_dodge_triggered.connect(_on_ftg_dodge_triggered)
+	GameManager.nine_tails_stage_changed.connect(_on_nine_tails_stage_changed)
+	GameManager.nine_tails_invincible_started.connect(_on_nine_tails_invincible_started)
+	GameManager.nine_tails_invincible_ended.connect(_on_nine_tails_invincible_ended)
+	GameManager.nine_tails_attack.connect(_on_nine_tails_attack)
+	GameManager.ftg_intercept_required.connect(_on_ftg_intercept_required)
+	GameManager.rasengan_counter_required.connect(_on_rasengan_counter_required)
+	# ── 卫宫专属信号 ──
+	GameManager.project_skill_required.connect(_on_project_skill_required)
+	GameManager.project_skill_made.connect(_on_project_skill_made)
+	GameManager.binding_field_started.connect(_on_binding_field_started)
+	GameManager.binding_field_ended.connect(_on_binding_field_ended)
+	GameManager.projected_skill_gained.connect(_on_projected_skill_gained)
+	GameManager.projected_skill_lost.connect(_on_projected_skill_lost)
+	# ── 宇智波泉奈专属信号 ──
+	GameManager.glory_unlocked_changed.connect(_on_glory_unlocked_changed)
+	GameManager.glory_takeover.connect(_on_glory_takeover)
+	GameManager.glory_required.connect(_on_glory_required)
+	GameManager.uchiha_stance_entered.connect(_on_uchiha_stance_entered)
+	# ── 新止水（天劫）专属信号 ──
+	GameManager.phantom_changed.connect(_on_phantom_changed)
+	GameManager.phantom_dodge_required.connect(_on_phantom_dodge_required)
+	GameManager.backtrack_required.connect(_on_backtrack_required)
+	GameManager.backtrack_performed.connect(_on_backtrack_performed)
+	GameManager.hiroari_targets_required.connect(_on_hiroari_targets_required)
+	GameManager.hiroari_used.connect(_on_hiroari_used)
 
 func _style_panels() -> void:
 	# LogPanelBg — white background, dark border (matching SVG)
@@ -424,7 +470,7 @@ func setup_players(players: Array[PlayerState]) -> void:
 func _get_cls(player: PlayerState) -> String:
 	return player.character.tags[0] if player.character.tags.size() > 0 else "战士"
 
-func _hp_color(hp: int, max_hp: int) -> Color:
+func _hp_color(hp: float, max_hp: float) -> Color:
 	var pct := float(hp) / float(max_hp)
 	if pct > 0.5:  return Color("#639922")
 	if pct > 0.25: return Color("#D85A30")
@@ -443,7 +489,7 @@ func _build_player_card(player: PlayerState) -> Control:
 	# HP text (above bar)
 	var hp_lbl := Label.new()
 	hp_lbl.name = "HpText"
-	hp_lbl.text = "HP %d/%d" % [player.hp, player.character.max_hp]
+	hp_lbl.text = "HP %.1f/%.1f" % [player.hp, player.character.max_hp]
 	hp_lbl.add_theme_font_size_override("font_size", 8)
 	hp_lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
 	hp_lbl.position = Vector2(4.0, 0.0)
@@ -494,7 +540,8 @@ func _build_player_card(player: PlayerState) -> Control:
 
 	if player.character.portrait != null:
 		var av_tex := TextureRect.new()
-		av_tex.texture = player.character.portrait
+		av_tex.name = "AvatarTexture"
+		av_tex.texture = _get_player_portrait(player)
 		av_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		av_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		av_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -502,6 +549,7 @@ func _build_player_card(player: PlayerState) -> Control:
 		av.add_child(av_tex)
 	else:
 		var av_lbl := Label.new()
+		av_lbl.name = "AvatarLabel"
 		av_lbl.text = player.character.character_name.left(1)
 		av_lbl.add_theme_font_size_override("font_size", 22)
 		av_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -632,6 +680,9 @@ func _refresh_player_card(player_id: int) -> void:
 
 	var max_hp := player.character.max_hp
 
+	# 头像刷新：八门全开时切换到死门形态
+	_refresh_player_avatar(card, player)
+
 	var hp_fill: ColorRect = card.get_node_or_null("HpBarFill")
 	if hp_fill:
 		hp_fill.color = _hp_color(player.hp, max_hp)
@@ -639,7 +690,7 @@ func _refresh_player_card(player_id: int) -> void:
 
 	var hp_text: Label = card.get_node_or_null("HpText")
 	if hp_text:
-		hp_text.text = "HP %d/%d" % [player.hp, max_hp]
+		hp_text.text = "HP %.1f/%.1f" % [player.hp, max_hp]
 
 	var body := card.get_node_or_null("CardBody")
 	if body:
@@ -662,6 +713,10 @@ func _refresh_player_card(player_id: int) -> void:
 			var badge := _make_status_badge("麻痹 %d回合" % player.paralyze_turns, Color("#BA7517"), Color("#FAEEDA"))
 			badge.tooltip_text = "麻痹：无法出拳，跳过本回合"
 			status_row.add_child(badge)
+		if player.knockdown_turns > 0:
+			var badge2 := _make_status_badge("击飞 %d回合" % player.knockdown_turns, Color("#7B4BA0"), Color("#F3ECFA"))
+			badge2.tooltip_text = "击飞：可正常猜拳获得回合，但行动阶段只能聚气"
+			status_row.add_child(badge2)
 		if player.shield > 0:
 			var badge := _make_status_badge("护盾 %d" % player.shield, Color("#534AB7"), Color("#EEEDFE"))
 			badge.tooltip_text = "护盾：抵消 %d 点伤害" % player.shield
@@ -673,6 +728,96 @@ func _refresh_player_card(player_id: int) -> void:
 			var badge := _make_status_badge("⏱ %d伤" % total, Color("#A32D2D"), Color("#FCEBEB"))
 			badge.tooltip_text = "延迟伤害：将在回合结束时触发 %d 点伤害" % total
 			status_row.add_child(badge)
+		if player.bell_count > 0:
+			var badge := _make_status_badge("钟×%d" % player.bell_count, Color("#6B3A2A"), Color("#FBF0EB"))
+			badge.tooltip_text = "钟：造成伤害时获得，可用于砸钟或招架"
+			status_row.add_child(badge)
+		if player.counter_stance:
+			var badge := _make_status_badge("防反", Color("#185FA5"), Color("#E6F1FB"))
+			badge.tooltip_text = "防反：受伤减半+免疫控制+获得1气+反击1伤"
+			status_row.add_child(badge)
+		if player.skill_disabled_turns > 0:
+			var badge := _make_status_badge("封技 %d回合" % player.skill_disabled_turns, Color("#993C1D"), Color("#FAECE7"))
+			badge.tooltip_text = "封技：无法使用技能（仅保留普攻）"
+			status_row.add_child(badge)
+		if player.invincible_turns > 0:
+			var badge := _make_status_badge("无敌 %d回合" % player.invincible_turns, Color("#27500A"), Color("#EAF3DE"))
+			badge.tooltip_text = "无敌：无视所有伤害和控制效果"
+			status_row.add_child(badge)
+		if player.burning:
+			var badge := _make_status_badge("燃烧", Color("#A32D2D"), Color("#FCEBEB"))
+			badge.tooltip_text = "燃烧：每回合结束失去1HP（HP>1保护）"
+			status_row.add_child(badge)
+		if player.berserker:
+			var badge := _make_status_badge("狂战士", Color("#791F1F"), Color("#FCEBEB"))
+			badge.tooltip_text = "狂战士：受伤回合结束额外失去1HP（可致死）"
+			status_row.add_child(badge)
+		if player.gate_count > 0:
+			var badge := _make_status_badge("八门×%d" % player.gate_count, Color("#6B3A2A"), Color("#FBF0EB"))
+			badge.tooltip_text = "八门遁甲：聚气时自动开门，第8门全开后获得新技能"
+			status_row.add_child(badge)
+		# ── 波风水门专属状态徽章 ──
+		if player.ftg_marks > 0:
+			var badge := _make_status_badge("飞雷神×%d" % player.ftg_marks, Color("#1A4B7A"), Color("#E1EFF8"))
+			badge.tooltip_text = "飞雷神标记：可用于释放飞雷神技能"
+			status_row.add_child(badge)
+		if player.ftg_marked_by.size() > 0:
+			var badge := _make_status_badge("被标记×%d" % player.ftg_marked_by.size(), Color("#A32D2D"), Color("#FCEBEB"))
+			badge.tooltip_text = "被飞雷神标记：可能被波风水门换位或闪避"
+			status_row.add_child(badge)
+		if player.nine_tails_invincible:
+			var stage_names: Array = ["", "咆哮", "大爪", "尾兽玉"]
+			var stage_text: String = stage_names[player.nine_tails_stage] if player.nine_tails_stage < stage_names.size() else "?"
+			var badge := _make_status_badge("九尾·%s" % stage_text, Color("#791F1F"), Color("#FCEBEB"))
+			badge.tooltip_text = "漂泊九尾：无敌状态中，三段攻击进行中"
+			status_row.add_child(badge)
+		# ── 秽土柱间专属状态徽章 ──
+		if player.stomp_active > 0:
+			var badge := _make_status_badge("跺脚 %d回合" % player.stomp_active, Color("#2A5A3A"), Color("#EAF5ED"))
+			badge.tooltip_text = "跺脚：受击时获得1气并下回合强制判胜"
+			status_row.add_child(badge)
+		# ── 卫宫专属状态徽章 ──
+		if player.projected_skill != null:
+			var badge := _make_status_badge("投影·%s" % player.projected_skill.skill_name, Color("#3B5BA5"), Color("#E8F0FB"))
+			badge.tooltip_text = "投影：本回合可用投影复制的技能（使用后消失）"
+			status_row.add_child(badge)
+		if player.binding_field_turns > 0:
+			var badge := _make_status_badge("无限剑制 %d回合" % player.binding_field_turns, Color("#185FA5"), Color("#E6F1FB"))
+			badge.tooltip_text = "无限剑制：结界持续 %d 回合，结界内敌人的技能已被复制" % player.binding_field_turns
+			status_row.add_child(badge)
+		# ── 宇智波泉奈专属状态徽章 ──
+		if player.uchiha_stance:
+			var badge := _make_status_badge("宇智波流", Color("#3B2D5A"), Color("#EFEAFB"))
+			badge.tooltip_text = "宇智波流：受击时伤害减半+进入无法选择+反击1伤并使攻击者本回合失去技能"
+			status_row.add_child(badge)
+		if player.untargetable_turns > 0:
+			var badge := _make_status_badge("不可选 %d回合" % player.untargetable_turns, Color("#5A2D2D"), Color("#FBEAEA"))
+			badge.tooltip_text = "无法选择：任何技能无法指定该玩家为目标"
+			status_row.add_child(badge)
+		if player.glory_unlocked:
+			var badge := _make_status_badge("荣耀·可用", Color("#7A5A00"), Color("#FDF3DD"))
+			badge.tooltip_text = "宇智波的荣耀：已解锁，持有4气时可在他人回合准备阶段夺取行动权"
+			status_row.add_child(badge)
+		# ── 新止水（天劫）专属状态徽章：幻影瞬身 ──
+		if player.phantom_count > 0:
+			var badge := _make_status_badge("幻影×%d" % player.phantom_count, Color("#2A5A7A"), Color("#E4F1F8"))
+			badge.tooltip_text = "幻影瞬身：普攻命中+1幻影；每幻影普攻增伤0.5；可消耗1气+1幻影闪避一次攻击；3幻影可释放日影舞"
+			status_row.add_child(badge)
+
+## 获取玩家当前应显示的头像：八门全开（gate_count>=8）时使用死门形态图
+func _get_player_portrait(player: PlayerState) -> Texture2D:
+	if player.character.alternate_portrait != null and player.gate_count >= 8:
+		return player.character.alternate_portrait
+	return player.character.portrait
+
+## 刷新玩家卡片头像（含八门全开形态切换）
+func _refresh_player_avatar(card: Control, player: PlayerState) -> void:
+	var av := card.get_node_or_null("CardBody/AvatarBox") as Panel
+	if av == null:
+		return
+	var av_tex := av.get_node_or_null("AvatarTexture") as TextureRect
+	if av_tex:
+		av_tex.texture = _get_player_portrait(player)
 
 func _refresh_all_distances() -> void:
 	if _human_player_id < 0:
@@ -984,7 +1129,14 @@ func _append_log_detail(text: String) -> void:
 # ── Skill availability ────────────────────────────────────────────────────────
 
 func _can_use_skill_on_any(player: PlayerState, skill: SkillData) -> bool:
-	if player.energy < skill.energy_cost:
+	# 可血付技能在气不足时也可用（用HP代替气支付）
+	if player.energy < skill.energy_cost and not skill.can_pay_with_hp:
+		return false
+	# 血付需要保留至少1血
+	if player.energy < skill.energy_cost and player.hp <= 1:
+		return false
+	# 钟消耗校验：无钟不可使用需钟的技能（如砸钟）
+	if player.bell_count < skill.bell_cost:
 		return false
 	for effect in skill.effects:
 		if effect.target == SkillEffect.EffectTarget.SELF:
@@ -1170,7 +1322,7 @@ func _show_target_panel(skill_index: int, skill: SkillData) -> void:
 		vbox.add_child(n_lbl)
 
 		var info_lbl := Label.new()
-		info_lbl.text = "HP %d/%d · 距离%d %s" % [
+		info_lbl.text = "HP %.1f/%.1f · 距离%d %s" % [
 			player.hp, player.character.max_hp, dist,
 			"✓" if in_range else "— 超出射程"
 		]
@@ -1355,6 +1507,18 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 				_current_action_player_id = -1
 				_on_action_required(wid)
 
+		GameManager.GamePhase.PREPARATION:
+			# 准备阶段：有准备技能（投影）的玩家按逆时针轮询释放
+			# 无准备技能时 GameManager 会立即进入 ACTION_INPUT，此处仅更新提示
+			_stop_turn_timer()
+			action_panel.hide()
+			target_panel.hide()
+			gesture_panel.hide()
+			phase_label.text = "准备阶段"
+			phase_label.add_theme_color_override("font_color", Color("#185FA5"))
+			right_header_label.text = "投影·准备"
+			_append_log("── 准备阶段 ──", LT_STATUS)
+
 		GameManager.GamePhase.APPLYING:
 			_stop_turn_timer()
 			action_panel.hide()
@@ -1367,6 +1531,12 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			var elim_id: int = data.get("player_id", -1)
 			if elim_id >= 0 and net_client:
 				_on_player_eliminated(elim_id)
+
+		GameManager.GamePhase.END_PHASE:
+			phase_label.text = "结束阶段"
+			phase_label.add_theme_color_override("font_color", Color("#6B3A2A"))
+			_refresh_all_cards()
+			_append_log("── 结束阶段 ──", LT_STATUS)
 
 		GameManager.GamePhase.ROUND_END:
 			if net_client:
@@ -1488,6 +1658,18 @@ func _on_action_required(player_id: int) -> void:
 	for child in skills_container.get_children():
 		child.queue_free()
 
+	# 击飞状态：只能聚气，隐藏所有技能按钮
+	if player.knockdown_turns > 0:
+		var kd_hint := Label.new()
+		kd_hint.text = "— 击飞中，只能聚气 —"
+		kd_hint.add_theme_font_size_override("font_size", 11)
+		kd_hint.add_theme_color_override("font_color", Color("#7B4BA0"))
+		kd_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		skills_container.add_child(kd_hint)
+		action_panel.show()
+		_start_turn_timer()
+		return
+
 	var sep := Label.new()
 	sep.text = "— 技能 —"
 	sep.add_theme_font_size_override("font_size", 10)
@@ -1498,6 +1680,9 @@ func _on_action_required(player_id: int) -> void:
 	var all_skills := player.get_all_skills()
 	for i in range(all_skills.size()):
 		var skill: SkillData = all_skills[i]
+		# 飞雷神拔除：仅当自身被飞雷神标记时才显示（水门不会被自己标记）
+		if skill.skill_name == "飞雷神拔除" and player.ftg_marked_by.is_empty():
+			continue
 		var can_use := _can_use_skill_on_any(player, skill)
 		skills_container.add_child(_make_skill_button(skill, i, can_use))
 
@@ -1536,19 +1721,38 @@ func _on_skill_button_pressed(skill_index: int, skill: SkillData) -> void:
 	if needs_target:
 		_show_target_panel(skill_index, skill)
 	else:
-		action_panel.hide()
-		if net_client:
-			net_client.submit_action(PlayerState.ActionType.USE_SKILL, skill_index, -1)
-		else:
-			GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, -1)
+		_submit_skill_action(skill_index, skill, -1)
 
 func _on_target_selected(target_id: int, skill_index: int) -> void:
 	target_panel.hide()
 	print("[game_ui] _on_target_selected target_id=%d skill_index=%d, net_client=%s" % [target_id, skill_index, net_client != null])
-	if net_client:
-		net_client.submit_action(PlayerState.ActionType.USE_SKILL, skill_index, target_id)
+	# 需要找到对应的技能，走统一血付提交流程
+	var player := GameManager.get_player(_current_action_player_id)
+	if player == null:
 		return
-	GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, target_id)
+	var all_skills := player.get_all_skills()
+	if skill_index < 0 or skill_index >= all_skills.size():
+		return
+	_submit_skill_action(skill_index, all_skills[skill_index], target_id)
+
+## 统一技能提交流程：先检查血付需求，再提交行动
+## 气不足且可血付时弹出血付选择框，确认后携带 hp_paid 提交
+func _submit_skill_action(skill_index: int, skill: SkillData, target_id: int) -> void:
+	var player := GameManager.get_player(_current_action_player_id)
+	if player == null:
+		return
+	var hp_paid: float = 0.0
+	if skill.can_pay_with_hp and player.energy < skill.energy_cost and player.hp > 1:
+		# 需要血付：弹出血付选择框，确认后提交
+		action_panel.hide()
+		_show_hp_payment_dialog_with_callback(skill_index, skill, target_id)
+		return
+	# 无需血付，直接提交
+	action_panel.hide()
+	if net_client:
+		net_client.submit_action(PlayerState.ActionType.USE_SKILL, skill_index, target_id, hp_paid)
+	else:
+		GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, target_id, hp_paid)
 
 ## 纯 UI 渲染：状态已由 RoundResolver（主机）或 ClientStateSync（客户端）更新
 func _on_skill_applied(logs: Array[Dictionary]) -> void:
@@ -1559,18 +1763,18 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 		var res: Dictionary  = entry.get("result", {})
 		match effect_type:
 			SkillEffect.EffectType.DAMAGE:
-				var dealt: int    = res.get("damage_dealt", 0)
-				var absorbed: int = res.get("shield_absorbed", 0)
-				var remain: int   = res.get("remaining_hp", 0)
-				var msg := "%s 护盾吸收%d，受%d伤，剩余HP %d" % [t_name, absorbed, dealt, remain] \
+				var dealt: float    = res.get("damage_dealt", 0.0)
+				var absorbed: float = res.get("shield_absorbed", 0.0)
+				var remain: float   = res.get("remaining_hp", 0.0)
+				var msg := "%s 护盾吸收%.1f，受%.1f伤，剩余HP %.1f" % [t_name, absorbed, dealt, remain] \
 							if absorbed > 0 \
-							else "%s 受到 %d 伤害，剩余HP %d" % [t_name, dealt, remain]
+							else "%s 受到 %.1f 伤害，剩余HP %.1f" % [t_name, dealt, remain]
 				_append_log(msg, LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_attack_effect(entry["target_id"])
 			SkillEffect.EffectType.SHIELD:
-				var sv: int = res.get("shield_value", 0)
-				_append_log("%s 获得%s" % [t_name, "全挡护盾" if sv == -1 else ("护盾 %d" % sv)], LT_STATUS, entry.get("attacker_id", -1))
+				var sv: float = res.get("shield_value", 0.0)
+				_append_log("%s 获得%s" % [t_name, "全挡护盾" if sv == -1 else ("护盾 %.1f" % sv)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.CLONE_SHIELD:
@@ -1588,17 +1792,71 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				_append_log("%s 与 %s 距离%s，当前: %d" % [a_name, t_name, dir, res.get("new_distance", 0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_all_distances()
 			SkillEffect.EffectType.HEAL:
-				_append_log("%s 回复 %d HP，剩余HP %d" % [t_name, res.get("heal_amount", 0), res.get("remaining_hp", 0)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s 回复 %.1f HP，剩余HP %.1f" % [t_name, res.get("heal_amount", 0.0), res.get("remaining_hp", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.DELAYED_DAMAGE:
-				_append_log("%s 挂载延迟伤害（%d回合后受 %d 伤）" % [t_name, res.get("delay", 1), res.get("damage", 0)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s 挂载延迟伤害（%d回合后受 %.1f 伤）" % [t_name, res.get("delay", 1), res.get("damage", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.UNLOCK_SKILL:
 				var sname: String = res.get("skill_name", "")
 				if sname != "":
 					_append_log("%s 解锁新技能【%s】" % [t_name, sname], LT_WIN, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+				_play_skill_effect(entry["target_id"], effect_type)
+			SkillEffect.EffectType.FTG_MARK:
+				var dealt: float = res.get("damage_dealt", 0.0)
+				_append_log("🌀 %s 被飞雷神标记！受 %.1f 伤，剩余HP %.1f" % [t_name, dealt, res.get("remaining_hp", 0.0)], LT_DAMAGE, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+				_play_skill_effect(entry["target_id"], effect_type)
+			SkillEffect.EffectType.FTG_CHARGE:
+				_append_log("🌀 %s 聚飞雷神标记（共%d个）" % [t_name, res.get("ftg_marks", 0)], LT_STATUS, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+			SkillEffect.EffectType.FTG_REMOVE:
+				_append_log("🌀 %s 拔除了飞雷神标记" % t_name, LT_STATUS, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+			SkillEffect.EffectType.NINE_TAILS:
+				_append_log("🦊 %s 释放漂泊九尾！" % t_name, LT_WIN, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+			SkillEffect.EffectType.PIERCE_DAMAGE:
+				var pdealt: float = res.get("damage_dealt", 0.0)
+				var premain: float = res.get("remaining_hp", 0.0)
+				var pcrit: bool   = res.get("crit", false)
+				var pmsg := "⚔️ %s 被断头台穿透！%s受 %.1f 伤，剩余HP %.1f" % [t_name, "暴击!" if pcrit else "", pdealt, premain]
+				_append_log(pmsg, LT_DAMAGE, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+				_play_attack_effect(entry["target_id"])
+			SkillEffect.EffectType.DEATH_SENTENCE:
+				var rounds: Array = res.get("rounds", [])
+				var wc: int = res.get("win_count", 0)
+				var ik: bool = res.get("instant_kill", false)
+				var dmg: float = res.get("damage_dealt", 0.0)
+				var heal: float = res.get("total_heal", 0.0)
+				var rem: float = res.get("remaining_hp", 0.0)
+				var atk: PlayerState = GameManager.get_player(entry.get("attacker_id", -1))
+				var a_name := atk.player_name if atk else "?"
+				# 7次猜拳结果：逐条清晰展示（每次猜拳独立成行，延迟滚动显示）
+				_append_log("⚖️ %s 发动断罪死！7次猜拳开始——" % a_name, LT_PHASE, entry.get("attacker_id", -1))
+				for i in range(rounds.size()):
+					var r: Dictionary = rounds[i]
+					var rwin: bool = r.get("win", false)
+					var rcrit: bool = r.get("crit", false)
+					var line: String
+					if rwin:
+						line = "  第%d次 ✊ 赢！%s%s" % [i + 1, "暴击×2 " if rcrit else "", "对 %s 造成 %.1f 伤" % [t_name, r.get("dmg", 0.0)]]
+					else:
+						line = "  第%d次 ✋ 输 — 自身回复 %.1f HP" % [i + 1, r.get("heal", 0.0)]
+					_append_log(line, LT_STATUS if rwin else LT_DAMAGE, entry.get("attacker_id", -1))
+					await get_tree().create_timer(0.18).timeout
+				var summary := "⚖️ 断罪死结算：赢%d次" % wc
+				if ik:
+					summary += "，目标被即死淘汰！"
+				else:
+					summary += "，%s 受 %.1f 伤，剩余HP %.1f" % [t_name, dmg, rem]
+				if heal > 0:
+					summary += "，%s 回复 %.1f HP" % [a_name, heal]
+				_append_log(summary, LT_WIN, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 
@@ -1661,7 +1919,7 @@ func _on_tiebreak_resolved(winner_id: int) -> void:
 	var p := GameManager.get_player(winner_id)
 	_append_log("── 加赛胜出：%s ──" % (p.player_name if p else str(winner_id)), LT_WIN)
 
-func _on_player_shielded(player_id: int, shield_value: int) -> void:
+func _on_player_shielded(player_id: int, shield_value: float) -> void:
 	var player := GameManager.get_player(player_id)
 	if player:
 		player.shield = shield_value
@@ -1673,6 +1931,12 @@ func _on_player_paralyzed(player_id: int, turns: int) -> void:
 		player.paralyze_turns = turns
 	_refresh_player_card(player_id)
 
+func _on_player_knocked_down(player_id: int, turns: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.knockdown_turns = turns
+	_refresh_player_card(player_id)
+
 func _on_distance_changed(_from_id: int, _to_id: int, _new_distance: int) -> void:
 	_refresh_all_distances()
 	_rebuild_distance_labels()
@@ -1682,13 +1946,13 @@ func _on_player_skipped(player_id: int) -> void:
 	_append_log("%s 被麻痹，跳过本回合" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
 	_refresh_player_card(player_id)
 
-func _on_delayed_damage_triggered(player_id: int, damage: int, remaining_hp: int) -> void:
+func _on_delayed_damage_triggered(player_id: int, damage: float, remaining_hp: float) -> void:
 	var player := GameManager.get_player(player_id)
 	if player:
 		player.hp = remaining_hp
 	var p_name := player.player_name if player else str(player_id)
 	if damage > 0:
-		_append_log("⏰ %s 延迟伤害触发，受 %d 伤，剩余HP %d" % [p_name, damage, remaining_hp], LT_DAMAGE, player_id)
+		_append_log("⏰ %s 延迟伤害触发，受 %.1f 伤，剩余HP %.1f" % [p_name, damage, remaining_hp], LT_DAMAGE, player_id)
 		_play_attack_effect(player_id)
 	else:
 		_append_log("⏰ %s 延迟伤害被护盾完全抵挡" % p_name, LT_STATUS, player_id)
@@ -1702,6 +1966,839 @@ func _on_clone_destroyed(player_id: int) -> void:
 func _on_skill_unlocked(player_id: int, skill_name: String) -> void:
 	var player := GameManager.get_player(player_id)
 	_append_log("✦ %s 永久解锁技能【%s】" % [player.player_name if player else str(player_id), skill_name], LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_bell_gained(player_id: int, bell_count: int) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("🔔 %s 获得一个钟（共%d个）" % [player.player_name if player else str(player_id), bell_count], LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+# ── 宇智波泉奈专属日志处理 ──
+func _on_glory_unlocked_changed(player_id: int, unlocked: bool) -> void:
+	var player := GameManager.get_player(player_id)
+	if unlocked:
+		_append_log("🏮 %s 的【宇智波的荣耀】已解锁！持有4气时可在他人回合夺取行动权" % (player.player_name if player else str(player_id)), LT_WIN, player_id)
+	else:
+		_append_log("🏮 %s 的【宇智波的荣耀】已消耗，需重新聚满4气解锁" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_glory_takeover(caster_id: int, target_id: int, damage: float, absorbed: float, clone_broken: bool) -> void:
+	var caster := GameManager.get_player(caster_id)
+	var target := GameManager.get_player(target_id)
+	var c_name := caster.player_name if caster else str(caster_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("🏮 %s 触发【宇智波的荣耀】！%s 本回合失去所有技能并受到 %d 伤，本回合行动权归 %s！" % [c_name, t_name, int(damage), c_name], LT_WIN, caster_id)
+	_refresh_player_card(caster_id)
+	if target:
+		_refresh_player_card(target_id)
+
+var _glory_decision_dialog: PanelContainer = null
+
+func _on_glory_required(player_id: int, target_id: int) -> void:
+	if player_id != _human_player_id:
+		return
+	_show_glory_decision_dialog(player_id, target_id)
+
+func _show_glory_decision_dialog(player_id: int, target_id: int) -> void:
+	if _glory_decision_dialog != null:
+		_glory_decision_dialog.queue_free()
+	_glory_decision_dialog = PanelContainer.new()
+	_glory_decision_dialog.position = Vector2(300, 180)
+	_glory_decision_dialog.size = Vector2(380, 160)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#6B3A2A")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_glory_decision_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_glory_decision_dialog.add_child(vbox)
+
+	var target := GameManager.get_player(target_id)
+	var t_name := target.player_name if target else str(target_id)
+	var label := Label.new()
+	label.text = "是否释放【宇智波的荣耀】？\n将夺取 %s 的本回合行动权并造成 2 伤" % t_name
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 20)
+	vbox.add_child(hbox)
+
+	var btn_yes := Button.new()
+	btn_yes.text = "释放荣耀"
+	btn_yes.add_theme_font_size_override("font_size", 14)
+	btn_yes.pressed.connect(func():
+		if net_client:
+			net_client.rpc("submit_glory_decision", player_id, true)
+		else:
+			GameManager.submit_glory_decision(player_id, true)
+		if _glory_decision_dialog:
+			_glory_decision_dialog.queue_free()
+			_glory_decision_dialog = null
+	)
+	hbox.add_child(btn_yes)
+
+	var btn_no := Button.new()
+	btn_no.text = "跳过"
+	btn_no.add_theme_font_size_override("font_size", 14)
+	btn_no.pressed.connect(func():
+		if net_client:
+			net_client.rpc("submit_glory_decision", player_id, false)
+		else:
+			GameManager.submit_glory_decision(player_id, false)
+		if _glory_decision_dialog:
+			_glory_decision_dialog.queue_free()
+			_glory_decision_dialog = null
+	)
+	hbox.add_child(btn_no)
+
+	add_child(_glory_decision_dialog)
+
+func _on_uchiha_stance_entered(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("🌀 %s 进入宇智波流招架状态" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_counter_stance_entered(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("🛡 %s 进入防反状态" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_counter_stance_triggered(target_id: int, attacker_id: int) -> void:
+	var target := GameManager.get_player(target_id)
+	var attacker := GameManager.get_player(attacker_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("⚔ %s 防反触发！减半伤害+获得1气+反击%s 1伤" % [t_name, attacker.player_name if attacker else str(attacker_id)], LT_DAMAGE, target_id)
+	_refresh_player_card(target_id)
+	if attacker:
+		_refresh_player_card(attacker_id)
+
+func _on_counter_stance_ended(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("🛡 %s 防反状态结束" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_skill_disabled(player_id: int, turns: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if turns > 0:
+		_append_log("🔒 %s 被封技 %d 回合" % [player.player_name if player else str(player_id), turns], LT_STATUS, player_id)
+	else:
+		_append_log("🔓 %s 封技解除" % (player.player_name if player else str(player_id)), LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_player_invincible(player_id: int, turns: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.invincible_turns = turns
+	_append_log("✦ %s 进入无敌状态（%d回合）" % [player.player_name if player else str(player_id), turns], LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_player_burning(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.burning = true
+	_append_log("🔥 %s 进入燃烧状态" % (player.player_name if player else str(player_id)), LT_DAMAGE, player_id)
+	_refresh_player_card(player_id)
+
+func _on_player_berserker(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.berserker = true
+	_append_log("💥 %s 进入狂战士状态" % (player.player_name if player else str(player_id)), LT_DAMAGE, player_id)
+	_refresh_player_card(player_id)
+
+func _on_gate_changed(player_id: int, gate_count: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.gate_count = gate_count
+	_append_log("🚪 %s 八门开到第%d门" % [player.player_name if player else str(player_id), gate_count], LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_eighth_gate_opened(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("★ %s 八门全开！回复10HP，获得【夜凯】【夕象】，进入燃烧+狂战士状态！" % (player.player_name if player else str(player_id)), LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_skill_lost(player_id: int, skill_name: String) -> void:
+	var player := GameManager.get_player(player_id)
+	if player and not player.lost_skills.has(skill_name):
+		player.lost_skills.append(skill_name)
+	_append_log("✖ %s 永久失去技能【%s】" % [player.player_name if player else str(player_id), skill_name], LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_burn_damage_triggered(player_id: int, damage: float, remaining_hp: float, reason: String) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.hp = remaining_hp
+	_append_log("🔥 %s 因%s失去%.1fHP，剩余HP %.1f" % [player.player_name if player else str(player_id), reason, damage, remaining_hp], LT_DAMAGE, player_id)
+	_refresh_player_card(player_id)
+	_play_attack_effect(player_id)
+
+# ── 波风水门专属信号处理 ────────────────────────────────────────────
+func _on_ftg_marks_changed(player_id: int, marks: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.ftg_marks = marks
+	_refresh_player_card(player_id)
+
+func _on_ftg_mark_applied(target_id: int, attacker_id: int) -> void:
+	var target := GameManager.get_player(target_id)
+	var attacker := GameManager.get_player(attacker_id)
+	if target:
+		if not target.ftg_marked_by.has(attacker_id):
+			target.ftg_marked_by.append(attacker_id)
+	_refresh_player_card(target_id)
+
+func _on_ftg_mark_removed(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.ftg_marked_by.clear()
+	_append_log("🌀 %s 拔除了飞雷神标记" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_ftg_swap_triggered(swapper_id: int, swapped_id: int, original_target_id: int) -> void:
+	var swapper := GameManager.get_player(swapper_id)
+	var swapped := GameManager.get_player(swapped_id)
+	_append_log("🌀 %s 与 %s 换位！%s 替代 %s 成为技能目标" % [
+		swapper.player_name if swapper else str(swapper_id),
+		swapped.player_name if swapped else str(swapped_id),
+		swapped.player_name if swapped else str(swapped_id),
+		"原目标"
+	], LT_STATUS, swapper_id)
+	_refresh_player_card(swapper_id)
+	_refresh_player_card(swapped_id)
+	_refresh_all_distances()
+
+func _on_ftg_dodge_triggered(player_id: int, attacker_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	var attacker := GameManager.get_player(attacker_id)
+	_append_log("🌀 %s 闪避 %s 的攻击！" % [
+		player.player_name if player else str(player_id),
+		attacker.player_name if attacker else str(attacker_id)
+	], LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_nine_tails_stage_changed(player_id: int, stage: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.nine_tails_stage = stage
+	_refresh_player_card(player_id)
+
+func _on_nine_tails_invincible_started(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.nine_tails_invincible = true
+	_append_log("🦊 %s 进入九尾无敌状态！" % (player.player_name if player else str(player_id)), LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_nine_tails_invincible_ended(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	if player:
+		player.nine_tails_invincible = false
+	_append_log("🦊 %s 九尾无敌结束" % (player.player_name if player else str(player_id)), LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_nine_tails_attack(player_id: int, stage: int, damage: float, target_ids: Array[int]) -> void:
+	var player := GameManager.get_player(player_id)
+	var stage_names: Array = ["", "咆哮", "大爪", "尾兽玉"]
+	var stage_name: String = stage_names[stage] if stage < stage_names.size() else "?"
+	var target_names: Array[String] = []
+	for tid in target_ids:
+		var tp := GameManager.get_player(tid)
+		target_names.append(tp.player_name if tp else str(tid))
+		_refresh_player_card(tid)
+	_append_log("🦊 %s 九尾·%s 对 %s 造成 %.1f 伤害" % [
+		player.player_name if player else str(player_id),
+		stage_name,
+		", ".join(target_names) if target_names.size() > 0 else "无目标",
+		damage
+	], LT_DAMAGE, player_id)
+
+func _on_end_phase_bell_decision_required(player_id: int, bell_count: int) -> void:
+	# 只有人类玩家才弹确认框
+	if player_id != _human_player_id:
+		return
+	# 弹出招架确认对话框
+	_show_bell_decision_dialog(player_id, bell_count)
+
+var _bell_decision_dialog: PanelContainer = null
+
+func _show_bell_decision_dialog(player_id: int, bell_count: int) -> void:
+	if _bell_decision_dialog != null:
+		_bell_decision_dialog.queue_free()
+	_bell_decision_dialog = PanelContainer.new()
+	_bell_decision_dialog.position = Vector2(300, 180)
+	_bell_decision_dialog.size = Vector2(360, 140)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#6B3A2A")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_bell_decision_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_bell_decision_dialog.add_child(vbox)
+
+	var label := Label.new()
+	label.text = "你是否消耗 1 个钟进入招架状态？\n（当前钟: %d）" % bell_count
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 20)
+	vbox.add_child(hbox)
+
+	var btn_yes := Button.new()
+	btn_yes.text = "招架"
+	btn_yes.add_theme_font_size_override("font_size", 14)
+	btn_yes.pressed.connect(func():
+		if net_client:
+			net_client.submit_bell_decision(player_id, true)
+		else:
+			GameManager.submit_bell_decision(player_id, true)
+		if _bell_decision_dialog:
+			_bell_decision_dialog.queue_free()
+			_bell_decision_dialog = null
+	)
+	hbox.add_child(btn_yes)
+
+	var btn_no := Button.new()
+	btn_no.text = "跳过"
+	btn_no.add_theme_font_size_override("font_size", 14)
+	btn_no.pressed.connect(func():
+		if net_client:
+			net_client.submit_bell_decision(player_id, false)
+		else:
+			GameManager.submit_bell_decision(player_id, false)
+		if _bell_decision_dialog:
+			_bell_decision_dialog.queue_free()
+			_bell_decision_dialog = null
+	)
+	hbox.add_child(btn_no)
+
+	add_child(_bell_decision_dialog)
+
+## 血付弹窗（回调模式）：玩家选择用多少血支付，确认后携带 hp_paid 提交行动
+var _hp_payment_dialog: PanelContainer = null
+
+func _show_hp_payment_dialog_with_callback(skill_index: int, skill: SkillData, target_id: int) -> void:
+	if _hp_payment_dialog != null:
+		_hp_payment_dialog.queue_free()
+	_hp_payment_dialog = PanelContainer.new()
+	_hp_payment_dialog.position = Vector2(260, 160)
+	_hp_payment_dialog.size = Vector2(440, 200)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#A32D2D")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_hp_payment_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_hp_payment_dialog.add_child(vbox)
+
+	var player := GameManager.get_player(_current_action_player_id)
+	if player == null:
+		return
+	var current_energy: int = player.energy
+	var need: int = max(0, skill.energy_cost - current_energy)
+	var max_hp_pay: int = max(0, player.hp - 1)
+
+	var label := Label.new()
+	label.text = "技能【%s】需要 %d 气，你当前有 %d 气，差 %d 气。\n可用生命值代替气支付（最多 %d HP，保留1血）。选择用多少血支付：" % [skill.skill_name, skill.energy_cost, current_energy, need, min(max_hp_pay, need)]
+	label.add_theme_font_size_override("font_size", 13)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(label)
+
+	# 数值选择 SpinBox
+	var spin_row := HBoxContainer.new()
+	spin_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	spin_row.add_theme_constant_override("separation", 10)
+	vbox.add_child(spin_row)
+
+	var spin_lbl := Label.new()
+	spin_lbl.text = "血付数量:"
+	spin_lbl.add_theme_font_size_override("font_size", 13)
+	spin_row.add_child(spin_lbl)
+
+	var spin_box := SpinBox.new()
+	spin_box.min_value = 0
+	spin_box.max_value = mini(max_hp_pay, need)
+	spin_box.value = mini(max_hp_pay, need)
+	spin_box.step = 1
+	spin_box.custom_minimum_size = Vector2(80, 0)
+	spin_row.add_child(spin_box)
+
+	# 按钮行
+	var btn_row := HBoxContainer.new()
+	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_row.add_theme_constant_override("separation", 16)
+	vbox.add_child(btn_row)
+
+	var btn_confirm := Button.new()
+	btn_confirm.text = "确认血付"
+	btn_confirm.add_theme_font_size_override("font_size", 14)
+	btn_confirm.pressed.connect(func():
+		var hp_paid: float = float(spin_box.value)
+		_dismiss_hp_payment_dialog()
+		if net_client:
+			net_client.submit_action(PlayerState.ActionType.USE_SKILL, skill_index, target_id, hp_paid)
+		else:
+			GameManager.submit_action(_current_action_player_id, PlayerState.ActionType.USE_SKILL, skill_index, target_id, hp_paid)
+	)
+	btn_row.add_child(btn_confirm)
+
+	var btn_cancel := Button.new()
+	btn_cancel.text = "取消"
+	btn_cancel.add_theme_font_size_override("font_size", 14)
+	btn_cancel.pressed.connect(func():
+		_dismiss_hp_payment_dialog()
+		action_panel.show()
+	)
+	btn_row.add_child(btn_cancel)
+
+	add_child(_hp_payment_dialog)
+
+func _dismiss_hp_payment_dialog() -> void:
+	if _hp_payment_dialog:
+		_hp_payment_dialog.queue_free()
+		_hp_payment_dialog = null
+
+## 血付完成：刷新玩家卡片并记录日志
+func _on_hp_payment_made(player_id: int, hp_paid: float) -> void:
+	if hp_paid <= 0:
+		return
+	var player := GameManager.get_player(player_id)
+	var p_name := player.player_name if player else str(player_id)
+	_append_log("%s 用 %.1f 点生命值代替气支付" % [p_name, hp_paid], LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+
+# ── 飞雷神拦截弹窗 ──────────────────────────────────────────────────
+
+var _ftg_intercept_dialog: PanelContainer = null
+## 暂存当前拦截上下文（供换位目标选择用）
+var _ftg_intercept_ctx: Dictionary = {}
+
+func _on_ftg_intercept_required(target_id: int, attacker_id: int, marked_player_ids: Array[int], attacker_is_marked: bool) -> void:
+	# 只有人类玩家才弹窗
+	if target_id != _human_player_id:
+		return
+	_ftg_intercept_ctx = {
+		"target_id": target_id,
+		"attacker_id": attacker_id,
+		"marked_player_ids": marked_player_ids,
+		"attacker_is_marked": attacker_is_marked,
+	}
+	_show_ftg_intercept_dialog(target_id, attacker_id, marked_player_ids, attacker_is_marked)
+
+func _show_ftg_intercept_dialog(target_id: int, attacker_id: int, marked_player_ids: Array[int], attacker_is_marked: bool) -> void:
+	if _ftg_intercept_dialog != null:
+		_ftg_intercept_dialog.queue_free()
+	_ftg_intercept_dialog = PanelContainer.new()
+	_ftg_intercept_dialog.position = Vector2(240, 140)
+	_ftg_intercept_dialog.size = Vector2(480, 260)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#3B5BA5")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_ftg_intercept_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_ftg_intercept_dialog.add_child(vbox)
+
+	var attacker := GameManager.get_player(attacker_id)
+	var a_name := attacker.player_name if attacker else str(attacker_id)
+
+	var label := Label.new()
+	label.text = "🌀 %s 的技能命中了你！\n飞雷神术式激活——选择应对：" % a_name
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+
+	# ── 换位按钮 ──
+	if not marked_player_ids.is_empty():
+		# 如果只有一个被标记玩家，直接换位；多个则需要选择
+		if marked_player_ids.size() == 1:
+			var swap_target := GameManager.get_player(marked_player_ids[0])
+			var s_name := swap_target.player_name if swap_target else str(marked_player_ids[0])
+			var btn_swap := Button.new()
+			btn_swap.text = "换位：与 %s 交换座位（替代你成为目标）" % s_name
+			btn_swap.add_theme_font_size_override("font_size", 13)
+			btn_swap.pressed.connect(func():
+				_submit_ftg_intercept_choice(GameManager.FTGChoice.SWAP, marked_player_ids[0])
+			)
+			vbox.add_child(btn_swap)
+		else:
+			var swap_label := Label.new()
+			swap_label.text = "选择换位目标："
+			swap_label.add_theme_font_size_override("font_size", 13)
+			vbox.add_child(swap_label)
+			for pid in marked_player_ids:
+				var swap_target := GameManager.get_player(pid)
+				var s_name := swap_target.player_name if swap_target else str(pid)
+				var btn := Button.new()
+				btn.text = "换位：与 %s 交换" % s_name
+				btn.add_theme_font_size_override("font_size", 13)
+				btn.pressed.connect(func():
+					_submit_ftg_intercept_choice(GameManager.FTGChoice.SWAP, pid)
+				)
+				vbox.add_child(btn)
+
+	# ── 闪避按钮 ──
+	if attacker_is_marked:
+		var minato := GameManager.get_player(target_id)
+		var can_dodge := minato != null and minato.energy >= 2
+		var btn_dodge := Button.new()
+		if can_dodge:
+			btn_dodge.text = "闪避：免疫本次攻击，消耗2气对 %s 释放螺旋丸（3伤）" % a_name
+		else:
+			btn_dodge.text = "闪避：免疫本次攻击（气不足2，无法反击螺旋丸）"
+		btn_dodge.add_theme_font_size_override("font_size", 13)
+		btn_dodge.pressed.connect(func():
+			_submit_ftg_intercept_choice(GameManager.FTGChoice.DODGE, -1)
+		)
+		vbox.add_child(btn_dodge)
+
+	# ── 跳过按钮 ──
+	var btn_skip := Button.new()
+	btn_skip.text = "跳过（不使用飞雷神）"
+	btn_skip.add_theme_font_size_override("font_size", 13)
+	btn_skip.pressed.connect(func():
+		_submit_ftg_intercept_choice(GameManager.FTGChoice.SKIP, -1)
+	)
+	vbox.add_child(btn_skip)
+
+	add_child(_ftg_intercept_dialog)
+
+func _submit_ftg_intercept_choice(choice: int, swap_target_id: int) -> void:
+	var target_id: int = _ftg_intercept_ctx.get("target_id", -1)
+	_dismiss_ftg_intercept_dialog()
+	if target_id < 0:
+		return
+	if net_client:
+		net_client.submit_ftg_intercept(target_id, choice, swap_target_id)
+	else:
+		GameManager.submit_ftg_intercept(target_id, choice, swap_target_id)
+
+func _dismiss_ftg_intercept_dialog() -> void:
+	if _ftg_intercept_dialog:
+		_ftg_intercept_dialog.queue_free()
+		_ftg_intercept_dialog = null
+	_ftg_intercept_ctx.clear()
+
+
+## ── 闪避后螺旋丸反击二次确认弹窗 ─────────────────────────────────
+
+var _rasengan_counter_dialog: PanelContainer = null
+var _rasengan_counter_ctx: Dictionary = {}
+
+## 闪避成功后，征求玩家是否消耗2气释放螺旋丸反击
+func _on_rasengan_counter_required(target_id: int, attacker_id: int, minato_energy: int) -> void:
+	if target_id != _human_player_id:
+		return
+	_rasengan_counter_ctx = {
+		"target_id": target_id,
+		"attacker_id": attacker_id,
+		"minato_energy": minato_energy,
+	}
+	_show_rasengan_counter_dialog(target_id, attacker_id, minato_energy)
+
+func _show_rasengan_counter_dialog(target_id: int, attacker_id: int, minato_energy: int) -> void:
+	if _rasengan_counter_dialog != null:
+		_rasengan_counter_dialog.queue_free()
+	_rasengan_counter_dialog = PanelContainer.new()
+	_rasengan_counter_dialog.position = Vector2(240, 160)
+	_rasengan_counter_dialog.size = Vector2(460, 200)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#E24B4A")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_rasengan_counter_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_rasengan_counter_dialog.add_child(vbox)
+
+	var attacker := GameManager.get_player(attacker_id)
+	var a_name := attacker.player_name if attacker else str(attacker_id)
+
+	var label := Label.new()
+	label.text = "🌀 你闪避了 %s 的攻击！\n飞雷神术式逆转——是否消耗2气释放螺旋丸反击？" % a_name
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(label)
+
+	var btn_yes := Button.new()
+	btn_yes.text = "反击：对 %s 释放螺旋丸（3伤，消耗2气）" % a_name
+	btn_yes.add_theme_font_size_override("font_size", 13)
+	btn_yes.pressed.connect(func():
+		_submit_rasengan_counter(true)
+	)
+	vbox.add_child(btn_yes)
+
+	var btn_no := Button.new()
+	btn_no.text = "放弃反击（保留能量）"
+	btn_no.add_theme_font_size_override("font_size", 13)
+	btn_no.pressed.connect(func():
+		_submit_rasengan_counter(false)
+	)
+	vbox.add_child(btn_no)
+
+	add_child(_rasengan_counter_dialog)
+
+func _submit_rasengan_counter(use_counter: bool) -> void:
+	var target_id: int = _rasengan_counter_ctx.get("target_id", -1)
+	_dismiss_rasengan_counter_dialog()
+	if target_id < 0:
+		return
+	if net_client:
+		net_client.submit_rasengan_counter(target_id, use_counter)
+	else:
+		GameManager.submit_rasengan_counter(target_id, use_counter)
+
+func _dismiss_rasengan_counter_dialog() -> void:
+	if _rasengan_counter_dialog:
+		_rasengan_counter_dialog.queue_free()
+		_rasengan_counter_dialog = null
+	_rasengan_counter_ctx.clear()
+
+
+# ── 卫宫·投影弹窗 ──────────────────────────────────────────────────
+## 投影：准备阶段选择目标玩家与技能（消耗1气，永久保留至用掉为止）
+## 弹窗分两步：第一步选目标，第二步选技能（含被动技）
+var _project_dialog: PanelContainer = null
+var _project_ctx: Dictionary = {}
+
+func _on_project_skill_required(player_id: int, target_ids: Array[int]) -> void:
+	# 只有人类玩家才弹窗（AI 由 GameManager 自动决策）
+	if player_id != _human_player_id:
+		return
+	_project_ctx = {"player_id": player_id, "target_ids": target_ids}
+	_show_project_target_step(player_id, target_ids)
+
+## 第一步：选择投影目标玩家
+func _show_project_target_step(player_id: int, target_ids: Array[int]) -> void:
+	_dismiss_project_dialog()
+	_project_dialog = PanelContainer.new()
+	_project_dialog.position = Vector2(240, 150)
+	_project_dialog.size = Vector2(480, 240)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#3B5BA5")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_project_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_project_dialog.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "⚔ 投影 — 选择目标玩家"
+	title.add_theme_font_size_override("font_size", 15)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("#185FA5"))
+	vbox.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "消耗 1 气，复制目标玩家技能库中的一个技能（永久保留至用掉为止）"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_color_override("font_color", Color("#5F5E5A"))
+	vbox.add_child(hint)
+
+	for tid in target_ids:
+		var tp := GameManager.get_player(tid)
+		var t_name := tp.player_name if tp else str(tid)
+		var btn := Button.new()
+		btn.text = "%s" % t_name
+		btn.custom_minimum_size = Vector2(0, 34)
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#E6F1FB"), Color("#185FA5"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#B5D4F4"), Color("#0C447C"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#9FCAE9"), Color("#0C447C"), 1, 4))
+		btn.pressed.connect(func():
+			_project_ctx["target_id"] = tid
+			_show_project_skill_step(player_id, tid)
+		)
+		vbox.add_child(btn)
+
+	var skip_btn := Button.new()
+	skip_btn.text = "跳过（不使用投影）"
+	skip_btn.add_theme_font_size_override("font_size", 12)
+	skip_btn.add_theme_color_override("font_color", Color("#6F5E5A"))
+	skip_btn.pressed.connect(func():
+		_submit_project_choice(-1, "")
+	)
+	vbox.add_child(skip_btn)
+
+	add_child(_project_dialog)
+
+## 第二步：选择要投影的技能（含被动技）
+func _show_project_skill_step(player_id: int, target_id: int) -> void:
+	_dismiss_project_dialog()
+	var target := GameManager.get_player(target_id)
+	if target == null:
+		_submit_project_choice(-1, "")
+		return
+	var all_skills := target.get_all_skills()
+
+	_project_dialog = PanelContainer.new()
+	_project_dialog.position = Vector2(240, 130)
+	_project_dialog.size = Vector2(480, 300)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#3B5BA5")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_project_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_project_dialog.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "⚔ 投影 — 选择 %s 的技能" % (target.player_name if target else str(target_id))
+	title.add_theme_font_size_override("font_size", 15)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("#185FA5"))
+	vbox.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 4)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+
+	for skill in all_skills:
+		# 跳过卫宫自己的"投影"（防止套娃复制投影）
+		if skill.skill_name == "投影":
+			continue
+		var btn := Button.new()
+		var range_str: String
+		if skill.max_range >= 999:
+			range_str = "自身"
+		elif skill.min_range == skill.max_range:
+			range_str = "范围%d" % skill.min_range
+		else:
+			range_str = "范围%d~%d" % [skill.min_range, skill.max_range]
+		btn.text = "%s（⚡%d · %s）" % [skill.skill_name, skill.energy_cost, range_str]
+		btn.custom_minimum_size = Vector2(0, 32)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.tooltip_text = skill.description
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#EAF3DE"), Color("#639922"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#C0DD97"), Color("#27500A"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#A8CE7E"), Color("#27500A"), 1, 4))
+		btn.pressed.connect(func():
+			_submit_project_choice(target_id, skill.resource_path)
+		)
+		list.add_child(btn)
+
+	if all_skills.is_empty():
+		var empty := Label.new()
+		empty.text = "（目标没有可用技能）"
+		empty.add_theme_font_size_override("font_size", 12)
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		list.add_child(empty)
+
+	var back_btn := Button.new()
+	back_btn.text = "← 返回选择目标"
+	back_btn.add_theme_font_size_override("font_size", 12)
+	back_btn.pressed.connect(func():
+		_show_project_target_step(player_id, _project_ctx.get("target_ids", []))
+	)
+	vbox.add_child(back_btn)
+
+	add_child(_project_dialog)
+
+## 提交投影选择：-1 表示跳过
+func _submit_project_choice(target_id: int, skill_path: String) -> void:
+	var player_id: int = _project_ctx.get("player_id", -1)
+	_dismiss_project_dialog()
+	if player_id < 0:
+		return
+	# 网络对局：主机侧由 RPC client_submit_project_skill 转发到 GameManager；
+	# 本地对局：直接 emit project_skill_made 信号（GameManager 已连接 _on_project_skill_made）
+	if net_client:
+		net_client.submit_project_skill(player_id, target_id, skill_path)
+	else:
+		GameManager.submit_project_skill(player_id, target_id, skill_path)
+
+func _dismiss_project_dialog() -> void:
+	if _project_dialog:
+		_project_dialog.queue_free()
+		_project_dialog = null
+
+## 投影完成（本机回显或网络同步）：刷新卡片并记日志
+func _on_project_skill_made(player_id: int, target_id: int, skill_path: String) -> void:
+	var player := GameManager.get_player(player_id)
+	var target := GameManager.get_player(target_id)
+	if skill_path == "" or target_id < 0:
+		var p_name := player.player_name if player else str(player_id)
+		_append_log("%s 跳过了投影" % p_name, LT_STATUS, player_id)
+		return
+	var skill_res := load(skill_path) as SkillData
+	if skill_res == null:
+		return
+	var p_name := player.player_name if player else str(player_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("⚔ %s 投影了 %s 的技能【%s】" % [p_name, t_name, skill_res.skill_name], LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+## 投影技能获得（投影成功）
+func _on_projected_skill_gained(player_id: int, skill_name: String) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("⚔ %s 获得了投影技能【%s】（本回合可用，使用后消失）" % [
+		player.player_name if player else str(player_id), skill_name
+	], LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+## 投影技能使用后消失
+func _on_projected_skill_lost(player_id: int, skill_name: String) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("⚔ %s 的投影技能【%s】已用完消失" % [
+		player.player_name if player else str(player_id), skill_name
+	], LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+# ── 卫宫·无限剑制信号 ───────────────────────────────────────────────
+
+func _on_binding_field_started(player_id: int, turns: int, target_ids: Array[int]) -> void:
+	var player := GameManager.get_player(player_id)
+	var target_names: Array[String] = []
+	for tid in target_ids:
+		var tp := GameManager.get_player(tid)
+		target_names.append(tp.player_name if tp else str(tid))
+		_refresh_player_card(tid)
+	var p_name := player.player_name if player else str(player_id)
+	_append_log("🗡 %s 展开无限剑制结界（%d回合），锁定敌人：%s" % [
+		p_name, turns, ", ".join(target_names) if not target_names.is_empty() else "无"
+	], LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_binding_field_ended(player_id: int) -> void:
+	var player := GameManager.get_player(player_id)
+	var p_name := player.player_name if player else str(player_id)
+	_append_log("🗑 %s 的无限剑制结界消散" % p_name, LT_STATUS, player_id)
 	_refresh_player_card(player_id)
 
 
@@ -1737,6 +2834,9 @@ func _on_action_result(data: Dictionary) -> void:
 		'paralyze':
 			var pid: int = data.get('player_id', -1)
 			_on_player_paralyzed(pid, data.get('turns', 0))
+		'knockdown':
+			var pid: int = data.get('player_id', -1)
+			_on_player_knocked_down(pid, data.get('turns', 0))
 		'shield':
 			var pid: int = data.get('player_id', -1)
 			_on_player_shielded(pid, data.get('value', 0))
@@ -1758,6 +2858,74 @@ func _on_action_result(data: Dictionary) -> void:
 			var pid: int = data.get('player_id', -1)
 			var p := GameManager.get_player(pid)
 			_append_log('── 加赛胜出：%s ──' % (p.player_name if p else str(pid)), LT_WIN)
+		'bell_gained':
+			_on_bell_gained(data.get('player_id', -1), data.get('bell_count', 0))
+		'counter_stance':
+			_on_counter_stance_entered(data.get('player_id', -1))
+		'counter_triggered':
+			_on_counter_stance_triggered(data.get('target_id', -1), data.get('attacker_id', -1))
+		'counter_ended':
+			_on_counter_stance_ended(data.get('player_id', -1))
+		'skill_disabled':
+			_on_skill_disabled(data.get('player_id', -1), data.get('turns', 0))
+		'invincible':
+			_on_player_invincible(data.get('player_id', -1), data.get('turns', 0))
+		'burning':
+			_on_player_burning(data.get('player_id', -1))
+		'berserker':
+			_on_player_berserker(data.get('player_id', -1))
+		'gate_changed':
+			_on_gate_changed(data.get('player_id', -1), data.get('gate_count', 0))
+		'eighth_gate':
+			_on_eighth_gate_opened(data.get('player_id', -1))
+		'skill_lost':
+			_on_skill_lost(data.get('player_id', -1), data.get('skill_name', ''))
+		'burn_damage':
+			_on_burn_damage_triggered(data.get('player_id', -1), data.get('damage', 0.0), data.get('hp', 0.0), data.get('reason', ''))
+		'hp_payment':
+			var pid: int = data.get('player_id', -1)
+			var hp_paid: float = data.get('hp_paid', 0.0)
+			if hp_paid > 0:
+				var player := GameManager.get_player(pid)
+				var p_name := player.player_name if player else str(pid)
+				_append_log("%s 用 %.1f 点生命值代替气支付" % [p_name, hp_paid], LT_STATUS, pid)
+			_refresh_player_card(pid)
+		'ftg_marks_changed':
+			_on_ftg_marks_changed(data.get('player_id', -1), data.get('marks', 0))
+		'ftg_mark_applied':
+			_on_ftg_mark_applied(data.get('target_id', -1), data.get('attacker_id', -1))
+		'ftg_mark_removed':
+			_on_ftg_mark_removed(data.get('player_id', -1))
+		'ftg_swap':
+			_on_ftg_swap_triggered(data.get('swapper_id', -1), data.get('swapped_id', -1), data.get('original_target_id', -1))
+		'ftg_dodge':
+			_on_ftg_dodge_triggered(data.get('player_id', -1), data.get('attacker_id', -1))
+		'nine_tails_stage':
+			_on_nine_tails_stage_changed(data.get('player_id', -1), data.get('stage', 0))
+		'nine_tails_invincible_started':
+			_on_nine_tails_invincible_started(data.get('player_id', -1))
+		'nine_tails_invincible_ended':
+			_on_nine_tails_invincible_ended(data.get('player_id', -1))
+		'nine_tails_attack':
+			_on_nine_tails_attack(data.get('player_id', -1), data.get('stage', 0), data.get('damage', 0.0), data.get('target_ids', []))
+		# ── 卫宫网络事件分发 ──
+		'project_skill_made':
+			_on_project_skill_made(data.get('player_id', -1), data.get('target_id', -1), data.get('skill_path', ''))
+		'projected_skill_gained':
+			_on_projected_skill_gained(data.get('player_id', -1), data.get('skill_name', ''))
+		'projected_skill_lost':
+			_on_projected_skill_lost(data.get('player_id', -1), data.get('skill_name', ''))
+		'binding_field_started':
+			_on_binding_field_started(data.get('player_id', -1), data.get('turns', 0), data.get('target_ids', []))
+		'binding_field_ended':
+			_on_binding_field_ended(data.get('player_id', -1))
+		# ── 新止水（天劫）网络事件分发 ──
+		'phantom_changed':
+			_on_phantom_changed(data.get('player_id', -1), data.get('count', 0))
+		'hiroari_used':
+			_on_hiroari_used(data.get('player_id', -1), data.get('target_ids', []))
+		'backtrack_performed':
+			_on_backtrack_performed(data.get('player_id', -1), data.get('round', 0))
 
 func _on_full_state_sync(players: Array, phase: int, round: int) -> void:
 	_current_round = round
@@ -1791,9 +2959,14 @@ func _on_state_hash_received(expected_hash: int) -> void:
 func _compute_local_state_hash() -> int:
 	var parts: Array[String] = []
 	for p in GameManager._players:
-		parts.append("%d:%d:%d:%d:%d:%d" % [
+		parts.append("%d:%.1f:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d" % [
 			p.player_id, p.hp, p.energy, p.shield,
-			p.clone_count, p.paralyze_turns
+			p.clone_count, p.paralyze_turns, p.bell_count,
+			1 if p.counter_stance else 0, p.skill_disabled_turns,
+			p.gate_count, p.invincible_turns,
+			1 if p.burning else 0, 1 if p.berserker else 0,
+			p.ftg_marks, p.nine_tails_stage,
+			p.max_energy, p.stomp_active
 		])
 	parts.sort()
 	return hash(",".join(PackedStringArray(parts)))
@@ -1817,9 +2990,28 @@ func _setup_from_sync(players_data: Array) -> void:
 		ps.energy = data["energy"]
 		ps.shield = data["shield"]
 		ps.paralyze_turns = data["paralyze"]
+		ps.knockdown_turns = data.get("knockdown", 0)
 		ps.clone_count = data["clone"]
 		ps.is_alive = data["alive"]
 		ps.delayed_damages = data.get("delayed_dmg", [])
+		ps.bell_count = data.get("bell_count", 0)
+		ps.counter_stance = data.get("counter_stance", false)
+		ps.skill_disabled_turns = data.get("skill_disabled", 0)
+		ps.limited_skills_used = data.get("limited_used", [])
+		ps.gate_count = data.get("gate_count", 0)
+		ps.invincible_turns = data.get("invincible_turns", 0)
+		ps.burning = data.get("burning", false)
+		ps.berserker = data.get("berserker", false)
+		ps.consecutive_rounds = data.get("consecutive_rounds", 0)
+		ps.lost_skills = data.get("lost_skills", [])
+		ps.ftg_marks = data.get("ftg_marks", 0)
+		ps.ftg_marked_by = data.get("ftg_marked_by", [])
+		ps.nine_tails_stage = data.get("nine_tails_stage", 0)
+		ps.nine_tails_invincible = data.get("nine_tails_invincible", false)
+		ps.max_energy = data.get("max_energy", 999)
+		ps.stomp_active = data.get("stomp_active", 0)
+		ps.force_win_next_round = data.get("force_win_next_round", 0) > 0
+		ps.phantom_count = data.get("phantom_count", 0)
 		for path in data.get("unlocked_skills", []):
 			var skill_res := load(path) as SkillData
 			if skill_res and not ps.unlocked_skills.has(skill_res):
@@ -1869,3 +3061,256 @@ func _on_game_over_result(winner_id: int, match_data: Dictionary = {}) -> void:
 		'round': _current_round,
 	}
 	SceneManager.go_to('res://scenes/game_over.tscn')
+
+
+# ══════════════════════════════════════════════════════════════════
+# ── 新止水（天劫）专属 UI ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+
+var _phantom_dodge_dialog: PanelContainer = null
+var _phantom_dodge_ctx: Dictionary = {}
+var _backtrack_dialog: PanelContainer = null
+var _hiroari_dialog: PanelContainer = null
+var _hiroari_ctx: Dictionary = {}
+
+## 幻影数量变化：刷新玩家卡片徽章
+func _on_phantom_changed(player_id: int, _count: int) -> void:
+	_refresh_player_card(player_id)
+
+## 回溯完成：刷新全部卡片（全体状态可能已恢复）
+func _on_backtrack_performed(_player_id: int, _round: int) -> void:
+	_refresh_all_cards()
+	_append_log("🕰 别天神·回溯发动！全体状态恢复到上一回合结束前", LT_WIN, _player_id)
+
+## 日影舞释放完成：日志提示
+func _on_hiroari_used(player_id: int, target_ids: Array[int]) -> void:
+	var player := GameManager.get_player(player_id)
+	_append_log("💨 %s 释放日影舞！4段连续打击：%s" % [
+		player.player_name if player else str(player_id),
+		str(target_ids)], LT_DAMAGE, player_id)
+	_refresh_player_card(player_id)
+
+## ── 幻影闪避决策弹窗（受击时：消耗1气+1幻影闪避） ──
+func _on_phantom_dodge_required(player_id: int, attacker_id: int) -> void:
+	if player_id != _human_player_id:
+		return
+	_phantom_dodge_ctx = {"player_id": player_id, "attacker_id": attacker_id}
+	_show_phantom_dodge_dialog(player_id, attacker_id)
+
+func _show_phantom_dodge_dialog(player_id: int, attacker_id: int) -> void:
+	if _phantom_dodge_dialog != null:
+		_phantom_dodge_dialog.queue_free()
+	_phantom_dodge_dialog = PanelContainer.new()
+	_phantom_dodge_dialog.position = Vector2(240, 170)
+	_phantom_dodge_dialog.size = Vector2(460, 200)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#2A5A7A")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_phantom_dodge_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_phantom_dodge_dialog.add_child(vbox)
+
+	var attacker := GameManager.get_player(attacker_id)
+	var a_name := attacker.player_name if attacker else str(attacker_id)
+	var player := GameManager.get_player(player_id)
+	var p_name := player.player_name if player else str(player_id)
+
+	var label := Label.new()
+	label.text = "👻 %s 攻击了你！\n是否消耗 1气+1幻影 闪避这次攻击？" % a_name
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(label)
+
+	var btn_yes := Button.new()
+	btn_yes.text = "闪避（消耗1气+1幻影）"
+	btn_yes.add_theme_font_size_override("font_size", 13)
+	btn_yes.pressed.connect(func():
+		_submit_phantom_dodge(true)
+	)
+	vbox.add_child(btn_yes)
+
+	var btn_no := Button.new()
+	btn_no.text = "硬抗（承受伤害）"
+	btn_no.add_theme_font_size_override("font_size", 13)
+	btn_no.pressed.connect(func():
+		_submit_phantom_dodge(false)
+	)
+	vbox.add_child(btn_no)
+
+	add_child(_phantom_dodge_dialog)
+
+func _submit_phantom_dodge(dodge: bool) -> void:
+	var player_id: int = _phantom_dodge_ctx.get("player_id", -1)
+	if _phantom_dodge_dialog:
+		_phantom_dodge_dialog.queue_free()
+		_phantom_dodge_dialog = null
+	_phantom_dodge_ctx.clear()
+	if player_id < 0:
+		return
+	if net_client:
+		net_client.submit_phantom_dodge(player_id, dodge)
+	else:
+		GameManager.submit_phantom_dodge(player_id, dodge)
+
+## ── 别天神（回溯）决策弹窗：上回合不是自己时准备阶段触发 ──
+func _on_backtrack_required(player_id: int) -> void:
+	if player_id != _human_player_id:
+		return
+	_show_backtrack_dialog(player_id)
+
+func _show_backtrack_dialog(player_id: int) -> void:
+	if _backtrack_dialog != null:
+		_backtrack_dialog.queue_free()
+	_backtrack_dialog = PanelContainer.new()
+	_backtrack_dialog.position = Vector2(240, 170)
+	_backtrack_dialog.size = Vector2(460, 190)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#3B5BA5")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_backtrack_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_backtrack_dialog.add_child(vbox)
+
+	var player := GameManager.get_player(player_id)
+	var p_name := player.player_name if player else str(player_id)
+
+	var label := Label.new()
+	label.text = "🕰 别天神·回溯\n是否消耗 1 气，将全体玩家状态回溯到上一回合？"
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(label)
+
+	var btn_yes := Button.new()
+	btn_yes.text = "发动回溯（消耗1气）"
+	btn_yes.add_theme_font_size_override("font_size", 13)
+	btn_yes.pressed.connect(func():
+		if _backtrack_dialog:
+			_backtrack_dialog.queue_free()
+			_backtrack_dialog = null
+		if net_client:
+			net_client.submit_backtrack_decision(player_id, true)
+		else:
+			GameManager.submit_backtrack_decision(player_id, true)
+	)
+	vbox.add_child(btn_yes)
+
+	var btn_no := Button.new()
+	btn_no.text = "跳过（不回溯）"
+	btn_no.add_theme_font_size_override("font_size", 13)
+	btn_no.pressed.connect(func():
+		if _backtrack_dialog:
+			_backtrack_dialog.queue_free()
+			_backtrack_dialog = null
+		if net_client:
+			net_client.submit_backtrack_decision(player_id, false)
+		else:
+			GameManager.submit_backtrack_decision(player_id, false)
+	)
+	vbox.add_child(btn_no)
+
+	add_child(_backtrack_dialog)
+
+## ── 日影舞目标选择弹窗（4段，可重复选择目标） ──
+func _on_hiroari_targets_required(player_id: int, target_ids: Array[int]) -> void:
+	if player_id != _human_player_id:
+		return
+	_hiroari_ctx = {"player_id": player_id, "target_ids": target_ids, "picks": []}
+	_show_hiroari_step()
+
+func _show_hiroari_step() -> void:
+	if _hiroari_dialog != null:
+		_hiroari_dialog.queue_free()
+	var ctx: Dictionary = _hiroari_ctx
+	var picks: Array = ctx.get("picks", [])
+	var target_ids: Array = ctx.get("target_ids", [])
+	var player_id: int = ctx.get("player_id", -1)
+
+	_hiroari_dialog = PanelContainer.new()
+	_hiroari_dialog.position = Vector2(240, 150)
+	_hiroari_dialog.size = Vector2(480, 260)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#993C1D")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_hiroari_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_hiroari_dialog.add_child(vbox)
+
+	var seg := picks.size() + 1
+	var title := Label.new()
+	title.text = "🌀 日影舞 — 第 %d/4 段，选择目标" % seg
+	title.add_theme_font_size_override("font_size", 15)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("#993C1D"))
+	vbox.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "每段造成 2 伤，可重复选择同一目标"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", Color("#5F5E5A"))
+	vbox.add_child(hint)
+
+	for tid in target_ids:
+		var tp := GameManager.get_player(tid)
+		var t_name := tp.player_name if tp else str(tid)
+		var btn := Button.new()
+		btn.text = "%s" % t_name
+		btn.custom_minimum_size = Vector2(0, 34)
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#FCEBEB"), Color("#993C1D"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#F7C1C1"), Color("#791F1F"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#F0A8A8"), Color("#791F1F"), 1, 4))
+		btn.pressed.connect(func():
+			picks.append(tid)
+			if picks.size() >= 4:
+				_submit_hiroari()
+			else:
+				_show_hiroari_step()
+		)
+		vbox.add_child(btn)
+
+	var skip_btn := Button.new()
+	skip_btn.text = "跳过本段（-1）"
+	skip_btn.add_theme_font_size_override("font_size", 12)
+	skip_btn.add_theme_color_override("font_color", Color("#6F5E5A"))
+	skip_btn.pressed.connect(func():
+		picks.append(-1)
+		if picks.size() >= 4:
+			_submit_hiroari()
+		else:
+			_show_hiroari_step()
+	)
+	vbox.add_child(skip_btn)
+
+	add_child(_hiroari_dialog)
+
+func _submit_hiroari() -> void:
+	if _hiroari_dialog:
+		_hiroari_dialog.queue_free()
+		_hiroari_dialog = null
+	var player_id: int = _hiroari_ctx.get("player_id", -1)
+	var picks: Array = _hiroari_ctx.get("picks", [])
+	_hiroari_ctx.clear()
+	if player_id < 0:
+		return
+	var targets: Array[int] = []
+	for p in picks:
+		targets.append(int(p))
+	if net_client:
+		net_client.submit_hiroari_targets(player_id, targets)
+	else:
+		GameManager.submit_hiroari_targets(player_id, targets)

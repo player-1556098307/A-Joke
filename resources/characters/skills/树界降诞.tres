@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_sjj_dmg"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SE_sjj_par"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 2
+target = 0
+
+[sub_resource type="Resource" id="SE_sjj_dis"]
+script = ExtResource("1_effect")
+effect_type = 8
+value = 2
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "仙法·树界降诞"
+description = "对一名玩家造成1点伤害并禁锢其2回合（麻痹+失去技能）。自身气>=4时变为【仙法·花树界降临】。"
+energy_cost = 2
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_sjj_dmg"), SubResource("SE_sjj_par"), SubResource("SE_sjj_dis")])

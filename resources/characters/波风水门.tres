@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://ur85ksfhunu6" path="res://resources/portraits/minato_drift.png" id="9_p1"]
+[ext_resource type="Resource" path="res://resources/characters/skills/飞雷神.tres" id="4_ftg"]
+[ext_resource type="Resource" path="res://resources/characters/skills/飞雷神聚.tres" id="5_ftgc"]
+[ext_resource type="Resource" path="res://resources/characters/skills/飞雷神拔除.tres" id="6_ftgr"]
+[ext_resource type="Resource" path="res://resources/characters/skills/螺旋丸.tres" id="7_rasengan"]
+[ext_resource type="Resource" path="res://resources/characters/skills/漂泊九尾.tres" id="8_nt"]
+
+[sub_resource type="Resource" id="SE_ba_mg"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba_mg"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成1点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_mg")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "波风水门（漂泊寻者）"
+max_hp = 8
+portrait = ExtResource("9_p1")
+avatar_emoji = "水门"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_mg"), ExtResource("4_ftg"), ExtResource("5_ftgc"), ExtResource("6_ftgr"), ExtResource("7_rasengan"), ExtResource("8_nt")])
+tags = Array[String](["刺客"])
+grade = "S"
+metadata/_custom_type_script = "uid://dx561rntxjbhw"

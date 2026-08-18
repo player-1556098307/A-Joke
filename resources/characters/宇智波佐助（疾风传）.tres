@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://543qdqjk1b"]
 
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
-[ext_resource type="Texture2D" uid="uid://bn21w6yw5x3fd" path="res://resources/characters/portraits/疾风传佐助.jpg" id="1_euv2h"]
+[ext_resource type="Texture2D" uid="uid://cl7vdcn3cfelq" path="res://resources/portraits/sasuke_fy.png" id="1_euv2h"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
 [ext_resource type="Resource" uid="uid://cn7gt3pxb8rwm" path="res://resources/characters/skills/kirin.tres" id="4_kirin"]
@@ -69,3 +69,4 @@ max_hp = 6
 portrait = ExtResource("1_euv2h")
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_s1"), SubResource("SD_s2")])
 tags = Array[String](["刺客", "法师"])
+grade = "B"

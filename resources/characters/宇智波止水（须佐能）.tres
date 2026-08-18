@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://bshisuishisui"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://dnbk1h0luxn3p" path="res://resources/portraits/shisui.png" id="4_p1"]
+[ext_resource type="Resource" path="res://resources/characters/skills/宇智波流·日晕舞.tres" id="5_hiano"]
+[ext_resource type="Resource" path="res://resources/characters/skills/须佐能乎·斩.tres" id="6_slash"]
+[ext_resource type="Resource" path="res://resources/characters/skills/别天神.tres" id="7_koto"]
+
+[sub_resource type="Resource" id="SE_ba_sh"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba_sh"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成1点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_sh")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "宇智波止水（须佐能）"
+max_hp = 6
+basic_attack_cost = 1
+portrait = ExtResource("4_p1")
+avatar_emoji = "止"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_sh"), ExtResource("5_hiano"), ExtResource("6_slash"), ExtResource("7_koto")])
+tags = Array[String](["刺客", "法师"])
+grade = "S"

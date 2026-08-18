@@ -61,6 +61,13 @@ func _init_network_mode(is_host: bool) -> void:
 	_net_client.full_state_received.connect($GameUI._on_full_state_sync)
 	_net_client.state_hash_received.connect($GameUI._on_state_hash_received)
 	_net_client.game_over_received.connect($GameUI._on_game_over_result)
+	_net_client.end_phase_bell_received.connect($GameUI._on_end_phase_bell_decision_required)
+	_net_client.ftg_intercept_received.connect($GameUI._on_ftg_intercept_required)
+	_net_client.rasengan_counter_received.connect($GameUI._on_rasengan_counter_required)
+	_net_client.project_skill_received.connect($GameUI._on_project_skill_required)
+	_net_client.phantom_dodge_received.connect($GameUI._on_phantom_dodge_required)
+	_net_client.backtrack_received.connect($GameUI._on_backtrack_required)
+	_net_client.hiroari_received.connect($GameUI._on_hiroari_targets_required)
 
 	if config.has("my_player_id"):
 		_net_client.my_player_id = config["my_player_id"]

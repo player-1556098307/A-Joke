@@ -1,0 +1,123 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://k9w3t7q2m5x1v"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://dutljmkg7j88b" path="res://resources/portraits/hashimoto_jianghu.png" id="4_p1"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+value = 1
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_zz1"]
+script = ExtResource("1_effect")
+value = 1
+
+[sub_resource type="Resource" id="SE_zz2"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 1
+
+[sub_resource type="Resource" id="SE_zz3"]
+script = ExtResource("1_effect")
+effect_type = 8
+value = 1
+
+[sub_resource type="Resource" id="SD_zz"]
+script = ExtResource("2_skill")
+skill_name = "砸钟"
+description = "消耗 1 个钟，对目标造成 1 点伤害并禁锢 1 回合，使其失去所有技能 1 回合。"
+energy_cost = 0
+min_range = 1
+max_range = 1
+bell_cost = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_zz1"), SubResource("SE_zz2"), SubResource("SE_zz3")])
+
+[sub_resource type="Resource" id="SE_zk"]
+script = ExtResource("1_effect")
+effect_type = 9
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SD_zk"]
+script = ExtResource("2_skill")
+skill_name = "招架"
+description = "消耗 1 个钟进入防反状态，持续到下回合开始。期间受伤减半、免疫控制、获得1气并反击1伤。"
+energy_cost = 0
+max_range = 999
+bell_cost = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_zk")])
+
+[sub_resource type="Resource" id="SE_ml1"]
+script = ExtResource("1_effect")
+value = 3
+bonus_if_paralyzed = 1
+
+[sub_resource type="Resource" id="SD_ml"]
+script = ExtResource("2_skill")
+skill_name = "木龙之术·豪"
+description = "对目标造成 3 点伤害，若目标被禁锢则额外 1 点伤害。"
+energy_cost = 2
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ml1")])
+
+[sub_resource type="Resource" id="SE_xf1"]
+script = ExtResource("1_effect")
+value = 2
+target = 1
+bonus_if_paralyzed = 1
+
+[sub_resource type="Resource" id="SE_xf2"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 3
+target = 1
+
+[sub_resource type="Resource" id="SD_xf"]
+script = ExtResource("2_skill")
+skill_name = "仙法·木龙覆花海"
+description = "对所有敌人造成 2 点伤害+禁锢 3 回合，已被禁锢者额外 1 点伤害。"
+energy_cost = 4
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_xf1"), SubResource("SE_xf2")])
+
+[sub_resource type="Resource" id="SE_ms1"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 3
+
+[sub_resource type="Resource" id="SE_ms2"]
+script = ExtResource("1_effect")
+effect_type = 8
+value = 3
+
+[sub_resource type="Resource" id="SD_ms"]
+script = ExtResource("2_skill")
+skill_name = "明神门"
+description = "限定技：立即获得 2 个气，使范围 1 内一名玩家禁锢并失去所有技能 3 回合。"
+energy_cost = 0
+min_range = 1
+max_range = 1
+is_limited = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ms1"), SubResource("SE_ms2")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "千手柱间（侠影江湖）"
+max_hp = 10
+portrait = ExtResource("4_p1")
+avatar_emoji = "柱"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_zz"), SubResource("SD_zk"), SubResource("SD_ml"), SubResource("SD_xf"), SubResource("SD_ms")])
+tags = Array[String](["坦克", "法师"])
+grade = "S"
+metadata/_custom_type_script = "uid://dx561rntxjbhw"

@@ -195,7 +195,7 @@ func _build_winner_section() -> void:
 	winner_name_label.add_theme_color_override("font_color", Color("#FAC775"))
 
 	final_hp_box.add_theme_stylebox_override("panel", _make_flat(Color("#EAF3DE"), Color("#C0DD97"), 1, 4))
-	final_hp_label.text = "最终 HP %d / %d" % [stats.final_hp, stats.max_hp]
+	final_hp_label.text = "最终 HP %.1f / %.1f" % [stats.final_hp, stats.max_hp]
 	final_hp_label.add_theme_color_override("font_color", Color("#3B6D11"))
 
 	if stats.unlocked_skills.size() > 0:
@@ -290,7 +290,7 @@ func _build_elimination_list() -> void:
 			vbox.add_child(reason_lbl)
 
 		var hp_lbl := Label.new()
-		hp_lbl.text = "最终HP：%d/%d" % [ps.final_hp, ps.max_hp]
+		hp_lbl.text = "最终HP：%.1f/%.1f" % [ps.final_hp, ps.max_hp]
 		hp_lbl.add_theme_font_size_override("font_size", 9)
 		hp_lbl.add_theme_color_override("font_color", Color("#888780"))
 		hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -490,14 +490,14 @@ func _add_compare_row(parent: VBoxContainer, label: String, player_ids: Array[in
 	lbl.add_theme_stylebox_override("normal", row_bg)
 	row.add_child(lbl)
 
-	var max_val := -1
+	var max_val := -1.0
 	for pid in player_ids:
-		var v: int = getter.call(_record.player_stats[pid])
+		var v: float = getter.call(_record.player_stats[pid])
 		if v > max_val: max_val = v
 
 	for pid in player_ids:
 		var ps: PlayerMatchStats = _record.player_stats[pid]
-		var v: int = getter.call(ps)
+		var v: float = getter.call(ps)
 		var cell := Label.new()
 		cell.text = str(v)
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -20,6 +20,61 @@ enum EffectType {
 	UNLOCK_SKILL,
 	## 影分身：一次性全挡伤害 + 充能加成
 	CLONE_SHIELD,
+	## 失去技能：value=回合数，目标无法使用技能（仅保留普攻）
+	DISABLE_SKILL,
+	## 防反姿态：进入counter_stance状态
+	COUNTER_STANCE,
+	## 真实伤害：无视护盾/分身/防反/无敌，直接扣HP
+	TRUE_DAMAGE,
+	## 失去技能：从角色技能列表中永久移除指定技能
+	LOSE_SKILL,
+	## 飞雷神标记：value=伤害量(0.5)，对目标造成伤害并标记飞雷神
+	FTG_MARK,
+	## 飞雷神聚气：自身+1飞雷神标记（消耗行动权，0气）
+	FTG_CHARGE,
+	## 飞雷神拔除：拔除自身飞雷神标记（消耗行动权，0气）
+	FTG_REMOVE,
+	## 漂泊九尾：三段延迟攻击（咆哮/大爪/尾兽玉），GameManager特殊处理
+	NINE_TAILS,
+	## 穿透伤害（断头台）：无视护盾(数值/全挡)、无敌、圣盾(全挡护盾)，直接扣HP
+	PIERCE_DAMAGE,
+	## 断罪死（第七圣典）：与目标进行7次猜拳，赢1次造成1伤，输1次回1血，赢≥4则即死
+	DEATH_SENTENCE,
+	## 投影（卫宫）：选择任意玩家，获得其一个技能的副本（用一次后消失）
+	PROJECT_SKILL,
+	## 无限剑制（卫宫）：下次猜拳必赢 + 结界持续5全局回合，结界内玩家的技能进入卫宫技能列表
+	BINDING_FIELD,
+	## 无法选择：value=回合数，目标无法被任何技能指定（不可选定状态）
+	UNTARGETABLE,
+	## 荣耀夺取（泉奈）：在目标回合的准备阶段触发，使其本回合失去所有技能并夺取本回合行动权
+	GLORY_TAKEOVER,
+	## 宇智波流招架（泉奈）：进入独立的招架状态，受击时伤害减半+进入无法选择+反击封技
+	UCHIHA_STANCE,
+	## 宇智波流·日晕舞（止水）：对一名玩家依次造成多段伤害，最后一段出伤前可预选中断点
+	## value=单段伤害, duration=段数；中断与后续由 GameManager 处理
+	HIANO_KAGEROHI,
+	## 须佐能乎·斩（止水）：本回合无敌 + 2点伤害延迟到回合结束阶段结算（标准吸收链）
+	## 伤害延迟由 GameManager 在 _end_round 处理，此处仅标记
+	SUSANOO_SLASH,
+	## 须佐能乎·螺旋（止水）：多段伤害（3段x1）+ 本回合无敌 + 目标本回合封技 + 解锁九十九
+	## 每段单独走吸收链，由 GameManager 循环处理
+	SUSANOO_SPIRAL,
+	## 须佐能乎·九十九（止水）：多段伤害（4段x1）+ 本回合无敌，由 GameManager 循环处理
+	SUSANOO_NINETY_NINE,
+	## 别天神（止水，被动限定技）：获得过九十九即满足条件；击杀时自动弹窗确认夺舍
+	## 夺舍：完全变成被杀者角色（技能替换）、血量回复至被杀者最大血量一半、继承其阵亡时气
+	KOTOAMATSUKAMI,
+	## 击飞：value=回合数，目标可正常猜拳获得回合，但行动阶段强制只能聚气
+	KNOCKDOWN,
+	## 天劫·回溯（新止水）：准备阶段消耗1气，全体玩家状态回滚到上一行动玩家回合开始前
+	## 由 GameManager 在准备阶段特殊处理（快照拍摄+恢复）
+	BACKTRACK,
+	## 日影舞（新止水）：拥有3个幻影时消耗3气，对任意玩家分配4段斩击（每段2伤），每段独立结算
+	## 由 GameManager 特殊处理（跨目标多段结算）
+	HIROARI,
+	## 幻影瞬身（新止水，被动标记）：普攻命中获得1幻影（至多3）；受击时可消耗1气+1幻影闪避
+	## 被动生效，GameManager 处理获得/增伤/闪避，此处仅标记
+	PHANTOM_BODY,
 }
 
 ## 效果目标枚举
@@ -31,8 +86,10 @@ enum EffectTarget {
 }
 
 @export var effect_type: EffectType             ## 效果类型
-@export var value: int                          ## 效果数值（含义因类型而异）
+@export var value: float                        ## 效果数值（含义因类型而异）
 @export var target: EffectTarget                ## 目标类型
 @export var duration: int = 1                   ## DELAYED_DAMAGE：延迟回合数
 @export var unlock_skill: SkillData = null      ## UNLOCK_SKILL：要解锁的技能资源
 @export var splash_range: int = 1               ## ENEMY_SPLASH：溅射半径
+@export var bonus_if_paralyzed: int = 0         ## DAMAGE：目标被禁锢时额外伤害
+@export var lose_skill_name: String = ""        ## LOSE_SKILL：要移除的技能名

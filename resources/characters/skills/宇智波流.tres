@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_zl_a"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1.5
+target = 0
+
+[sub_resource type="Resource" id="SE_zl_b"]
+script = ExtResource("1_effect")
+effect_type = 22
+value = 1
+target = 2
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "宇智波流"
+description = "突进攻击，对一名玩家造成1.5点伤害，并进入一回合宇智波流招架状态：受到攻击时伤害减半，自身进入无法选择状态一回合，立即对攻击者造成1点伤害并使其本回合失去所有技能。"
+energy_cost = 2
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_zl_a"), SubResource("SE_zl_b")])

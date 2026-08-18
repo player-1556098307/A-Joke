@@ -60,4 +60,5 @@ max_hp = 6
 portrait = ExtResource("1_jb1ta")
 skills = Array[ExtResource("2_dkdcv")]([SubResource("SD_ba_nr"), SubResource("Resource_ltmqi"), SubResource("Resource_cvo13")])
 tags = Array[String](["战士"])
+grade = "C"
 metadata/_custom_type_script = "uid://dx561rntxjbhw"

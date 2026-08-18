@@ -13,6 +13,14 @@ signal player_reconnected_notice(player_id: int)
 signal high_latency_notice(player_id: int, ms: int)
 signal game_over_received(winner_id: int, match_data: Dictionary)
 signal state_hash_received(hash_val: int)
+signal end_phase_bell_received(player_id: int, bell_count: int)
+signal end_phase_result_received(player_id: int, use_bell: bool)
+signal ftg_intercept_received(target_id: int, attacker_id: int, marked_player_ids: Array[int], attacker_is_marked: bool)
+signal rasengan_counter_received(target_id: int, attacker_id: int, minato_energy: int)
+signal project_skill_received(player_id: int, target_ids: Array[int])
+signal phantom_dodge_received(player_id: int, attacker_id: int)
+signal backtrack_received(player_id: int)
+signal hiroari_received(player_id: int, target_ids: Array[int])
 
 var my_player_id: int = -1
 var reconnect_token: String = ""
@@ -54,6 +62,35 @@ func server_broadcast(op: int, data: Dictionary) -> void:
 			game_over_received.emit(data.get("winner_id", -1), data.get("match_record", {}))
 		NetworkProtocol.SrvOp.STATE_HASH:
 			state_hash_received.emit(data.get("hash", 0))
+		NetworkProtocol.SrvOp.END_PHASE_BELL:
+			end_phase_bell_received.emit(data.get("player_id", -1), data.get("bell_count", 0))
+		NetworkProtocol.SrvOp.END_PHASE_RESULT:
+			end_phase_result_received.emit(data.get("player_id", -1), data.get("use_bell", false))
+		NetworkProtocol.SrvOp.FTG_INTERCEPT:
+			ftg_intercept_received.emit(
+				data.get("target_id", -1),
+				data.get("attacker_id", -1),
+				data.get("marked_player_ids", []),
+				data.get("attacker_is_marked", false))
+		NetworkProtocol.SrvOp.FTG_COUNTER_CONFIRM:
+			rasengan_counter_received.emit(
+				data.get("target_id", -1),
+				data.get("attacker_id", -1),
+				data.get("minato_energy", 0))
+		NetworkProtocol.SrvOp.PROJECT_SKILL_REQUIRED:
+			project_skill_received.emit(
+				data.get("player_id", -1),
+				data.get("target_ids", []))
+		NetworkProtocol.SrvOp.PHANTOM_DODGE_REQUIRED:
+			phantom_dodge_received.emit(
+				data.get("player_id", -1),
+				data.get("attacker_id", -1))
+		NetworkProtocol.SrvOp.BACKTRACK_REQUIRED:
+			backtrack_received.emit(data.get("player_id", -1))
+		NetworkProtocol.SrvOp.HIROARI_REQUIRED:
+			hiroari_received.emit(
+				data.get("player_id", -1),
+				data.get("target_ids", []))
 
 ## 服务器调用：确认加入成功，返回 token 和 player_id
 @rpc("authority", "reliable")
@@ -78,9 +115,30 @@ func server_pong(client_ts: float) -> void:
 func submit_gesture(gesture: PlayerState.Gesture) -> void:
 	rpc_id(1, "client_submit_gesture", gesture)  # 1 = server peer_id
 
-func submit_action(action: PlayerState.ActionType, skill_index: int, target_id: int) -> void:
-	print("[NetClient] submit_action action=%d skill_index=%d target_id=%d -> sending to host" % [action, skill_index, target_id])
-	rpc_id(1, "client_submit_action", action, skill_index, target_id)
+func submit_action(action: PlayerState.ActionType, skill_index: int, target_id: int, hp_paid: int = 0) -> void:
+	print("[NetClient] submit_action action=%d skill_index=%d target_id=%d hp_paid=%d -> sending to host" % [action, skill_index, target_id, hp_paid])
+	rpc_id(1, "client_submit_action", action, skill_index, target_id, hp_paid)
+
+func submit_bell_decision(player_id: int, use_bell: bool) -> void:
+	rpc_id(1, "client_submit_bell_decision", player_id, use_bell)
+
+func submit_ftg_intercept(player_id: int, choice: int, swap_target_id: int = -1) -> void:
+	rpc_id(1, "client_submit_ftg_intercept", player_id, choice, swap_target_id)
+
+func submit_rasengan_counter(player_id: int, use_counter: bool) -> void:
+	rpc_id(1, "client_submit_rasengan_counter", player_id, use_counter)
+
+func submit_project_skill(player_id: int, target_id: int, skill_path: String) -> void:
+	rpc_id(1, "client_submit_project_skill", player_id, target_id, skill_path)
+
+func submit_phantom_dodge(player_id: int, dodge: bool) -> void:
+	rpc_id(1, "client_submit_phantom_dodge", player_id, dodge)
+
+func submit_backtrack_decision(player_id: int, use_backtrack: bool) -> void:
+	rpc_id(1, "client_submit_backtrack_decision", player_id, use_backtrack)
+
+func submit_hiroari_targets(player_id: int, targets: Array[int]) -> void:
+	rpc_id(1, "client_submit_hiroari_targets", player_id, targets)
 
 func send_ping() -> void:
 	rpc_id(1, "client_ping", Time.get_unix_time_from_system())
@@ -96,7 +154,7 @@ func client_submit_gesture(_gesture: int) -> void:
 	pass
 
 @rpc("any_peer", "reliable")
-func client_submit_action(_action: int, _skill_index: int, _target_id: int) -> void:
+func client_submit_action(_action: int, _skill_index: int, _target_id: int, _hp_paid: int = 0) -> void:
 	pass
 
 @rpc("any_peer", "reliable")
@@ -113,6 +171,34 @@ func client_request_sync() -> void:
 
 @rpc("any_peer", "reliable")
 func client_send_chat(_message: String) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_bell_decision(_player_id: int, _use_bell: bool) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_ftg_intercept(_player_id: int, _choice: int, _swap_target_id: int) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_rasengan_counter(_player_id: int, _use_counter: bool) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_project_skill(_player_id: int, _target_id: int, _skill_path: String) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_phantom_dodge(_player_id: int, _dodge: bool) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_backtrack_decision(_player_id: int, _use_backtrack: bool) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_hiroari_targets(_player_id: int, _targets: Array[int]) -> void:
 	pass
 
 ## RoomManager 通知加入失败时调用

@@ -17,6 +17,14 @@ enum SrvOp {
 	GAME_OVER_RESULT     = 40,
 	CHAT_MESSAGE         = 41,
 	STATE_HASH           = 50,  # 回合结束状态哈希，用于去同步检测
+	END_PHASE_BELL       = 51,  # END_PHASE钟决策请求
+	END_PHASE_RESULT     = 52,  # END_PHASE钟决策结果
+	FTG_INTERCEPT        = 53,  # 飞雷神拦截决策请求
+	FTG_COUNTER_CONFIRM  = 54,  # 闪避后螺旋丸反击二次确认请求
+	PROJECT_SKILL_REQUIRED = 55,  # 投影决策请求（准备阶段，人类玩家弹窗）
+	PHANTOM_DODGE_REQUIRED = 56,  # 幻影闪避决策请求（新止水受击弹窗）
+	BACKTRACK_REQUIRED   = 57,  # 别天神回溯决策请求（新止水准备阶段弹窗）
+	HIROARI_REQUIRED     = 58,  # 日影舞目标选择请求（新止水行动阶段弹窗）
 }
 
 # ── 客户端 → 服务器 OpCode ────────────────────────────────────
@@ -26,6 +34,7 @@ enum CliOp {
 	RECONNECT_REQ   = 3,   # {room_id: String, token: String}
 	PING            = 10,  # {ts: float}
 	SPECTATE_JOIN   = 20,  # {}
+	BELL_DECISION   = 30,  # {player_id: int, use_bell: bool}
 }
 
 # 序列化：Dictionary → PackedByteArray（JSON）
@@ -54,10 +63,35 @@ static func serialize_player_state(p: PlayerState) -> Dictionary:
 		"energy":         p.energy,
 		"shield":         p.shield,
 		"paralyze":       p.paralyze_turns,
+		"knockdown":      p.knockdown_turns,
 		"clone":          p.clone_count,
 		"alive":          p.is_alive,
 		"char_id":        p.character.resource_path,
 		"delayed_dmg":    p.delayed_damages,
 		"is_human":       p.is_human,
 		"unlocked_skills": p.unlocked_skills.map(func(s: SkillData): return s.resource_path),
+		"bell_count":      p.bell_count,
+		"counter_stance":  p.counter_stance,
+		"skill_disabled":  p.skill_disabled_turns,
+		"limited_used":    p.limited_skills_used,
+		"gate_count":      p.gate_count,
+		"invincible_turns": p.invincible_turns,
+		"burning":         p.burning,
+		"berserker":       p.berserker,
+		"consecutive_rounds": p.consecutive_rounds,
+		"lost_skills":     p.lost_skills,
+		"ftg_marks":      p.ftg_marks,
+		"ftg_marked_by":   p.ftg_marked_by,
+		"nine_tails_stage": p.nine_tails_stage,
+		"nine_tails_invincible": p.nine_tails_invincible,
+		"max_energy":       p.max_energy,
+		"stomp_active":     p.stomp_active,
+		"phantom_count":    p.phantom_count,
+		"force_win_next_round": 1 if p.force_win_next_round else 0,
+		"projected_skill_path": p.projected_skill.resource_path if p.projected_skill != null else "",
+		"projected_used_this_round": 1 if p.projected_used_this_round else 0,
+		"binding_field_turns": p.binding_field_turns,
+		"binding_field_targets": p.binding_field_targets,
+		"binding_field_force_win": 1 if p.binding_field_force_win else 0,
+		"binding_field_skills_path": p.binding_field_skills.map(func(s: SkillData): return s.resource_path),
 	}

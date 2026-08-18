@@ -62,3 +62,4 @@ max_hp = 6
 portrait = ExtResource("1_xkdpf")
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_ss"), SubResource("SD_sc1"), SubResource("SD_sc2")])
 tags = Array[String](["法师", "刺客"])
+grade = "C"

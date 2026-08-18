@@ -178,8 +178,14 @@ layout_mode = 2
 focus_mode = 0
 text = "聚气 +1"
 
-[node name="SkillsContainer" type="VBoxContainer" parent="ActionPanel" unique_id=169106615]
+[node name="SkillsScroll" type="ScrollContainer" parent="ActionPanel"]
 layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="SkillsContainer" type="VBoxContainer" parent="ActionPanel/SkillsScroll" unique_id=169106615]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="TargetPanel" type="VBoxContainer" parent="." unique_id=2098565999]

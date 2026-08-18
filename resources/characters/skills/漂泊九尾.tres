@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_nine_tails"]
+script = ExtResource("1_effect")
+effect_type = 15
+target = 2
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "漂泊九尾"
+description = "限定技：进入无敌状态。立即对所有玩家造成0.5x3伤害；下回合结束对范围2内所有玩家造成1x2伤害；下下回合结束对所有其他玩家造成4伤害，然后退出无敌。"
+energy_cost = 5
+min_range = 0
+max_range = 0
+is_limited = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_nine_tails")])

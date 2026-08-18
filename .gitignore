@@ -5,3 +5,6 @@
 # Project config & docs
 .claude/
 .md/
+
+# Agent intermediate artifacts
+.temp/

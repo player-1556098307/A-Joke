@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3 uid="uid://b8edohashirama"]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://cfpuadbgaqfqv" path="res://resources/portraits/hashimoto_edo.png" id="4_p1"]
+[ext_resource type="Resource" path="res://resources/characters/skills/树界降诞.tres" id="4_sjj"]
+[ext_resource type="Resource" path="res://resources/characters/skills/木人之术.tres" id="5_mrz"]
+[ext_resource type="Resource" path="res://resources/characters/skills/真数千手.tres" id="6_qss"]
+[ext_resource type="Resource" path="res://resources/characters/skills/明神门_秽土.tres" id="7_msg"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成1点伤害。无消耗。"
+energy_cost = 0
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_xr"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 0
+target = 2
+
+[sub_resource type="Resource" id="SD_xr"]
+script = ExtResource("2_skill")
+skill_name = "仙人之力"
+description = "锁定技：气上限为6。跺脚（被动）：释放普攻后，本回合与下回合内受到伤害时获得1气并取消猜拳直接获得下回合。"
+energy_cost = 0
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_xr")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "千手柱间（秽土转生）"
+max_hp = 8
+avatar_emoji = "秽"
+portrait = ExtResource("4_p1")
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_xr"), ExtResource("4_sjj"), ExtResource("5_mrz"), ExtResource("6_qss"), ExtResource("7_msg")])
+tags = Array[String](["战士", "法师", "秽土转生"])
+grade = "S"
+metadata/_custom_type_script = "uid://dx561rntxjbhw"

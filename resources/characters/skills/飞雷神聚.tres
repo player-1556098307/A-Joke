@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_ftg_charge"]
+script = ExtResource("1_effect")
+effect_type = 13
+value = 1
+target = 2
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "飞雷神聚"
+description = "消耗行动权聚气，获得1个飞雷神标记。"
+energy_cost = 0
+min_range = 0
+max_range = 0
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ftg_charge")])

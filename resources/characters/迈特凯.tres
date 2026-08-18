@@ -1,0 +1,106 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://ckbrwqavgg3lg" path="res://resources/portraits/might_gai_summer.png" id="7_p1"]
+[ext_resource type="Texture2D" uid="uid://bxulwbkc35gqm" path="res://resources/portraits/might_gai_eighth_gate.png" id="8_p2"]
+[ext_resource type="Resource" path="res://resources/characters/skills/夜凯.tres" id="4_yk"]
+[ext_resource type="Resource" path="res://resources/characters/skills/夕象.tres" id="5_xx"]
+[ext_resource type="Resource" path="res://resources/characters/skills/双龙戏珠.tres" id="6_slxz"]
+
+[sub_resource type="Resource" id="SE_ba_mg"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba_mg"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_mg")])
+
+[sub_resource type="Resource" id="SE_gate"]
+script = ExtResource("1_effect")
+effect_type = 9
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SE_gate_uk1"]
+script = ExtResource("1_effect")
+effect_type = 6
+target = 2
+unlock_skill = ExtResource("4_yk")
+
+[sub_resource type="Resource" id="SE_gate_uk2"]
+script = ExtResource("1_effect")
+effect_type = 6
+target = 2
+unlock_skill = ExtResource("5_xx")
+
+[sub_resource type="Resource" id="SE_gate_uk3"]
+script = ExtResource("1_effect")
+effect_type = 6
+target = 2
+unlock_skill = ExtResource("6_slxz")
+
+[sub_resource type="Resource" id="SD_gate"]
+script = ExtResource("2_skill")
+skill_name = "八门遁甲"
+description = "锁定技：每次聚气后自动开一门，本回合+下回合无敌。第八门全开时：回10血，获得夜凯和夕象，进入燃烧+狂战士状态，然后失去此技能。"
+energy_cost = 0
+max_range = 999
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_gate"), SubResource("SE_gate_uk1"), SubResource("SE_gate_uk2"), SubResource("SE_gate_uk3")])
+
+[sub_resource type="Resource" id="SE_zh"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 4
+target = 0
+
+[sub_resource type="Resource" id="SD_zh"]
+script = ExtResource("2_skill")
+skill_name = "昼虎"
+description = "对一名玩家造成 4 点伤害。"
+energy_cost = 5
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_zh")])
+
+[sub_resource type="Resource" id="SE_fs_clone"]
+script = ExtResource("1_effect")
+effect_type = 7
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SE_fs_dmg"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 2
+target = 0
+
+[sub_resource type="Resource" id="SD_fs"]
+script = ExtResource("2_skill")
+skill_name = "分身"
+description = "释放分身立即对一名玩家造成 2 点伤害，分身可抵挡一次伤害并增加聚气收益。有分身时不能再放分身。"
+energy_cost = 2
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_fs_dmg"), SubResource("SE_fs_clone")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "迈特凯（夏日限定）"
+max_hp = 16
+portrait = ExtResource("7_p1")
+alternate_portrait = ExtResource("8_p2")
+avatar_emoji = "凯"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_mg"), SubResource("SD_gate"), SubResource("SD_zh"), SubResource("SD_fs")])
+tags = Array[String](["战士"])
+grade = "S"
+metadata/_custom_type_script = "uid://dx561rntxjbhw"
