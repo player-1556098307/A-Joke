@@ -1099,17 +1099,18 @@ func _apply_actions() -> void:
 			# 技能效果应用后，检查所有受击者是否有跺脚激活
 			_process_stomp_trigger(winner, logs)
 
-			# 标记造成伤害（用于钟获取）
-			for entry in logs:
-				if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
-				or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
-				or entry.get("effect_type", -1) == SkillEffect.EffectType.FTG_MARK \
-				or entry.get("effect_type", -1) == SkillEffect.EffectType.PIERCE_DAMAGE \
-				or entry.get("effect_type", -1) == SkillEffect.EffectType.DEATH_SENTENCE:
-					var res: Dictionary = entry.get("result", {})
-					if res.get("damage_dealt", 0) > 0:
-						winner.dealt_damage_this_round = true
-						break
+			# 标记造成伤害（用于钟获取）——消耗钟的技能（如砸钟）伤害不计入，防止砸钟回钟
+			if skill.bell_cost <= 0:
+				for entry in logs:
+					if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
+					or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
+					or entry.get("effect_type", -1) == SkillEffect.EffectType.FTG_MARK \
+					or entry.get("effect_type", -1) == SkillEffect.EffectType.PIERCE_DAMAGE \
+					or entry.get("effect_type", -1) == SkillEffect.EffectType.DEATH_SENTENCE:
+						var res: Dictionary = entry.get("result", {})
+						if res.get("damage_dealt", 0) > 0:
+							winner.dealt_damage_this_round = true
+							break
 			for entry in logs:
 				_emit_effect_signals(entry)
 			skill_applied.emit(logs)
@@ -1490,15 +1491,16 @@ func _on_hiano_interrupt_made(player_id: int, interrupt_at: int) -> void:
 
 ## 通用日志封装：为技能使用后的日志发射信号、记录行动、刷新能量
 func _finalize_skill_use(winner: PlayerState, skill: SkillData, logs: Array[Dictionary]) -> void:
-	# 造成伤害标记（钟获取）
-	for entry in logs:
-		if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.PIERCE_DAMAGE:
-			var res: Dictionary = entry.get("result", {})
-			if res.get("damage_dealt", 0) > 0:
-				winner.dealt_damage_this_round = true
-				break
+	# 造成伤害标记（钟获取）——砸钟等 bell_cost>0 技能伤害不计入，防止砸钟回钟
+	if skill.bell_cost <= 0:
+		for entry in logs:
+			if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.PIERCE_DAMAGE:
+				var res: Dictionary = entry.get("result", {})
+				if res.get("damage_dealt", 0) > 0:
+					winner.dealt_damage_this_round = true
+					break
 	for entry in logs:
 		_emit_effect_signals(entry)
 	skill_applied.emit(logs)
@@ -2818,8 +2820,10 @@ func _check_phantom_dodge_intercept(attacker: PlayerState, skill: SkillData, tar
 			continue
 		if not target.is_alive:
 			continue
-		# 闪避条件：气>=1 且 幻影>=1
+		# 闪避条件：气>=1 且 幻影>=1 且 未麻痹（麻痹状态不可使用任何技能）
 		if target.energy < 1 or target.phantom_count < 1:
+			continue
+		if target.paralyze_turns > 0:
 			continue
 
 		# 人类玩家：发射信号等待UI决策
@@ -2843,7 +2847,10 @@ func _ai_decide_phantom_dodge(target: PlayerState, attacker: PlayerState) -> boo
 	return false
 
 ## 应用幻影闪避：消耗1气+1幻影，从 targets 中移除该玩家
+## 麻痹状态不可使用任何技能，直接忽略（防御性校验，正常路径已在 _check_phantom_dodge_intercept 拦截）
 func _apply_phantom_dodge(target: PlayerState, attacker: PlayerState, targets: Array[PlayerState] = []) -> void:
+	if target == null or target.paralyze_turns > 0:
+		return
 	target.energy = max(0, target.energy - 1)
 	target.phantom_count = max(0, target.phantom_count - 1)
 	phantom_changed.emit(target.player_id, target.phantom_count)
@@ -3035,15 +3042,16 @@ func _resume_ftg_action() -> void:
 	# 跺脚受击触发检查
 	_process_stomp_trigger(winner, logs)
 
-	# 标记造成伤害
-	for entry in logs:
-		if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.FTG_MARK:
-			var res: Dictionary = entry.get("result", {})
-			if res.get("damage_dealt", 0) > 0:
-				winner.dealt_damage_this_round = true
-				break
+	# 标记造成伤害——砸钟（bell_cost>0）伤害不计入钟获取
+	if skill.bell_cost <= 0:
+		for entry in logs:
+			if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.FTG_MARK:
+				var res: Dictionary = entry.get("result", {})
+				if res.get("damage_dealt", 0) > 0:
+					winner.dealt_damage_this_round = true
+					break
 	for entry in logs:
 		_emit_effect_signals(entry)
 	skill_applied.emit(logs)
@@ -3065,6 +3073,9 @@ func _on_phantom_dodge_made(player_id: int, dodge: bool) -> void:
 	if target == null:
 		_resume_phantom_dodge_action()
 		return
+	# 麻痹状态不可使用任何技能：即使已弹出闪避弹窗，点击闪避也无效（直接恢复行动）
+	if target.paralyze_turns > 0:
+		dodge = false
 	# 若闪避，应用闪避（消耗1气+1幻影，从 targets 中移除）
 	if dodge:
 		var winner: PlayerState = _phantom_dodge_pending.get("winner", null) as PlayerState
@@ -3116,16 +3127,17 @@ func _resume_phantom_dodge_action() -> void:
 	_process_stomp_trigger(winner, logs)
 
 	# 标记造成伤害
-	for entry in logs:
-		if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.FTG_MARK \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.PIERCE_DAMAGE \
-		or entry.get("effect_type", -1) == SkillEffect.EffectType.DEATH_SENTENCE:
-			var res: Dictionary = entry.get("result", {})
-			if res.get("damage_dealt", 0) > 0:
-				winner.dealt_damage_this_round = true
-				break
+	if skill.bell_cost <= 0:
+		for entry in logs:
+			if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.FTG_MARK \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.PIERCE_DAMAGE \
+			or entry.get("effect_type", -1) == SkillEffect.EffectType.DEATH_SENTENCE:
+				var res: Dictionary = entry.get("result", {})
+				if res.get("damage_dealt", 0) > 0:
+					winner.dealt_damage_this_round = true
+					break
 	for entry in logs:
 		_emit_effect_signals(entry)
 	skill_applied.emit(logs)
