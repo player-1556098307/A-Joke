@@ -8,3 +8,6 @@
 
 # Agent intermediate artifacts
 .temp/
+
+# Build outputs
+builds/
