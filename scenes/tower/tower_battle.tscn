@@ -4,7 +4,11 @@
 [ext_resource type="Script" path="res://scenes/tower/tower_manager.gd" id="2_mgr"]
 [ext_resource type="PackedScene" uid="uid://c7cf7imids2bt" path="res://scenes/game_ui.tscn" id="3_gui"]
 
-[node name="TowerBattle" type="Node"]
+[node name="TowerBattle" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 script = ExtResource("1_battle")
 
 [node name="GameUI" parent="." instance=ExtResource("3_gui")]

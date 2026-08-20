@@ -1,7 +1,7 @@
 ## TowerBattle — 慈悲尖塔战斗场景
 ## 复用 GameUI 对局界面 + TowerManager 层推进
 ## 支持层间过渡动画、进场/退场对话、通关/失败结算、战斗中剧情触发
-extends Node
+extends Control
 
 @onready var _ui: Control = $GameUI
 @onready var tower_mgr: TowerManager = $TowerManager
@@ -20,6 +20,8 @@ var _player_eliminated_triggered: bool = false  ## 玩家队有人被淘汰
 var _enemy_name: String = ""
 
 func _ready() -> void:
+	# 根节点全屏锚定（Control 继承，子 Control 才能正确布局）
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# 顶层提示层（独立全屏 Control，mouse 穿透，覆盖在 GameUI 之上）
 	var overlay := Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

@@ -915,7 +915,8 @@ func _apply_actions() -> void:
 			# 影分身存在时聚气加成 +2，否则 +1
 			var gain: int = 1 + winner.clone_count
 			# 仙人之力（仙人鸣人）：聚气额外+1
-			if _tower_has_skill(winner, "仙人之力"):
+			# 注意：不能用"仙人之力"技能名判断——秽土柱间也有同名被动（跺脚+气上限6），会误判给柱间加聚气
+			if _tower_has_skill(winner, "蛙组手"):
 				gain += 1
 			winner.add_energy(gain)
 			player_charged.emit(_sole_winner_id, winner.energy)
@@ -2753,10 +2754,13 @@ func _is_minato(player: PlayerState) -> bool:
 	return false
 
 ## ── 秽土柱间辅助方法 ──────────────────────────────────────────────────────────
-## 检查角色是否为秽土柱间（通过技能名"仙人之力"判断）
+## 检查角色是否为秽土柱间（通过独有技能"仙法·树界降诞"判断）
+## 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
 func _is_edo_hashirama(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
 	for skill in player.character.skills:
-		if skill.skill_name == "仙人之力":
+		if skill.skill_name == "仙法·树界降诞":
 			return true
 	return false
 

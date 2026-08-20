@@ -32,15 +32,18 @@ func _cn_num(n: int) -> String:
 	return str(n)
 
 func _ready() -> void:
+	# 根节点作为纯容器，鼠标穿透（避免全屏 STOP 拦截下方/内部按钮点击）
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_ui()
 	_start_dialogue()
 
 func _build_ui() -> void:
-	# 全屏暗色背景
+	# 全屏暗色背景（仅视觉，不拦截鼠标）
 	var bg := ColorRect.new()
 	bg.color = C_BG
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.show_behind_parent = true
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	# 返回按钮（左上角）

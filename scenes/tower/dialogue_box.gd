@@ -46,6 +46,10 @@ var _choice_callback: Callable = Callable()
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# 关键：根节点鼠标穿透（IGNORE）。
+	# 否则对话结束后根节点仍全屏 STOP，会拦截下层所有点击（如"进入尖塔"按钮），导致画面"点不动"。
+	# 对话推进依赖 _input（Node级事件），与 mouse_filter 无关，因此 IGNORE 不影响对话功能。
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_ui()
 	_hide_all()
 
@@ -221,11 +225,12 @@ func _input(event: InputEvent) -> void:
 # ============================================================
 
 func _build_ui() -> void:
-	# 全屏半透明背景
+	# 全屏半透明背景（仅视觉，不拦截鼠标）
 	_bg = ColorRect.new()
 	_bg.color = C_BG
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_bg.show_behind_parent = true
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_bg)
 
 	# 头像区域（左侧，可选）
@@ -314,6 +319,7 @@ func _build_ui() -> void:
 	add_child(_skip_btn)
 
 func _hide_all() -> void:
+	visible = false
 	_bg.visible = false
 	_name_bar.visible = false
 	_dialogue_panel.visible = false
@@ -323,6 +329,7 @@ func _hide_all() -> void:
 	_skip_btn.visible = false
 
 func _show_all_ui() -> void:
+	visible = true
 	_bg.visible = true
 	_name_bar.visible = true
 	_dialogue_panel.visible = true

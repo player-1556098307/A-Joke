@@ -152,10 +152,13 @@ func _is_xiye(player: PlayerState) -> bool:
 			return true
 	return false
 
-## 判断角色是否为秽土柱间（通过技能名"仙人之力"判断）
+## 判断角色是否为秽土柱间（通过独有技能"仙法·树界降诞"判断）
+## 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
 func _is_edo_hashirama(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
 	for skill in player.character.skills:
-		if skill.skill_name == "仙人之力":
+		if skill.skill_name == "仙法·树界降诞":
 			return true
 	return false
 

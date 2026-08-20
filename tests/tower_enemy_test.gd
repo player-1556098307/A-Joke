@@ -204,11 +204,19 @@ func _test_sage(sage_char: CharacterData, naruto_char: CharacterData) -> void:
 	})
 	await get_tree().process_frame
 	var sage: PlayerState = gm.get_player(0)
+	# 修复验证：仙人鸣人不应有秽土柱间的气上限6（默认999）
+	_assert(sage.max_energy != 6, "5a: 仙人鸣人气上限非6（实际=%d）" % sage.max_energy)
 	sage.current_gesture = PlayerState.Gesture.ROCK
 	gm.get_player(1).current_gesture = PlayerState.Gesture.SCISSORS
 	gm.call("_resolve_round")
 	gm.submit_action(0, PlayerState.ActionType.CHARGE, -1, -1)
-	_assert(sage.energy == 4, "5: 尖塔祝福2气+仙人之力聚气2=4（实际=%d）" % sage.energy)
+	_assert(sage.energy == 4, "5b: 尖塔祝福2气+仙人之力聚气2=4（实际=%d）" % sage.energy)
+	# 修复验证：仙人鸣人普攻不应触发跺脚（stomp_active 保持0）
+	var sage2 := PlayerState.new(0, "仙人鸣人", sage_char, true)
+	if gm._is_edo_hashirama(sage2):
+		_assert(false, "5c: 仙人鸣人不被误判为秽土柱间")
+	else:
+		_assert(true, "5c: 仙人鸣人不被误判为秽土柱间")
 
 ## ═════════ 测试6：蛙组手（必中真伤） ═══════════════════════
 func _test_frog_kata(sage_char: CharacterData, shisui_char: CharacterData) -> void:

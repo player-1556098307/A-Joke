@@ -171,8 +171,9 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	skill_target_id     = -1
 	pending_skill_index = -1
 	# 秽土柱间·仙人之力：气上限6
+	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
 	for skill in char_data.skills:
-		if skill.skill_name == "仙人之力":
+		if skill.skill_name == "仙法·树界降诞":
 			max_energy = 6
 			break
 
