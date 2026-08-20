@@ -225,9 +225,9 @@ func _input(event: InputEvent) -> void:
 # ============================================================
 
 func _build_ui() -> void:
-	# 全屏半透明背景（仅视觉，不拦截鼠标）
+	# 全屏半透明背景（仅视觉，不拦截鼠标；alpha<1 允许下层立绘透视）
 	_bg = ColorRect.new()
-	_bg.color = C_BG
+	_bg.color = Color(C_BG.r, C_BG.g, C_BG.b, 0.72)
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_bg.show_behind_parent = true
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -247,7 +247,7 @@ func _build_ui() -> void:
 	_name_bar.anchor_left = 0.06; _name_bar.anchor_top = 0.0
 	_name_bar.anchor_right = 0.94; _name_bar.offset_top = 14.0; _name_bar.offset_bottom = 56.0
 	var nb_s := StyleBoxFlat.new()
-	nb_s.bg_color = C_PANEL_BG; nb_s.border_color = C_BORDER
+	nb_s.bg_color = Color(C_PANEL_BG.r, C_PANEL_BG.g, C_PANEL_BG.b, 0.85); nb_s.border_color = C_BORDER
 	nb_s.set_border_width_all(2); nb_s.set_corner_radius_all(6)
 	_name_bar.add_theme_stylebox_override("panel", nb_s)
 	add_child(_name_bar)
@@ -267,7 +267,7 @@ func _build_ui() -> void:
 	_dialogue_panel.anchor_right = 0.94
 	_dialogue_panel.offset_top = 70.0; _dialogue_panel.offset_bottom = 430.0
 	var p_s := StyleBoxFlat.new()
-	p_s.bg_color = C_PANEL_BG; p_s.border_color = C_BORDER
+	p_s.bg_color = Color(C_PANEL_BG.r, C_PANEL_BG.g, C_PANEL_BG.b, 0.85); p_s.border_color = C_BORDER
 	p_s.set_border_width_all(2); p_s.set_corner_radius_all(8)
 	_dialogue_panel.add_theme_stylebox_override("panel", p_s)
 	add_child(_dialogue_panel)

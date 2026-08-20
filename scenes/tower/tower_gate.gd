@@ -16,6 +16,7 @@ var _back_btn: Button
 var _portrait: TextureRect
 var _glow: ColorRect
 var _particle_timer: float = 0.0
+var _glow_base_a: float = 0.0  ## 光晕基础透明度（由 _fade_portrait 控制）
 
 const _CN_DIGITS := ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
 
@@ -49,28 +50,24 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	# 神官立绘（右侧，入场淡入）
+	# 神官立绘（全屏背景，半透明，对话时淡入淡出）
 	_portrait = TextureRect.new()
 	var tex: Texture2D = load("res://resources/portraits/metatron_gate.png")
 	if tex:
 		_portrait.texture = tex
-	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_portrait.anchor_left = 0.55; _portrait.anchor_top = 0.0
-	_portrait.anchor_right = 1.0; _portrait.anchor_bottom = 1.0
-	_portrait.offset_left = -20.0; _portrait.offset_right = 10.0
+	_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait.self_modulate = Color(1, 1, 1, 0)
-	_portrait.z_index = 1
+	_portrait.z_index = 0
 	add_child(_portrait)
 
-	# 金色光晕（立绘后方，脉冲呼吸）
+	# 金色光晕（全屏背景，脉冲呼吸，立绘之后）
 	_glow = ColorRect.new()
 	_glow.color = C_GOLD
 	_glow.self_modulate = Color(1, 1, 1, 0)
-	_glow.anchor_left = 0.55; _glow.anchor_top = 0.1
-	_glow.anchor_right = 1.0; _glow.anchor_bottom = 0.9
-	_glow.offset_left = 20.0; _glow.offset_right = -40.0
+	_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_glow.z_index = 0
 	add_child(_glow)
@@ -106,29 +103,36 @@ func _build_ui() -> void:
 	_enter_btn.pressed.connect(_on_enter)
 	add_child(_enter_btn)
 
-	# DialogueBox 组件（z_index=2 确保在立绘 z_index=1 之上，不被遮挡）
+	# DialogueBox 组件
 	_dialogue_box = DialogueBox.new()
-	_dialogue_box.z_index = 2
 	add_child(_dialogue_box)
 	_dialogue_box.dialogue_finished.connect(_on_dialogue_finished)
+	_dialogue_box.line_shown.connect(_on_line_shown)
 
-	# 立绘入场淡入 + 光晕渐亮
-	_play_entrance()
+func _on_line_shown(speaker: String, _text: String, _index: int) -> void:
+	# 梅塔特隆说话时立绘淡入，否则淡出
+	if speaker.is_empty():
+		_fade_portrait(false)
+	else:
+		_fade_portrait(true)
 
-func _play_entrance() -> void:
+func _fade_portrait(visible_in: bool) -> void:
+	if _portrait == null or not is_instance_valid(_portrait):
+		return
+	var target_a := 0.8 if visible_in else 0.0
+	_glow_base_a = 0.15 if visible_in else 0.0
 	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(_portrait, "self_modulate", Color(1, 1, 1, 0.92), 1.5).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(_glow, "self_modulate", Color(1, 1, 1, 0.15), 1.5).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_portrait, "self_modulate:a", target_a, 0.5).set_trans(Tween.TRANS_SINE)
+	# 光晕基础透明度由 _process 叠加脉冲后实时驱动
+
 
 func _process(delta: float) -> void:
-	if _glow == null:
+	if _glow == null or not is_instance_valid(_glow):
 		return
-	# 光晕脉冲呼吸（0.10 ↔ 0.22）
+	# 光晕脉冲呼吸（在基础透明度上叠加 ±0.04 脉冲）
 	_particle_timer += delta
-	var pulse := 0.16 + 0.06 * sin(_particle_timer * 2.0)
-	if is_instance_valid(_glow):
-		_glow.self_modulate.a = pulse
+	var pulse := _glow_base_a + 0.04 * sin(_particle_timer * 2.0)
+	_glow.self_modulate.a = pulse
 
 func _start_dialogue() -> void:
 	var data := _build_dialogue_data()
@@ -226,6 +230,7 @@ func _death_exception(cn: String, floor_cn: String, count: int, failed_floor: in
 	}
 
 func _on_dialogue_finished() -> void:
+	_fade_portrait(false)
 	_enter_btn.visible = true
 
 func _on_enter() -> void:
