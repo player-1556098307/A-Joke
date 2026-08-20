@@ -10,6 +10,8 @@ const DEFAULT_AI_SPEED: String = "fast"
 const DEFAULT_ANIM_SPEED: float = 1.0
 ## 默认全屏状态
 const DEFAULT_FULLSCREEN: bool = false
+## 默认音效开关
+const DEFAULT_SFX_ENABLED: bool = true
 
 ## 手势输入超时时间（秒），0 表示无限制
 var gesture_timeout: int = DEFAULT_GESTURE_TIMEOUT
@@ -19,6 +21,8 @@ var ai_speed: String = DEFAULT_AI_SPEED
 var anim_speed: float = DEFAULT_ANIM_SPEED
 ## 是否全屏
 var fullscreen: bool = DEFAULT_FULLSCREEN
+## 是否启用音效
+var sfx_enabled: bool = DEFAULT_SFX_ENABLED
 
 const SAVE_PATH = "user://settings.cfg"
 
@@ -34,6 +38,7 @@ func save_settings() -> void:
 	cfg.set_value("gameplay", "ai_speed", ai_speed)
 	cfg.set_value("gameplay", "anim_speed", anim_speed)
 	cfg.set_value("display", "fullscreen", fullscreen)
+	cfg.set_value("audio", "sfx_enabled", sfx_enabled)
 	cfg.save(SAVE_PATH)
 
 ## 从文件加载设置，文件不存在时使用默认值
@@ -45,6 +50,7 @@ func load_settings() -> void:
 	ai_speed        = cfg.get_value("gameplay", "ai_speed",        DEFAULT_AI_SPEED)
 	anim_speed      = cfg.get_value("gameplay", "anim_speed",      DEFAULT_ANIM_SPEED)
 	fullscreen      = cfg.get_value("display",  "fullscreen",      DEFAULT_FULLSCREEN)
+	sfx_enabled     = cfg.get_value("audio",    "sfx_enabled",     DEFAULT_SFX_ENABLED)
 
 ## 根据设置切换全屏/窗口模式
 func apply_fullscreen() -> void:

@@ -16,6 +16,7 @@ var _btn_slow:     Button
 var _anim_slider:       HSlider
 var _anim_value_label:  Label
 var _btn_fullscreen:    Button
+var _btn_sfx:           Button
 
 var _timeout_btns: Array[Button] = []
 var _speed_btns:   Array[Button] = []
@@ -200,33 +201,24 @@ func _build_ui() -> void:
 	row_fs.add_child(_btn_fullscreen)
 	content.add_child(row_fs)
 
-	# ── Audio (disabled placeholder) ──────────────────────────────────────────
+	# ── Audio ─────────────────────────────────────────────────────────────────
 	content.add_child(_make_spacer(8))
 	content.add_child(_make_divider())
 	content.add_child(_make_spacer(8))
 
 	var audio_box := VBoxContainer.new()
-	audio_box.modulate = Color(1, 1, 1, 0.4)
-	audio_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	audio_box.add_theme_constant_override("separation", 4)
-	audio_box.add_child(_make_section_title("音效（即将推出）"))
+	audio_box.add_child(_make_section_title("音效"))
 	audio_box.add_child(_make_spacer(4))
 
-	var row_sfx := _make_row("音效")
-	row_sfx.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sfx_btn := _make_preset_btn("开")
-	sfx_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sfx_btn.disabled = true
-	row_sfx.add_child(sfx_btn)
+	var row_sfx := _make_row("战斗音效")
+	_btn_sfx = Button.new()
+	_btn_sfx.focus_mode = Control.FOCUS_NONE
+	_btn_sfx.custom_minimum_size = Vector2(72, 36)
+	_btn_sfx.add_theme_font_size_override("font_size", 13)
+	_btn_sfx.pressed.connect(_on_sfx_toggled)
+	row_sfx.add_child(_btn_sfx)
 	audio_box.add_child(row_sfx)
-
-	var row_bgm := _make_row("音乐")
-	row_bgm.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bgm_btn := _make_preset_btn("开")
-	bgm_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bgm_btn.disabled = true
-	row_bgm.add_child(bgm_btn)
-	audio_box.add_child(row_bgm)
 
 	content.add_child(audio_box)
 
@@ -271,6 +263,7 @@ func _load_ui_from_settings() -> void:
 	_anim_value_label.text = "%.1f×" % SettingsManager.anim_speed
 
 	_update_fullscreen_button()
+	_update_sfx_button()
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
 func _on_preset_timeout(value: int, btn: Button) -> void:
@@ -304,13 +297,23 @@ func _on_fullscreen_pressed() -> void:
 	_update_fullscreen_button()
 	SettingsManager.save_settings()
 
+func _on_sfx_toggled() -> void:
+	SettingsManager.sfx_enabled = not SettingsManager.sfx_enabled
+	if SFXManager:
+		SFXManager.set_enabled(SettingsManager.sfx_enabled)
+	_update_sfx_button()
+	SettingsManager.save_settings()
+
 func _on_reset_pressed() -> void:
 	SettingsManager.gesture_timeout = SettingsManager.DEFAULT_GESTURE_TIMEOUT
 	SettingsManager.ai_speed        = SettingsManager.DEFAULT_AI_SPEED
 	SettingsManager.anim_speed      = SettingsManager.DEFAULT_ANIM_SPEED
 	SettingsManager.fullscreen      = SettingsManager.DEFAULT_FULLSCREEN
+	SettingsManager.sfx_enabled     = SettingsManager.DEFAULT_SFX_ENABLED
 	SettingsManager.apply_fullscreen()
 	SettingsManager.save_settings()
+	if SFXManager:
+		SFXManager.set_enabled(SettingsManager.sfx_enabled)
 	Engine.time_scale = 1.0
 	_load_ui_from_settings()
 
@@ -331,6 +334,20 @@ func _update_fullscreen_button() -> void:
 		_btn_fullscreen.add_theme_stylebox_override("hover",   _make_flat(Color("#CCE4F9"), Color("#185FA5"), 2, 6))
 		_btn_fullscreen.add_theme_stylebox_override("pressed", _make_flat(Color("#B5D4F4"), Color("#185FA5"), 2, 6))
 		_btn_fullscreen.add_theme_color_override("font_color", Color("#0C447C"))
+
+func _update_sfx_button() -> void:
+	if SettingsManager.sfx_enabled:
+		_btn_sfx.text = "✓ 开"
+		_btn_sfx.add_theme_stylebox_override("normal",  _make_flat(Color("#3B6D11"), Color("#2C2C2A"), 2, 6))
+		_btn_sfx.add_theme_stylebox_override("hover",   _make_flat(Color("#4A8A16"), Color("#2C2C2A"), 2, 6))
+		_btn_sfx.add_theme_stylebox_override("pressed", _make_flat(Color("#27500A"), Color("#2C2C2A"), 2, 6))
+		_btn_sfx.add_theme_color_override("font_color", Color("#EAF3DE"))
+	else:
+		_btn_sfx.text = "✕ 关"
+		_btn_sfx.add_theme_stylebox_override("normal",  _make_flat(Color("#E6F1FB"), Color("#185FA5"), 2, 6))
+		_btn_sfx.add_theme_stylebox_override("hover",   _make_flat(Color("#CCE4F9"), Color("#185FA5"), 2, 6))
+		_btn_sfx.add_theme_stylebox_override("pressed", _make_flat(Color("#B5D4F4"), Color("#185FA5"), 2, 6))
+		_btn_sfx.add_theme_color_override("font_color", Color("#0C447C"))
 
 func _select_timeout_preset(btn: Button) -> void:
 	for b in _timeout_btns:

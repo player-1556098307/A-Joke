@@ -18,6 +18,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameManager="*res://core/game_manager.gd"
+SFXManager="*res://core/sfx_manager.gd"
 SceneManager="*uid://c4r65luqih7wo"
 SettingsManager="*res://core/settings_manager.gd"
 NetworkManager="*res://core/net/NetworkManager.gd"
