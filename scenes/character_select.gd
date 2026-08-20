@@ -184,6 +184,8 @@ const _CHARACTER_PRELOADS = [
 	preload("res://resources/characters/宇智波止水（天劫）.tres"),
 	preload("res://resources/characters/春野樱（疾风传）.tres"),
 	preload("res://resources/characters/漩涡鸣人（疾风传）.tres"),
+	preload("res://resources/characters/黑塔.tres"),
+	preload("res://resources/characters/大黑塔.tres"),
 ]
 
 func _load_all_characters() -> void:

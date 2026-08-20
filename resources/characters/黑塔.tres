@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" uid="uid://6ky0ke7nu5w7" path="res://resources/characters/portraits/黑塔.png" id="1_portrait"]
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba_ht"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba_ht"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_ht")])
+
+[sub_resource type="Resource" id="SE_dia"]
+script = ExtResource("1_effect")
+effect_type = 32
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SD_dia"]
+script = ExtResource("2_skill")
+skill_name = "送你砖石"
+description = "被动：当你的技能使其他玩家血量低于其血量上限的50%时，立即对与你范围为1的所有其他玩家造成1点伤害。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_dia")])
+
+[sub_resource type="Resource" id="SE_gen"]
+script = ExtResource("1_effect")
+effect_type = 33
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SD_gen"]
+script = ExtResource("2_skill")
+skill_name = "genjutsu"
+description = "被动：当你对一名玩家造成伤害后，你对其范围计算-1（可累积，距离最小为1）。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_gen")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "黑塔"
+max_hp = 6
+basic_attack_cost = 1
+portrait = ExtResource("1_portrait")
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_ht"), SubResource("SD_dia"), SubResource("SD_gen")])
+tags = Array[String](["法师"])
+grade = "B"

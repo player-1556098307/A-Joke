@@ -1,0 +1,74 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" uid="uid://ba8pmsltkairo" path="res://resources/characters/portraits/大黑塔.png" id="1_portrait"]
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba_bh"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba_bh"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_bh")])
+
+[sub_resource type="Resource" id="SE_jd"]
+script = ExtResource("1_effect")
+effect_type = 34
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SD_jd"]
+script = ExtResource("2_skill")
+skill_name = "解读"
+description = "被动：受到你造成伤害的玩家获得标记【解】。【解】：与大黑塔计算距离-1，受到大黑塔伤害+1。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_jd")])
+
+[sub_resource type="Resource" id="SE_om"]
+script = ExtResource("1_effect")
+effect_type = 35
+value = 1
+target = 2
+
+[sub_resource type="Resource" id="SD_om"]
+script = ExtResource("2_skill")
+skill_name = "格局打开"
+description = "被动：当【解】玩家受到伤害后，你获得一个气。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_om")])
+
+[sub_resource type="Resource" id="SE_mg"]
+script = ExtResource("1_effect")
+effect_type = 36
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_mg"]
+script = ExtResource("2_skill")
+skill_name = "魔法"
+description = "消耗3个气：对一名玩家造成2点伤害，并额外对所有【解】玩家造成1点伤害（含主目标）。"
+energy_cost = 3
+min_range = 1
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_mg")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "大黑塔"
+max_hp = 8
+basic_attack_cost = 1
+portrait = ExtResource("1_portrait")
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba_bh"), SubResource("SD_jd"), SubResource("SD_om"), SubResource("SD_mg")])
+tags = Array[String](["法师"])
+grade = "A"
