@@ -45,6 +45,7 @@ var _skip_btn: Button
 var _choice_callback: Callable = Callable()
 
 func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	_hide_all()
 
