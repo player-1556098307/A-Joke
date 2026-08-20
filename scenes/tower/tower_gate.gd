@@ -13,6 +13,9 @@ const C_TEXT_DIM := Color("#9A9182")
 var _dialogue_box: DialogueBox
 var _enter_btn: Button
 var _back_btn: Button
+var _portrait: TextureRect
+var _glow: ColorRect
+var _particle_timer: float = 0.0
 
 const _CN_DIGITS := ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
 
@@ -45,6 +48,32 @@ func _build_ui() -> void:
 	bg.show_behind_parent = true
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
+
+	# 神官立绘（右侧，入场淡入）
+	_portrait = TextureRect.new()
+	var tex: Texture2D = load("res://resources/portraits/metatron_gate.png")
+	if tex:
+		_portrait.texture = tex
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.anchor_left = 0.55; _portrait.anchor_top = 0.0
+	_portrait.anchor_right = 1.0; _portrait.anchor_bottom = 1.0
+	_portrait.offset_left = -20.0; _portrait.offset_right = 10.0
+	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_portrait.self_modulate = Color(1, 1, 1, 0)
+	_portrait.z_index = 1
+	add_child(_portrait)
+
+	# 金色光晕（立绘后方，脉冲呼吸）
+	_glow = ColorRect.new()
+	_glow.color = C_GOLD
+	_glow.self_modulate = Color(1, 1, 1, 0)
+	_glow.anchor_left = 0.55; _glow.anchor_top = 0.1
+	_glow.anchor_right = 1.0; _glow.anchor_bottom = 0.9
+	_glow.offset_left = 20.0; _glow.offset_right = -40.0
+	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_glow.z_index = 0
+	add_child(_glow)
 
 	# 返回按钮（左上角）
 	_back_btn = Button.new()
@@ -81,6 +110,24 @@ func _build_ui() -> void:
 	_dialogue_box = DialogueBox.new()
 	add_child(_dialogue_box)
 	_dialogue_box.dialogue_finished.connect(_on_dialogue_finished)
+
+	# 立绘入场淡入 + 光晕渐亮
+	_play_entrance()
+
+func _play_entrance() -> void:
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_portrait, "self_modulate", Color(1, 1, 1, 0.92), 1.5).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_glow, "self_modulate", Color(1, 1, 1, 0.15), 1.5).set_trans(Tween.TRANS_SINE)
+
+func _process(delta: float) -> void:
+	if _glow == null:
+		return
+	# 光晕脉冲呼吸（0.10 ↔ 0.22）
+	_particle_timer += delta
+	var pulse := 0.16 + 0.06 * sin(_particle_timer * 2.0)
+	if is_instance_valid(_glow):
+		_glow.self_modulate.a = pulse
 
 func _start_dialogue() -> void:
 	var data := _build_dialogue_data()

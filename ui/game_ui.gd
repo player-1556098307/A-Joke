@@ -421,6 +421,62 @@ func _play_skill_effect(target_id: int, effect_type: int) -> void:
 			ring.queue_free()
 	)
 
+## 伤害/治疗飘字
+## kind: "normal"(红) / "true"(紫) / "pierce"(橙) / "crit"(大红暴击) / "heal"(绿)
+func _show_damage_popup(target_id: int, amount: float, kind: String = "normal") -> void:
+	if amount == 0.0:
+		return
+	var card: Control = _player_cards.get(target_id)
+	if card == null:
+		return
+
+	var is_heal := kind == "heal"
+	var sign_str := "+" if is_heal else "-"
+	var text := "%s%.1f" % [sign_str, amount]
+	if kind == "crit":
+		text = "暴击！%s%.1f" % [sign_str, amount]
+
+	var colors := {
+		"normal": Color("#E24B4A"),
+		"true":   Color("#9B59B6"),
+		"pierce": Color("#E67E22"),
+		"crit":   Color("#FF4444"),
+		"heal":   Color("#639922"),
+	}
+	var col: Color = colors.get(kind, Color("#E24B4A"))
+	var font_size := 20 if kind == "crit" else 16
+
+	var popup := Label.new()
+	popup.text = text
+	popup.add_theme_font_size_override("font_size", font_size)
+	popup.add_theme_color_override("font_color", col)
+	popup.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	popup.add_theme_constant_override("outline_size", 3)
+	popup.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 卡片上方居中
+	popup.position = Vector2(22.0, -8.0)
+	popup.size = Vector2(60.0, 24.0)
+	popup.z_index = 50
+	card.add_child(popup)
+
+	var tw := create_tween().bind_node(popup)
+	tw.set_parallel(true)
+	# 向上飘 36px + 淡出
+	tw.tween_property(popup, "position", Vector2(22.0, -44.0), 0.8).set_trans(Tween.TRANS_QUART)
+	tw.tween_property(popup, "self_modulate", Color(1, 1, 1, 1), 0.15)
+	tw.tween_property(popup, "self_modulate", Color(1, 1, 1, 0), 0.5).set_delay(0.3)
+	# 暴击额外弹跳缩放
+	if kind == "crit":
+		popup.scale = Vector2(0.3, 0.3)
+		tw.tween_property(popup, "scale", Vector2(1.3, 1.3), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.chain().tween_property(popup, "scale", Vector2(1.0, 1.0), 0.15)
+	tw.chain().tween_callback(func():
+		if is_instance_valid(popup):
+			popup.queue_free()
+	)
+
 func _style_gesture_buttons() -> void:
 	var data := [
 		[btn_rock,     "✊  石头"],
@@ -1805,6 +1861,7 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				_append_log(msg, LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_attack_effect(entry["target_id"])
+				_show_damage_popup(entry["target_id"], dealt, "normal")
 			SkillEffect.EffectType.SHIELD:
 				var sv: float = res.get("shield_value", 0.0)
 				_append_log("%s 获得%s" % [t_name, "全挡护盾" if sv == -1 else ("护盾 %.1f" % sv)], LT_STATUS, entry.get("attacker_id", -1))
@@ -1828,6 +1885,7 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				_append_log("%s 回复 %.1f HP，剩余HP %.1f" % [t_name, res.get("heal_amount", 0.0), res.get("remaining_hp", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
+				_show_damage_popup(entry["target_id"], res.get("heal_amount", 0.0), "heal")
 			SkillEffect.EffectType.DELAYED_DAMAGE:
 				_append_log("%s 挂载延迟伤害（%d回合后受 %.1f 伤）" % [t_name, res.get("delay", 1), res.get("damage", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
@@ -1843,6 +1901,7 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				_append_log("🌀 %s 被飞雷神标记！受 %.1f 伤，剩余HP %.1f" % [t_name, dealt, res.get("remaining_hp", 0.0)], LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
+				_show_damage_popup(entry["target_id"], dealt, "normal")
 			SkillEffect.EffectType.FTG_CHARGE:
 				_append_log("🌀 %s 聚飞雷神标记（共%d个）" % [t_name, res.get("ftg_marks", 0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
@@ -1852,6 +1911,13 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 			SkillEffect.EffectType.NINE_TAILS:
 				_append_log("🦊 %s 释放漂泊九尾！" % t_name, LT_WIN, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
+			SkillEffect.EffectType.TRUE_DAMAGE:
+				var tdealt: float = res.get("damage_dealt", 0.0)
+				var tremain: float = res.get("remaining_hp", 0.0)
+				_append_log("💫 %s 受到 %.1f 真实伤害，剩余HP %.1f" % [t_name, tdealt, tremain], LT_DAMAGE, entry.get("attacker_id", -1))
+				_refresh_player_card(entry["target_id"])
+				_play_attack_effect(entry["target_id"])
+				_show_damage_popup(entry["target_id"], tdealt, "true")
 			SkillEffect.EffectType.PIERCE_DAMAGE:
 				var pdealt: float = res.get("damage_dealt", 0.0)
 				var premain: float = res.get("remaining_hp", 0.0)
@@ -1860,6 +1926,7 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				_append_log(pmsg, LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_attack_effect(entry["target_id"])
+				_show_damage_popup(entry["target_id"], pdealt, "crit" if pcrit else "pierce")
 			SkillEffect.EffectType.DEATH_SENTENCE:
 				var rounds: Array = res.get("rounds", [])
 				var wc: int = res.get("win_count", 0)
@@ -1916,9 +1983,34 @@ func _on_player_eliminated(player_id: int) -> void:
 	_append_log("★ %s 被淘汰！" % (player.player_name if player else str(player_id)), LT_WIN, player_id)
 	var card: Control = _player_cards.get(player_id)
 	if card:
-		card.modulate = Color(0.4, 0.4, 0.4, 0.7)
+		_play_elimination_effect(card)
 	_refresh_all_distances()
 	_rebuild_distance_labels()
+
+## 淘汰特效：闪烁→缩放碎裂→旋转→淡出
+func _play_elimination_effect(card: Control) -> void:
+	var original_pos := card.position
+	var original_scale := card.scale
+	var original_mod := card.modulate
+	var original_rot := card.rotation
+	# 阶段1：红色闪烁警告（0→0.3s）
+	var tw := create_tween().bind_node(card)
+	tw.tween_method(
+		func(t: float): card.modulate = original_mod.lerp(Color(1.0, 0.2, 0.2, 1.0), abs(sin(t * PI * 4))),
+		0.0, 0.3, 0.3
+	)
+	# 阶段2：缩放碎裂（0.3→0.5s）—快速放大再骤缩
+	tw.chain().tween_property(card, "scale", original_scale * 1.25, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(card, "scale", original_scale * 0.6, 0.1).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+	# 阶段3：旋转坠落（0.5→0.85s）—顺时针旋转45度并下沉
+	tw.chain().set_parallel(true)
+	tw.tween_property(card, "rotation", original_rot + deg_to_rad(45.0), 0.35).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+	tw.tween_property(card, "position", original_pos + Vector2(0, 12), 0.35).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+	# 阶段4：变灰淡出 + 回正姿态（0.85→1.4s）—转为灰色半透明，旋转和位移归位
+	tw.chain().set_parallel(true)
+	tw.tween_property(card, "modulate", Color(0.35, 0.35, 0.35, 0.55), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(card, "rotation", original_rot, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(card, "position", original_pos, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_game_over(winner_id: int, record: MatchRecord) -> void:
 	gesture_panel.hide()
