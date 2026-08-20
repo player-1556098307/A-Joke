@@ -5,10 +5,10 @@ extends Control
 @onready var btn_pve: Button = $BtnPvE
 @onready var btn_pvp: Button = $BtnPvP
 @onready var btn_hgw: Button = $BtnHGW
+@onready var btn_tower: Button = $BtnTower
 @onready var btn_settings: Button = $BtnSettings
 @onready var btn_quit: Button = $BtnQuit
 @onready var character_showcase: HBoxContainer = $CharacterShowcase
-@onready var tips_panel: PanelContainer = $TipsPanel
 @onready var border_frame: Panel = $BorderFrame
 
 func _ready() -> void:
@@ -16,12 +16,13 @@ func _ready() -> void:
 	_style_pve_button()
 	_style_pvp_button()
 	_style_hgw_button()
+	_style_tower_button()
 	_style_settings_button()
 	_style_quit_button()
-	_style_tips_panel()
 	btn_pve.pressed.connect(_on_pve_pressed)
 	btn_pvp.pressed.connect(_on_pvp_pressed)
 	btn_hgw.pressed.connect(_on_hgw_pressed)
+	btn_tower.pressed.connect(_on_tower_pressed)
 	btn_settings.pressed.connect(_on_settings_pressed)
 	btn_quit.pressed.connect(get_tree().quit)
 	_spawn_character_showcase()
@@ -136,6 +137,17 @@ func _style_hgw_button() -> void:
 		"圣杯战争", Color("#F0E6D3"), 18,
 		"测试 · 六边形地图", Color("#C9A84C"), 11)
 
+func _style_tower_button() -> void:
+	btn_tower.text = ""
+	btn_tower.focus_mode = Control.FOCUS_NONE
+	btn_tower.add_theme_stylebox_override("normal", _make_flat(Color("#2A5A3A"), Color("#2C2C2A"), 3, 8))
+	btn_tower.add_theme_stylebox_override("hover",  _make_flat(Color("#3B6D11"), Color("#2C2C2A"), 3, 8))
+	btn_tower.add_theme_stylebox_override("pressed",_make_flat(Color("#1E4727"), Color("#2C2C2A"), 3, 8))
+	_add_left_bar(btn_tower, Color("#FAC775"))
+	_add_two_line_labels(btn_tower,
+		"慈悲尖塔", Color("#EAF3DE"), 18,
+		"PvE 闯关 · 1-3人组队", Color("#C0DD97"), 11)
+
 func _style_settings_button() -> void:
 	btn_settings.text = ""
 	btn_settings.focus_mode = Control.FOCUS_NONE
@@ -152,14 +164,6 @@ func _style_quit_button() -> void:
 	btn_quit.add_theme_stylebox_override("pressed",_make_flat(Color("#F5C0C0"), Color("#E24B4A"), 2, 8))
 	_add_centered_label(btn_quit, "✕ 退出", Color("#791F1F"), 14)
 
-func _style_tips_panel() -> void:
-	var s := StyleBoxFlat.new()
-	s.bg_color = Color("#F1EFE8")
-	s.border_color = Color("#D3D1C7")
-	s.set_border_width_all(1)
-	s.set_corner_radius_all(6)
-	tips_panel.add_theme_stylebox_override("panel", s)
-
 func _on_pve_pressed() -> void:
 	SceneManager.go_to("res://scenes/character_select.tscn")
 
@@ -168,6 +172,10 @@ func _on_pvp_pressed() -> void:
 
 func _on_hgw_pressed() -> void:
 	SceneManager.go_to("res://scenes/hgw/hgw_character_select.tscn")
+
+func _on_tower_pressed() -> void:
+	# 进队伍房间选人；开场/死亡对话在点击"开始闯关"之后显示
+	SceneManager.go_to("res://scenes/tower/tower_select.tscn")
 
 func _on_settings_pressed() -> void:
 	SceneManager.go_to("res://scenes/settings.tscn")

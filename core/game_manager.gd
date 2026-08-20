@@ -184,6 +184,18 @@ signal hiroari_targets_required(player_id: int, target_ids: Array[int])
 ## 日影舞目标选择完成（UI/网络回传，targets 为4个目标ID数组）
 signal hiroari_targets_made(player_id: int, targets: Array[int])
 
+## ── 黑塔专属信号 ───────────────────────────────────────────────
+## 送你砖石触发：对范围内（距离≤1）的其他玩家各造成1点伤害
+signal herta_diamond_triggered(player_id: int, target_ids: Array[int])
+
+## ── 大黑塔专属信号 ───────────────────────────────────────────────
+## 目标获得【解】标记（大黑塔伤害导致）
+signal jiedu_applied(target_id: int, herta_id: int)
+## 格局打开回气：【解】玩家受伤，大黑塔获得1气
+signal open_mind_triggered(herta_id: int)
+## 魔法释放：主目标+所有【解】玩家AOE
+signal magic_used(caster_id: int, main_target_id: int)
+
 ## 所有玩家状态数组
 var _players: Array[PlayerState] = []
 ## 当前游戏阶段
@@ -212,6 +224,8 @@ var _debug_force_scissors: bool = false
 
 ## 联机模式标志（服务器设置为 true，关闭单机"人类死亡即结束"逻辑）
 var _is_network_game: bool = false
+## 慈悲尖塔模式标志（PvE组队：人类死亡不结束，队友可继续；敌人全灭=层胜利由外部管理器处理）
+var _is_tower_mode: bool = false
 ## END_PHASE 招架决策队列（待决策的有钟玩家）
 var _bell_decision_players: Array[PlayerState] = []
 ## 当前招架决策游标
@@ -309,6 +323,7 @@ func setup_game(config: Dictionary) -> void:
 	_prev_round_winner_id = -1
 	_last_round_pre_snapshot = {}
 	_prev_round_pre_snapshot = {}
+	_is_tower_mode = config.get("tower_mode", false)
 
 	var player_configs: Array = config["players"]
 	for i in range(player_configs.size()):
@@ -331,6 +346,11 @@ func setup_game(config: Dictionary) -> void:
 	_distance_system.setup(seat_order)
 
 	_debug_force_scissors = config.get("debug_force_scissors", false)
+	# 尖塔祝福：拥有尖塔祝福技能的角色开局获得2个气
+	for p in _players:
+		if _has_tower_blessing(p):
+			p.add_energy(2)
+			player_charged.emit(p.player_id, p.energy)
 	_init_match_record()
 	_enter_phase.call_deferred(GamePhase.GESTURE_INPUT)
 
@@ -408,6 +428,12 @@ func _resolve_round() -> void:
 	var result := RoundResolver.resolve_gestures(gestures)
 	round_resolved.emit(result)
 	_record_round_snapshot(result)
+
+	# ── 反馈（司马懿）：猜拳未获得回合 → 获得1个怒标记（至多4）──
+	var tower_winners: Array = result.get("winners", [])
+	for p in _players:
+		if p.is_alive and _tower_has_skill(p, "反馈") and not tower_winners.has(p.player_id) and p.fury_marks < 4:
+			p.fury_marks += 1
 
 	# ── 跺脚/无限剑制 强制判胜：force_win_next_round 的玩家直接成为唯一赢家 ──
 	var force_win_id: int = -1
@@ -860,6 +886,9 @@ func _start_action_input() -> void:
 		winner.consecutive_rounds = 1
 	_prev_winner_id = _sole_winner_id
 
+	# 鬼才（司马懿）：连续获得两回合时，额外获得一个回合（下回合强制判胜）
+	_process_genius(winner)
+
 	action_required.emit(_sole_winner_id)
 
 	if not winner.is_human:
@@ -885,6 +914,9 @@ func _apply_actions() -> void:
 		PlayerState.ActionType.CHARGE:
 			# 影分身存在时聚气加成 +2，否则 +1
 			var gain: int = 1 + winner.clone_count
+			# 仙人之力（仙人鸣人）：聚气额外+1
+			if _tower_has_skill(winner, "仙人之力"):
+				gain += 1
 			winner.add_energy(gain)
 			player_charged.emit(_sole_winner_id, winner.energy)
 			var cs: PlayerMatchStats = _match_record.player_stats.get(_sole_winner_id)
@@ -1029,6 +1061,81 @@ func _apply_actions() -> void:
 				_hiroari_target_ids = [-1, -1, -1, -1]
 				_request_hiroari_targets(winner)
 				return
+			# ── 大黑塔·魔法：主目标2伤 + 所有【解】玩家1伤（含主目标）──
+			elif skill.skill_name == "魔法":
+				var magic_target: PlayerState = targets[0] if targets.size() > 0 else null
+				if magic_target == null:
+					_enter_phase(GamePhase.ELIMINATION)
+					return
+				winner.energy -= skill.energy_cost
+				player_charged.emit(winner.player_id, winner.energy)
+				var logs_m: Array[Dictionary] = []
+				# 主目标 2 伤（解读增伤在吸收链内处理）
+				var e_main := SkillEffect.new()
+				e_main.effect_type = SkillEffect.EffectType.DAMAGE
+				e_main.value = 2.0
+				e_main.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+				var res_main := RoundResolver.apply_effect_standalone(e_main, winner, magic_target, _distance_system)
+				logs_m.append({
+					"attacker_id": winner.player_id,
+					"target_id":   magic_target.player_id,
+					"effect_type": SkillEffect.EffectType.DAMAGE,
+					"value":       2.0,
+					"result":      res_main,
+				})
+				# 解读标记处理（主目标受伤后可能刚获得【解】）
+				_process_bigherta_effects(winner, logs_m)
+				# AOE：所有【解】玩家各1伤（含主目标，此时主目标可能刚被标记）
+				var aoe_logs_m: Array[Dictionary] = []
+				for p in get_alive_players():
+					if p.player_id == winner.player_id:
+						continue
+					if p.jiedu_by.is_empty():
+						continue
+					var e_aoe := SkillEffect.new()
+					e_aoe.effect_type = SkillEffect.EffectType.DAMAGE
+					e_aoe.value = 1.0
+					e_aoe.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+					var res_aoe := RoundResolver.apply_effect_standalone(e_aoe, winner, p, _distance_system)
+					aoe_logs_m.append({
+						"attacker_id": winner.player_id,
+						"target_id":   p.player_id,
+						"effect_type": SkillEffect.EffectType.DAMAGE,
+						"value":       1.0,
+						"result":      res_aoe,
+					})
+				# AOE 伤害同样处理解读标记+格局打开（新标记的玩家被AOE打）
+				_process_bigherta_effects(winner, aoe_logs_m)
+				logs_m.append_array(aoe_logs_m)
+				magic_used.emit(winner.player_id, magic_target.player_id)
+				# 通用收尾：标记伤害/信号/记录
+				_finalize_shisui_use(winner, skill, logs_m)
+				_enter_phase(GamePhase.ELIMINATION)
+				return
+			# ── 蛙组手（仙人鸣人）：必中，2点真实伤害（跳过闪避/拦截）──
+			elif skill.skill_name == "蛙组手":
+				var frog_target: PlayerState = targets[0] if targets.size() > 0 else null
+				if frog_target == null:
+					_enter_phase(GamePhase.ELIMINATION)
+					return
+				winner.energy -= skill.energy_cost
+				player_charged.emit(winner.player_id, winner.energy)
+				# 必中真实伤害：TRUE_DAMAGE 走吸收链（受无敌/防反影响），但必中跳过闪避/拦截
+				var e_frog := SkillEffect.new()
+				e_frog.effect_type = SkillEffect.EffectType.TRUE_DAMAGE
+				e_frog.value = 2.0
+				e_frog.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+				var res_frog := RoundResolver.apply_effect_standalone(e_frog, winner, frog_target, _distance_system)
+				var frog_logs: Array[Dictionary] = [{
+					"attacker_id": winner.player_id,
+					"target_id":   frog_target.player_id,
+					"effect_type": SkillEffect.EffectType.TRUE_DAMAGE,
+					"value":       2.0,
+					"result":      res_frog,
+				}]
+				_finalize_shisui_use(winner, skill, frog_logs)
+				_enter_phase(GamePhase.ELIMINATION)
+				return
 
 			# ── 飞雷神拦截检查 ──────────────────────────────────────
 			# 检查目标中是否有波风水门且可触发换位/闪避
@@ -1063,6 +1170,17 @@ func _apply_actions() -> void:
 				targets = _phantom_dodge_pending["targets"]
 				_phantom_dodge_pending.clear()
 
+			# 黑塔：记录结算前HP快照（用于砖石50%阈值判定）
+			var herta_hp_before: Dictionary = {}
+			if _is_herta(winner):
+				for p in _players:
+					if p.is_alive:
+						herta_hp_before[p.player_id] = p.hp
+			# 破败王者之刃：记录普攻结算前目标HP（阶段1的50%伤害依据）
+			var blade_hp_before: Dictionary = {}
+			if skill.skill_name == "普攻" and _tower_has_skill(winner, "破败王者之刃"):
+				for t in targets:
+					blade_hp_before[t.player_id] = t.hp
 			var logs := RoundResolver.apply_effects(winner, skill, targets, _distance_system, splash_targets)
 
 			# ── 新止水·幻影瞬身：普攻命中后获得1幻影（至多3）──
@@ -1135,6 +1253,27 @@ func _apply_actions() -> void:
 			if skill.skill_name == "无限剑制":
 				_start_binding_field(winner)
 
+			# ── 黑塔被动：genjutsu 距离-1 + 送你砖石 AOE（含连锁）──
+			if _is_herta(winner):
+				_process_herta_passives(winner, logs, herta_hp_before, [])
+
+			# ── 大黑塔被动：解读标记 + 格局打开（任何来源受伤都检查）──
+			_process_bigherta_effects(winner, logs)
+
+			# ── 尖塔敌人普攻机制：破败王者之刃 + 反馈 ──
+			if skill.skill_name == "普攻":
+				var hit_target: PlayerState = null
+				for entry in logs:
+					if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE:
+						var res: Dictionary = entry.get("result", {})
+						if res.get("damage_dealt", 0) > 0:
+							hit_target = get_player(entry.get("target_id", -1))
+							break
+				if hit_target != null and hit_target.is_alive:
+					var bhp: float = float(blade_hp_before.get(hit_target.player_id, -1.0))
+					_process_blade_of_the_fallen(winner, hit_target, bhp)
+					_process_fury_burst(winner, hit_target)
+
 	_enter_phase(GamePhase.ELIMINATION)
 
 ## 构建技能目标列表：ENEMY_ALL 取全部敌人，ENEMY_SINGLE 取指定目标
@@ -1152,6 +1291,7 @@ func _build_skill_targets(attacker: PlayerState, skill: SkillData) -> Array[Play
 	if has_enemy_all:
 		# ENEMY_ALL 默认包含所有其他存活玩家（含队友）
 		# 真数千手用此机制打全场，施法者自身通过技能后效无敌免疫伤害
+		# 注：友伤（队友被AOE波及）是游戏设定，不排除同队
 		for p in _players:
 			if p.is_alive and p.player_id != attacker.player_id:
 				# 无法选择状态：不能被任何技能指定为目标（ENEMY_ALL 同样排除）
@@ -1930,8 +2070,8 @@ func _check_elimination() -> void:
 		if alive.all(func(p): return p.team_id == first_team):
 			_enter_phase(GamePhase.GAME_OVER)
 			return
-	# 保留原有"人类死亡则结束"逻辑（单机模式用）
-	if _is_human_dead() and not _is_network_game:
+	# 保留原有"人类死亡则结束"逻辑（单机模式用；慈悲尖塔模式人类死亡不结束）
+	if _is_human_dead() and not _is_network_game and not _is_tower_mode:
 		_enter_phase(GamePhase.GAME_OVER)
 		return
 	_enter_phase(GamePhase.END_PHASE)
@@ -2083,7 +2223,7 @@ func _end_round() -> void:
 				player.reset_round_data()
 			_enter_phase(GamePhase.GAME_OVER)
 			return
-	if _is_human_dead() and not _is_network_game:
+	if _is_human_dead() and not _is_network_game and not _is_tower_mode:
 		for player in _players:
 			player.reset_round_data()
 		_enter_phase(GamePhase.GAME_OVER)
@@ -2641,6 +2781,190 @@ func _process_stomp_trigger(attacker: PlayerState, logs: Array[Dictionary]) -> v
 			target.force_win_next_round = true
 			player_charged.emit(target_id, target.energy)
 
+## ── 黑塔辅助方法与被动处理 ──────────────────────────────────────────────
+## 检查角色是否为黑塔（通过技能名"送你砖石"判断）
+func _is_herta(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	for skill in player.character.skills:
+		if skill.skill_name == "送你砖石":
+			return true
+	return false
+
+## 黑塔被动结算：在技能伤害应用后调用
+## 1. genjutsu：对每个受到实际伤害的目标，黑塔对其距离-1（本结算链每玩家至多一次，可跨回合累积至最小1）
+## 2. 送你砖石：目标血量从 ≥50% 跨到 <50% 时，对与黑塔距离≤1的所有其他玩家造成1点伤害
+##    砖石AOE伤害本身也触发 genjutsu 与砖石（连锁触发），每玩家每结算链至多作为触发源一次（防无限循环）
+## hp_before：本次伤害结算前各存活玩家的HP快照 {player_id: hp}
+## triggered_ids：本结算链已作为砖石触发源的玩家ID（递归传递）
+func _process_herta_passives(winner: PlayerState, logs: Array[Dictionary], hp_before: Dictionary, triggered_ids: Array[int]) -> void:
+	if not _is_herta(winner):
+		return
+	var new_triggers: Array[int] = []
+	var genjutsu_done: Array[int] = []
+	for entry in logs:
+		var res: Dictionary = entry.get("result", {})
+		if res.get("damage_dealt", 0) <= 0:
+			continue
+		var target_id: int = entry.get("target_id", -1)
+		if target_id < 0:
+			continue
+		var target := get_player(target_id)
+		if target == null or not target.is_alive:
+			continue
+		# genjutsu：对受伤玩家距离-1
+		if not genjutsu_done.has(target_id):
+			genjutsu_done.append(target_id)
+			_distance_system.modify_distance(winner.player_id, target_id, -1)
+			distance_changed.emit(winner.player_id, target_id, _distance_system.get_distance(winner.player_id, target_id))
+		# 送你砖石：血量跨过50%阈值（伤前≥50% 且 伤后<50%）
+		var before: float = hp_before.get(target_id, target.hp)
+		var half: float = target.character.max_hp * 0.5
+		if before >= half and target.hp < half and not triggered_ids.has(target_id):
+			triggered_ids.append(target_id)
+			new_triggers.append(target_id)
+	# 砖石 AOE：对黑塔距离≤1的所有其他玩家各造成1点伤害（正常吸收链）
+	for trigger_id in new_triggers:
+		var aoe_target_ids: Array[int] = []
+		var aoe_logs: Array[Dictionary] = []
+		var aoe_hp_before: Dictionary = {}
+		for p in get_alive_players():
+			if p.player_id == winner.player_id:
+				continue
+			if _distance_system.get_distance(winner.player_id, p.player_id) > 1:
+				continue
+			aoe_hp_before[p.player_id] = p.hp
+			aoe_target_ids.append(p.player_id)
+			var e := SkillEffect.new()
+			e.effect_type = SkillEffect.EffectType.DAMAGE
+			e.value = 1.0
+			e.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+			var res := RoundResolver.apply_effect_standalone(e, winner, p, _distance_system)
+			aoe_logs.append({
+				"attacker_id": winner.player_id,
+				"target_id":   p.player_id,
+				"effect_type": SkillEffect.EffectType.DAMAGE,
+				"value":       1.0,
+				"result":      res,
+			})
+		if aoe_target_ids.size() > 0:
+			herta_diamond_triggered.emit(winner.player_id, aoe_target_ids)
+		# 连锁：AOE伤害继续触发 genjutsu + 砖石（每玩家每链至多一次）
+		if not aoe_logs.is_empty():
+			_process_herta_passives(winner, aoe_logs, aoe_hp_before, triggered_ids)
+		# 黑塔砖石AOE伤害也触发大黑塔的格局打开（【解】玩家受伤回气）
+		_process_bigherta_effects(winner, aoe_logs)
+
+## ── 大黑塔被动处理：解读标记 + 格局打开 ──────────────────────────────
+## 在任何伤害结算后调用（攻击者可为任何角色，格局打开对任何来源生效）
+## 1. 解读：若攻击者是大黑塔，对每个实际受伤目标施加【解】标记（一次性）+ 距离-1
+## 2. 格局打开：对每个受伤且带【解】的目标，仅该标记来源的大黑塔获得1气（每次伤害+1）
+##    注：极端情况下多个大黑塔同时在场，回气只给标记该目标的那个大黑塔
+func _process_bigherta_effects(attacker: PlayerState, logs: Array[Dictionary]) -> void:
+	var is_herta_attack: bool = RoundResolver.is_big_herta(attacker)
+	for entry in logs:
+		var res: Dictionary = entry.get("result", {})
+		if res.get("damage_dealt", 0) <= 0:
+			continue
+		var target_id: int = entry.get("target_id", -1)
+		if target_id < 0:
+			continue
+		var target := get_player(target_id)
+		if target == null or not target.is_alive:
+			continue
+		# 记录本次伤害前该目标已有的标记来源（格局打开只回气给既有标记者）
+		var existing_markers: Array[int] = target.jiedu_by.duplicate()
+		# 解读：大黑塔造成伤害 → 目标获得该大黑塔的【解】（按施法者区分，不覆盖他人标记）
+		if is_herta_attack and not target.jiedu_by.has(attacker.player_id):
+			target.jiedu_by.append(attacker.player_id)
+			_distance_system.modify_distance(attacker.player_id, target_id, -1)
+			distance_changed.emit(attacker.player_id, target_id, _distance_system.get_distance(attacker.player_id, target_id))
+			jiedu_applied.emit(target_id, attacker.player_id)
+		# 格局打开：【解】玩家受伤 → 每个既有标记者（伤害前已标记）各+1气
+		# 本次伤害刚施加的新标记不参与本次回气（严格"【解】玩家受到伤害"语义）
+		for mid in existing_markers:
+			var mark_owner := get_player(mid)
+			if mark_owner != null and mark_owner.is_alive:
+				mark_owner.add_energy(1)
+				player_charged.emit(mark_owner.player_id, mark_owner.energy)
+				open_mind_triggered.emit(mark_owner.player_id)
+
+## ── 慈悲尖塔敌人机制 ─────────────────────────────────────────────────
+## 检查角色是否拥有指定技能（含解锁技能）
+func _tower_has_skill(player: PlayerState, skill_name: String) -> bool:
+	if player == null or player.character == null:
+		return false
+	for skill in player.character.skills:
+		if skill.skill_name == skill_name:
+			return true
+	for skill in player.unlocked_skills:
+		if skill.skill_name == skill_name:
+			return true
+	return false
+
+## 尖塔祝福：开局获得2个气
+func _has_tower_blessing(player: PlayerState) -> bool:
+	return _tower_has_skill(player, "尖塔祝福")
+
+## 破败王者之刃（锁定技）：普攻命中后按阶段触发
+## 阶段1（第1次普攻）：附带目标现有生命值（普攻结算前）50%的伤害
+## 阶段2（第2次普攻）：恢复自身一半生命值
+## 阶段3（第3次普攻）：获得2个气
+## 悲痛：血量低于一半时刷新阶段（重新从阶段1开始）
+func _process_blade_of_the_fallen(attacker: PlayerState, target: PlayerState, hp_before: float = -1.0) -> void:
+	if attacker == null or target == null:
+		return
+	if not _tower_has_skill(attacker, "破败王者之刃"):
+		return
+	# 悲痛：血量低于一半时刷新阶段
+	if attacker.hp < attacker.character.max_hp * 0.5:
+		attacker.blade_stage = 0
+	if attacker.blade_stage >= 3:
+		return  # 三次用完，等待悲痛刷新
+	match attacker.blade_stage:
+		0:
+			# 附带目标现有生命值（普攻结算前）50%的伤害（走正常吸收链）
+			var before_hp: float = hp_before if hp_before >= 0.0 else target.hp
+			var extra := SkillEffect.new()
+			extra.effect_type = SkillEffect.EffectType.DAMAGE
+			extra.value = before_hp * 0.5
+			extra.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+			RoundResolver.apply_effect_standalone(extra, attacker, target, _distance_system)
+		1:
+			# 恢复自身一半生命值（最大生命值的一半）
+			var heal: float = attacker.character.max_hp * 0.5
+			attacker.hp = min(attacker.character.max_hp, attacker.hp + heal)
+		2:
+			# 获得2个气
+			attacker.add_energy(2)
+			player_charged.emit(attacker.player_id, attacker.energy)
+	attacker.blade_stage += 1
+
+## 反馈（司马懿）：普攻命中后附加怒标记数的真实伤害，然后清空怒
+func _process_fury_burst(attacker: PlayerState, target: PlayerState) -> void:
+	if attacker == null or target == null:
+		return
+	if not _tower_has_skill(attacker, "反馈"):
+		return
+	if attacker.fury_marks <= 0:
+		return
+	var e := SkillEffect.new()
+	e.effect_type = SkillEffect.EffectType.TRUE_DAMAGE
+	e.value = float(attacker.fury_marks)
+	e.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+	RoundResolver.apply_effect_standalone(e, attacker, target, _distance_system)
+	attacker.fury_marks = 0
+
+## 鬼才（司马懿）：连续获得两回合时，额外获得一个回合（复用强制判胜）
+## 每连赢2回合触发一次（consecutive_rounds % 2 == 0），由 _start_action_input 调用
+func _process_genius(winner: PlayerState) -> void:
+	if winner == null or not winner.is_alive:
+		return
+	if not _tower_has_skill(winner, "鬼才"):
+		return
+	if winner.consecutive_rounds >= 2 and winner.consecutive_rounds % 2 == 0:
+		winner.force_win_next_round = true
+
 ## ── 漂泊九尾释放处理 ──────────────────────────────────────────────────────────
 ## 释放时：进入无敌 + 咆哮（0.5x3伤害对所有其他玩家）
 func _process_nine_tails_release(caster: PlayerState) -> void:
@@ -3021,6 +3345,12 @@ func _resume_ftg_action() -> void:
 	var splash_targets: Array[PlayerState] = _ftg_pending.get("splash_targets", [])
 	_ftg_pending.clear()
 
+	# 黑塔：记录结算前HP快照（用于砖石50%阈值判定）
+	var herta_hp_before: Dictionary = {}
+	if _is_herta(winner):
+		for p in _players:
+			if p.is_alive:
+				herta_hp_before[p.player_id] = p.hp
 	var logs := RoundResolver.apply_effects(winner, skill, targets, _distance_system, splash_targets)
 
 	# 双龙戏珠后效
@@ -3058,6 +3388,13 @@ func _resume_ftg_action() -> void:
 	player_charged.emit(_sole_winner_id, winner.energy)
 	_record_action(winner, skill, logs)
 
+	# ── 黑塔被动：genjutsu 距离-1 + 送你砖石 AOE（含连锁）──
+	if _is_herta(winner):
+		_process_herta_passives(winner, logs, herta_hp_before, [])
+
+	# ── 大黑塔被动：解读标记 + 格局打开 ──
+	_process_bigherta_effects(winner, logs)
+
 	_enter_phase(GamePhase.ELIMINATION)
 
 ## 人类玩家幻影闪避决策提交入口（由UI/网络主机调用）
@@ -3093,6 +3430,12 @@ func _resume_phantom_dodge_action() -> void:
 	var splash_targets: Array[PlayerState] = _phantom_dodge_pending.get("splash_targets", [])
 	_phantom_dodge_pending.clear()
 
+	# 黑塔：记录结算前HP快照（用于砖石50%阈值判定）
+	var herta_hp_before: Dictionary = {}
+	if _is_herta(winner):
+		for p in _players:
+			if p.is_alive:
+				herta_hp_before[p.player_id] = p.hp
 	var logs := RoundResolver.apply_effects(winner, skill, targets, _distance_system, splash_targets)
 
 	# ── 新止水·幻影瞬身：普攻命中后获得1幻影（至多3）──
@@ -3143,5 +3486,12 @@ func _resume_phantom_dodge_action() -> void:
 	skill_applied.emit(logs)
 	player_charged.emit(_sole_winner_id, winner.energy)
 	_record_action(winner, skill, logs)
+
+	# ── 黑塔被动：genjutsu 距离-1 + 送你砖石 AOE（含连锁）──
+	if _is_herta(winner):
+		_process_herta_passives(winner, logs, herta_hp_before, [])
+
+	# ── 大黑塔被动：解读标记 + 格局打开 ──
+	_process_bigherta_effects(winner, logs)
 
 	_enter_phase(GamePhase.ELIMINATION)

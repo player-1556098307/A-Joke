@@ -25,7 +25,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_ba_sh")])
 
 [resource]
 script = ExtResource("3_char")
-character_name = "宇智波止水（天劫）"
+character_name = "宇智波止水"
 max_hp = 6
 basic_attack_cost = 1
 portrait = ExtResource("4_p1")

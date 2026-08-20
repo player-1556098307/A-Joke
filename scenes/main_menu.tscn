@@ -158,51 +158,26 @@ offset_top = 322.0
 offset_right = 906.0
 offset_bottom = 386.0
 
+[node name="BtnTower" type="Button" parent="."]
+layout_mode = 0
+offset_left = 610.0
+offset_top = 394.0
+offset_right = 906.0
+offset_bottom = 458.0
+
 [node name="BtnSettings" type="Button" parent="." unique_id=1679551461]
 layout_mode = 0
 offset_left = 610.0
-offset_top = 398.0
+offset_top = 466.0
 offset_right = 750.0
-offset_bottom = 442.0
+offset_bottom = 510.0
 
 [node name="BtnQuit" type="Button" parent="." unique_id=559644760]
 layout_mode = 0
 offset_left = 766.0
-offset_top = 398.0
+offset_top = 466.0
 offset_right = 906.0
-offset_bottom = 442.0
-
-[node name="TipsPanel" type="PanelContainer" parent="." unique_id=1530077088]
-layout_mode = 0
-offset_left = 610.0
-offset_top = 454.0
-offset_right = 906.0
-offset_bottom = 504.0
-
-[node name="TipsVBox" type="VBoxContainer" parent="TipsPanel" unique_id=78619081]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="TipsTitle" type="Label" parent="TipsPanel/TipsVBox" unique_id=665734330]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.372549, 0.368627, 0.352941, 1)
-theme_override_font_sizes/font_size = 11
-text = "操作说明"
-horizontal_alignment = 1
-
-[node name="TipsLine1" type="Label" parent="TipsPanel/TipsVBox" unique_id=1441071723]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.533333, 0.529412, 0.501961, 1)
-theme_override_font_sizes/font_size = 10
-text = "猜拳获胜 → 聚气或释放技能"
-horizontal_alignment = 1
-
-[node name="TipsLine2" type="Label" parent="TipsPanel/TipsVBox" unique_id=84332695]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.533333, 0.529412, 0.501961, 1)
-theme_override_font_sizes/font_size = 10
-text = "距离影响技能射程 · 最后存活者获胜"
-horizontal_alignment = 1
+offset_bottom = 510.0
 
 [node name="RightBottomLine" type="ColorRect" parent="." unique_id=326606578]
 layout_mode = 0

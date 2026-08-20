@@ -203,9 +203,51 @@ func _ready() -> void:
 	dd_skill.effects = [dd_effect]
 	gm_gai.energy = 10
 	var dd_logs := RoundResolver.apply_effects(gm_gai, dd_skill, [gm_naruto], dist_sys)
-	# 真伤无视防御直接扣血，HP最低为0（不会为负）
+	# 真伤无视护盾直接扣血，HP最低为0（不会为负）
 	var expected_hp: int = maxi(0, target_hp_before - 10)
 	_assert(gm_naruto.hp == expected_hp, "10: 真实伤害10点，目标HP从" + str(target_hp_before) + "→" + str(gm_naruto.hp) + "（期望" + str(expected_hp) + "）")
+
+	# ── 测试10.5：真实伤害防御链（只无视护盾，受无敌/防反/分身影响）──
+	# 10.5a：真伤无视数值护盾
+	gm_naruto.hp = 8.0
+	gm_naruto.shield = 3
+	var dd_skill2 := SkillData.new()
+	dd_skill2.skill_name = "测试真伤2"
+	dd_skill2.energy_cost = 0
+	dd_skill2.min_range = 1
+	dd_skill2.max_range = 1
+	dd_skill2.effects = [dd_effect]
+	var shield_before: int = gm_naruto.shield
+	RoundResolver.apply_effects(gm_gai, dd_skill2, [gm_naruto], dist_sys)
+	_assert(gm_naruto.hp == 0.0 and gm_naruto.shield == shield_before, "10.5a: 真伤无视数值护盾（HP8-10=0，护盾未消耗=%d）" % gm_naruto.shield)
+	# 10.5b：真伤受无敌影响（免疫）
+	gm_naruto.hp = 8.0
+	gm_naruto.invincible_turns = 1
+	RoundResolver.apply_effects(gm_gai, dd_skill2, [gm_naruto], dist_sys)
+	_assert(gm_naruto.hp == 8.0, "10.5b: 真伤打无敌目标免疫（HP不变=%.1f）" % gm_naruto.hp)
+	gm_naruto.invincible_turns = 0
+	# 10.5c：真伤受防反影响（减半）
+	gm_naruto.hp = 8.0
+	gm_naruto.counter_stance = true
+	var attacker_hp_before: float = gm_gai.hp
+	var counter_energy_before: int = gm_naruto.energy
+	RoundResolver.apply_effects(gm_gai, dd_skill2, [gm_naruto], dist_sys)
+	_assert(gm_naruto.hp == 3.0, "10.5c: 真伤打防反目标减半（10/2=5，8→3，实际=%.1f）" % gm_naruto.hp)
+	_assert(gm_gai.hp == attacker_hp_before - 1.0, "10.5c2: 防反反击1伤（攻击者%.1f→%.1f）" % [attacker_hp_before, gm_gai.hp])
+	_assert(gm_naruto.energy == counter_energy_before + 1, "10.5c3: 防反获得1气（%d→%d）" % [counter_energy_before, gm_naruto.energy])
+	gm_naruto.counter_stance = false
+	# 10.5d：真伤被分身抵挡
+	gm_naruto.hp = 8.0
+	gm_naruto.clone_count = 1
+	RoundResolver.apply_effects(gm_gai, dd_skill2, [gm_naruto], dist_sys)
+	_assert(gm_naruto.hp == 8.0 and gm_naruto.clone_count == 0, "10.5d: 真伤被分身抵挡（HP不变，分身消耗=%d）" % gm_naruto.clone_count)
+	# 10.5e：真伤无视全挡护盾（圣盾）
+	gm_naruto.hp = 8.0
+	gm_naruto.shield = -1
+	RoundResolver.apply_effects(gm_gai, dd_skill2, [gm_naruto], dist_sys)
+	_assert(gm_naruto.hp == 0.0 and gm_naruto.shield == -1, "10.5e: 真伤无视全挡护盾（HP8-10=0，圣盾未消耗=%d）" % gm_naruto.shield)
+	gm_naruto.shield = 0
+	gm_naruto.hp = 8.0
 
 	# ── 测试11：燃烧/狂战士结算 ──────────────────────────────────
 	gm_gai.burning = true

@@ -134,6 +134,18 @@ var phantom_count: int = 0
 ## 存储格式：{ "round": int, "winner_id": int, "states": {player_id: Dictionary} }
 var backtrack_snapshot: Dictionary = {}
 
+## ── 大黑塔专属字段 ───────────────────────────────────────────────
+## 【解】标记：被大黑塔伤害过的玩家获得；效果=与标记者距离-1、受标记者伤害+1
+## 按施法者区分：jiedu_by 记录标记来源大黑塔的player_id列表（类似飞雷神 ftg_marked_by）
+## 同一玩家可被多个大黑塔分别标记，各自独立生效、互不通用；永久存在（无自然消失机制）
+var jiedu_by: Array[int] = []
+
+## ── 慈悲尖塔敌人专属字段 ─────────────────────────────────────────
+## 破败王者之刃阶段计数（0=第1次普攻，1=第2次，2=第3次；3+=技能耗尽等待悲痛刷新）
+var blade_stage: int = 0
+## 反馈怒标记数（司马懿，0-4）
+var fury_marks: int = 0
+
 ## ── 回合临时数据（每回合开始时重置）───────────────────────────────────────────
 var current_gesture: Gesture           ## 本回合出的手势
 var pending_action: ActionType         ## 待执行的行动类型
@@ -301,6 +313,8 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"koto_awaiting_confirm": koto_awaiting_confirm,
 		"last_hit_by_id": last_hit_by_id,
 		"phantom_count": phantom_count,
+		"delayed_damages": delayed_damages.duplicate(),
+		"jiedu_by": jiedu_by.duplicate(),
 	}
 
 ## 从回溯快照恢复自身状态（全部字段）
@@ -357,6 +371,8 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	koto_awaiting_confirm    = snap.get("koto_awaiting_confirm", koto_awaiting_confirm)
 	last_hit_by_id           = snap.get("last_hit_by_id", last_hit_by_id)
 	phantom_count            = snap.get("phantom_count", phantom_count)
+	delayed_damages          = (snap.get("delayed_damages", []) as Array).duplicate(true)
+	jiedu_by                 = (snap.get("jiedu_by", []) as Array).duplicate()
 
 ## 重置回合临时数据（每回合开始时调用），持续状态字段不在此重置
 ## 防反（counter_stance）为持续状态：进入后持续到自己的下个回合行动开始（_start_action_input）时清除

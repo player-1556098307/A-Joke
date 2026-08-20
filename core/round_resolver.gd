@@ -169,6 +169,35 @@ static func agent_bonus(attacker: PlayerState, target: PlayerState) -> float:
 			return 1.0
 	return 0.0
 
+## 判断角色是否为大黑塔（通过技能名"解读"判断）
+static func is_big_herta(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	for skill in player.character.skills:
+		if skill.skill_name == "解读":
+			return true
+	return false
+
+## 谋略（司马懿）：免疫判定效果（麻痹/封技/击飞/无法选择等控制）
+static func is_strategist(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	for skill in player.character.skills:
+		if skill.skill_name == "谋略":
+			return true
+	return false
+
+## 解读（大黑塔）：目标带有【该大黑塔施加的】解标记时，伤害+1
+## 按施法者区分：只有标记者本人享受增伤，其他同角色大黑塔不互通
+static func jiedu_bonus(attacker: PlayerState, target: PlayerState) -> float:
+	if attacker == null or target == null:
+		return 0.0
+	if not is_big_herta(attacker):
+		return 0.0
+	if not target.jiedu_by.has(attacker.player_id):
+		return 0.0
+	return 1.0
+
 ## 相位滑剑：满血伤害x2；没气获得1气；伤害致濒死时置位可暴击
 ## 返回 {multiplier: float, energy_gained: int, crit_armed: bool}
 static func phase_sword_pre_apply(attacker: PlayerState, dmg_before: float) -> Dictionary:
@@ -237,6 +266,8 @@ static func _apply_single_effect(
 			# ── 希耶尔被动强化（对希耶尔造成的所有伤害生效）──
 			# 代行者：目标带秽土/死徒/法师标签时+1
 			raw += agent_bonus(attacker, target)
+			# ── 大黑塔·解读强化（对【解】目标造成伤害+1）──
+			raw += jiedu_bonus(attacker, target)
 			# 相位滑剑：满血x2 + 没气得1气
 			var ps := phase_sword_pre_apply(attacker, raw)
 			raw *= ps["multiplier"]
@@ -293,13 +324,40 @@ static func _apply_single_effect(
 			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.TRUE_DAMAGE:
-			# 真实伤害：无视护盾/分身/防反/无敌，直接扣HP
+			# 真实伤害：无视护盾/圣盾（全挡护盾），仅此而已。
+			# 无敌、伤害减免（防反/宇智波流招架）、分身等防御机制照常生效。
+			# 无敌状态：完全免疫（包括九尾无敌）
+			if target.invincible_turns > 0 or target.nine_tails_invincible:
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "true_damage": true, "invincible": true }
 			var tdmg: float = effect.value
+			var clone_broken: bool = false
+			var counter_stance_triggered: bool = false
+			# 宇智波流招架（泉奈）：伤害减半 + 反击封技（伤害减免状态照常生效）
+			var uchiha_counter_triggered: bool = false
+			if target.uchiha_stance and not is_controlled(target):
+				tdmg = ceilf(tdmg / 2.0)
+				uchiha_counter_triggered = true
+				target.untargetable_turns = max(target.untargetable_turns, 1)
+				attacker.hp = max(0.0, attacker.hp - 1.0)
+				attacker.skill_disabled_turns = max(attacker.skill_disabled_turns, 1)
+				target.uchiha_stance = false
+			# 防反：减半 + 获得1气 + 反击1伤（伤害减免状态照常生效）
+			if target.counter_stance and not is_controlled(target):
+				tdmg = ceilf(tdmg / 2.0)
+				counter_stance_triggered = true
+				target.add_energy(1)
+				attacker.hp = max(0.0, attacker.hp - 1.0)
+			# 分身抵挡（防御机制照常生效）
+			if target.clone_count > 0:
+				target.clone_count -= 1
+				tdmg = 0
+				clone_broken = true
+			# 跳过护盾/圣盾：真实伤害无视护盾，直接扣HP
 			target.hp = max(0.0, target.hp - tdmg)
 			if tdmg > 0:
 				target.took_damage_this_round = true
 				target.last_hit_by_id = attacker.player_id
-			return { "damage_dealt": tdmg, "shield_absorbed": 0, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "true_damage": true }
+			return { "damage_dealt": tdmg, "shield_absorbed": 0, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": 0, "counter_damage": 1 if counter_stance_triggered else 0, "true_damage": true, "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.PIERCE_DAMAGE:
 			# 穿透伤害（断头台）：无视护盾(数值/全挡)、无敌、圣盾(全挡护盾)，直接扣HP
@@ -357,6 +415,9 @@ static func _apply_single_effect(
 			# 无敌状态：免疫控制
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "turns": target.paralyze_turns, "counter_immune": true, "invincible": true }
+			# 谋略（司马懿）：免疫判定效果
+			if is_strategist(target):
+				return { "turns": target.paralyze_turns, "counter_immune": true }
 			# 防反状态：只免疫伴随伤害的攻击的控制效果；纯控制技能（明神门等无伤害）正常生效
 			if target.counter_stance and has_damage:
 				return { "turns": target.paralyze_turns, "counter_immune": true }
@@ -367,6 +428,9 @@ static func _apply_single_effect(
 			# 无敌状态：免疫控制
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "disabled_turns": target.skill_disabled_turns, "counter_immune": true, "invincible": true }
+			# 谋略（司马懿）：免疫判定效果
+			if is_strategist(target):
+				return { "disabled_turns": target.skill_disabled_turns, "counter_immune": true }
 			# 防反状态：只免疫伴随伤害的攻击效果；纯控制技能正常生效
 			if target.counter_stance and has_damage:
 				return { "disabled_turns": target.skill_disabled_turns, "counter_immune": true }
@@ -377,6 +441,9 @@ static func _apply_single_effect(
 			# 无敌状态：免疫控制
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true, "invincible": true }
+			# 谋略（司马懿）：免疫判定效果
+			if is_strategist(target):
+				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true }
 			# 防反状态：只免疫伴随伤害的攻击的控制效果；纯控制技能正常生效
 			if target.counter_stance and has_damage:
 				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true }
@@ -467,6 +534,9 @@ static func _apply_single_effect(
 
 		SkillEffect.EffectType.UNTARGETABLE:
 			# 无法选择：value=持续回合数，期间其他玩家任何技能无法指定该玩家为目标
+			# 谋略（司马懿）：免疫判定效果
+			if is_strategist(target):
+				return { "untargetable_turns": target.untargetable_turns, "counter_immune": true }
 			target.untargetable_turns = max(target.untargetable_turns, int(effect.value))
 			return { "untargetable_turns": target.untargetable_turns }
 

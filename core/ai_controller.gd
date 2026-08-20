@@ -29,10 +29,14 @@ func decide_action(
 			"target_id": -1,
 		}
 
+	# 目标池：排除自己；组队/塔模式（team_id != 0）下排除队友（AI不打自己人）
 	var others: Array[PlayerState] = []
 	for p in alive_players:
-		if p.player_id != player.player_id:
-			others.append(p)
+		if p.player_id == player.player_id:
+			continue
+		if player.team_id != 0 and p.team_id == player.team_id:
+			continue
+		others.append(p)
 
 	# 迈特凯特殊策略
 	if _is_might_gai(player):
@@ -77,6 +81,12 @@ func decide_action(
 	# 新止水（天劫）特殊策略
 	if _is_new_shisui(player):
 		var result := _decide_new_shisui_action(player, others, distance_system)
+		if result.size() > 0:
+			return result
+
+	# 大黑塔特殊策略
+	if _is_big_herta(player):
+		var result := _decide_big_herta_action(player, others, distance_system)
 		if result.size() > 0:
 			return result
 
@@ -169,6 +179,40 @@ func _is_new_shisui(player: PlayerState) -> bool:
 		if skill.skill_name == "日影舞":
 			return true
 	return false
+
+## 判断角色是否为大黑塔（通过技能名"解读"判断）
+func _is_big_herta(player: PlayerState) -> bool:
+	for skill in player.character.skills:
+		if skill.skill_name == "解读":
+			return true
+	return false
+
+## 大黑塔专用决策策略
+## 优先级：魔法（3气，主目标优先【解】玩家/低血）> 普攻 > 充能
+## 解读/格局打开为被动自动触发，AI只需决定主动行动
+func _decide_big_herta_action(
+	player: PlayerState,
+	others: Array[PlayerState],
+	distance_system: DistanceSystem
+) -> Dictionary:
+	var all_skills := player.get_all_skills()
+
+	# 1. 魔法：3气，主目标2伤 + 所有【解】玩家1伤（AOE）
+	var magic_idx := _find_skill_index(all_skills, player, "魔法")
+	if magic_idx >= 0 and player.energy >= 3:
+		var target := _pick_best_target(player, all_skills[magic_idx], others, distance_system)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": magic_idx, "target_id": target }
+
+	# 2. 普攻：有气时攻击（触发解读标记）
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], others, distance_system)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+
+	# 返回空让调用方走默认充能逻辑
+	return {}
 
 ## 宇智波泉奈专用决策策略
 ## 优先级：宇智波流（2耗，突进+招架，残血/被针对时防御性使用）> 豪火球（2耗，范围2，2伤+灼烧）> 普攻 > 充能
