@@ -106,8 +106,9 @@ func _build_ui() -> void:
 	_enter_btn.pressed.connect(_on_enter)
 	add_child(_enter_btn)
 
-	# DialogueBox 组件
+	# DialogueBox 组件（z_index=2 确保在立绘 z_index=1 之上，不被遮挡）
 	_dialogue_box = DialogueBox.new()
+	_dialogue_box.z_index = 2
 	add_child(_dialogue_box)
 	_dialogue_box.dialogue_finished.connect(_on_dialogue_finished)
 
