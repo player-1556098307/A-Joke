@@ -24,6 +24,7 @@ var _phase: String = ""  ## "fade_in", "hold", "dialogue", "fade_out", "done"
 var _has_dialogue: bool = false
 
 func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
