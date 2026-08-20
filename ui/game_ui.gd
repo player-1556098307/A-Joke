@@ -327,13 +327,17 @@ func _play_charge_effect(player_id: int) -> void:
 	card.add_child(glow)
 	card.move_child(glow, 0)
 
-	var tween := create_tween()
+	# bind_node(glow)：层切换释放旧卡片时 Tween 自动终止，回调不再访问已释放节点
+	var tween := create_tween().bind_node(glow)
 	tween.set_parallel(true)
 	tween.tween_property(glow, "self_modulate", Color(1, 1, 1, 0.55), 0.2)
 	tween.tween_property(glow, "scale", Vector2(1.06, 1.06), 0.2)
 	tween.tween_property(glow, "self_modulate", Color(1, 1, 1, 0), 0.5).set_delay(0.4)
 	tween.tween_property(glow, "scale", Vector2(1.0, 1.0), 0.5).set_delay(0.4)
-	tween.chain().tween_callback(func(): glow.queue_free())
+	tween.chain().tween_callback(func():
+		if is_instance_valid(glow):
+			glow.queue_free()
+	)
 
 	var popup := Label.new()
 	popup.text = "⚡"
@@ -346,12 +350,15 @@ func _play_charge_effect(player_id: int) -> void:
 	popup.self_modulate = Color(1, 1, 1, 0)
 	card.add_child(popup)
 
-	var t2 := create_tween()
+	var t2 := create_tween().bind_node(popup)
 	t2.tween_property(popup, "position", Vector2(34, -50), 0.7)
 	t2.set_parallel(true)
 	t2.tween_property(popup, "self_modulate", Color(1, 1, 1, 1), 0.2)
 	t2.tween_property(popup, "self_modulate", Color(1, 1, 1, 0), 0.4).set_delay(0.4)
-	t2.chain().tween_callback(func(): popup.queue_free())
+	t2.chain().tween_callback(func():
+		if is_instance_valid(popup):
+			popup.queue_free()
+	)
 
 func _play_attack_effect(target_id: int) -> void:
 	var card: Control = _player_cards.get(target_id)
@@ -367,12 +374,15 @@ func _play_attack_effect(target_id: int) -> void:
 	card.add_child(flash)
 	card.move_child(flash, 0)
 
-	var tween := create_tween()
+	var tween := create_tween().bind_node(flash)
 	tween.tween_property(flash, "self_modulate", Color(1, 1, 1, 0), 0.35)
-	tween.tween_callback(func(): flash.queue_free()).set_delay(0.4)
+	tween.tween_callback(func():
+		if is_instance_valid(flash):
+			flash.queue_free()
+	).set_delay(0.4)
 
 	var orig_pos := card.position
-	var shake := create_tween()
+	var shake := create_tween().bind_node(card)
 	shake.tween_property(card, "position", orig_pos + Vector2(6, 0), 0.04)
 	shake.tween_property(card, "position", orig_pos - Vector2(6, 0), 0.08)
 	shake.tween_property(card, "position", orig_pos + Vector2(2, 0), 0.06)
@@ -402,11 +412,14 @@ func _play_skill_effect(target_id: int, effect_type: int) -> void:
 	card.add_child(ring)
 	card.move_child(ring, 0)
 
-	var tween := create_tween()
+	var tween := create_tween().bind_node(ring)
 	tween.set_parallel(true)
 	tween.tween_property(ring, "self_modulate", Color(1, 1, 1, 0), 0.6)
 	tween.tween_property(ring, "scale", Vector2(1.08, 1.08), 0.6)
-	tween.chain().tween_callback(func(): ring.queue_free())
+	tween.chain().tween_callback(func():
+		if is_instance_valid(ring):
+			ring.queue_free()
+	)
 
 func _style_gesture_buttons() -> void:
 	var data := [
@@ -523,7 +536,11 @@ func _build_player_card(player: PlayerState) -> Control:
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bdr_col := Color("#185FA5") if player.is_human else Color("#2C2C2A")
 	var bdr_w   := 2 if player.is_human else 2
-	body.add_theme_stylebox_override("panel", _make_flat(Color("#FFFDF5"), bdr_col, bdr_w, 4))
+	var card_bg := Color("#FFFDF5")
+	if _tower_theme_active:
+		card_bg = Color("#222018")
+		bdr_col = Color("#5A4E38") if player.is_human else Color("#3A342A")
+	body.add_theme_stylebox_override("panel", _make_flat(card_bg, bdr_col, bdr_w, 4))
 	wrap.add_child(body)
 
 	# Avatar box (56×56, centered horizontally, top 6px)
@@ -563,7 +580,10 @@ func _build_player_card(player: PlayerState) -> Control:
 	name_bar.position = Vector2(4.0, 58.0)
 	name_bar.size = Vector2(96.0, 16.0)
 	name_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_bar.add_theme_stylebox_override("panel", _make_flat(Color("#2C2C2A"), Color("#2C2C2A"), 0, 2))
+	var name_bar_bg := Color("#2C2C2A")
+	if _tower_theme_active:
+		name_bar_bg = Color("#3A342A")
+	name_bar.add_theme_stylebox_override("panel", _make_flat(name_bar_bg, name_bar_bg, 0, 2))
 	body.add_child(name_bar)
 
 	var name_lbl := Label.new()
@@ -937,13 +957,19 @@ func _mark_decided(player_id: int) -> void:
 	lbl.add_theme_color_override("font_color", Color("#27500A"))
 	bar.show(); fill.show(); lbl.show()
 
-	var tw := create_tween()
+	# bind_node(card)：层切换释放旧卡时 Tween 自动终止，不再访问已释放的子节点
+	var tw := create_tween().bind_node(card)
 	tw.tween_callback(func():
-		bar.hide(); fill.hide(); lbl.hide()
-		lbl.text = "思考中..."
-		lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
-		fill.color = Color("#888780")
-		fill.size.x = 0.0
+		if is_instance_valid(bar):
+			bar.hide()
+		if is_instance_valid(fill):
+			fill.hide()
+			fill.color = Color("#888780")
+			fill.size.x = 0.0
+		if is_instance_valid(lbl):
+			lbl.hide()
+			lbl.text = "思考中..."
+			lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
 	).set_delay(0.8)
 
 # ── Log ──────────────────────────────────────────────────────────────────────
@@ -1292,6 +1318,10 @@ func _show_target_panel(skill_index: int, skill: SkillData) -> void:
 	for player in GameManager.get_alive_players():
 		if player.player_id == _current_action_player_id:
 			continue
+		# 组队/塔模式：队友不可选为目标
+		var me := GameManager.get_player(_current_action_player_id)
+		if me != null and me.team_id != 0 and player.team_id == me.team_id:
+			continue
 		var dist     := GameManager.get_distance(_current_action_player_id, player.player_id)
 		var in_range := dist >= skill.min_range and dist <= skill.max_range
 		var btn      := Button.new()
@@ -1600,25 +1630,28 @@ func _play_all_gesture_reveals() -> void:
 		_pending_reveals.clear()
 		return
 
-	# Phase 1: pop in (0→0.3s)
+	# Phase 1: pop in (0→0.3s) —— bind_node(popup)：层切换释放旧卡时 Tween 自动终止
 	for popup in popups:
-		var t := create_tween()
+		var t := create_tween().bind_node(popup)
 		t.set_parallel(true)
 		t.tween_property(popup, "self_modulate", Color(1, 1, 1, 1), 0.3)
 		t.tween_property(popup, "scale", Vector2(1.3, 1.3), 0.3)
 
 	# Phase 2: settle (0.3→1.0s)
 	for popup in popups:
-		var t := create_tween()
+		var t := create_tween().bind_node(popup)
 		t.tween_property(popup, "scale", Vector2(1.0, 1.0), 0.7).set_delay(0.3)
 
 	# Phase 3: hold (1.0→1.5s, natural)
 
 	# Phase 4: fade out (1.5→2.0s)
 	for popup in popups:
-		var t := create_tween()
+		var t := create_tween().bind_node(popup)
 		t.tween_property(popup, "self_modulate", Color(1, 1, 1, 0), 0.5).set_delay(1.5)
-		t.tween_callback(func(): popup.queue_free()).set_delay(2.1)
+		t.tween_callback(func():
+			if is_instance_valid(popup):
+				popup.queue_free()
+		).set_delay(2.1)
 
 	_pending_reveals.clear()
 
@@ -1891,6 +1924,10 @@ func _on_game_over(winner_id: int, record: MatchRecord) -> void:
 	gesture_panel.hide()
 	action_panel.hide()
 	target_panel.hide()
+	# 慈悲尖塔模式：每层结束都触发 game_over，层推进由 TowerManager 处理，
+	# 不跳转结算场景（否则与塔流程冲突导致崩溃）
+	if GameManager.get("_is_tower_mode"):
+		return
 	SceneManager.pending_game_result = {
 		"winner_id":       winner_id,
 		"elimination_log": _elimination_log.duplicate(true),
@@ -3314,3 +3351,47 @@ func _submit_hiroari() -> void:
 		net_client.submit_hiroari_targets(player_id, targets)
 	else:
 		GameManager.submit_hiroari_targets(player_id, targets)
+
+
+# ============================================================
+#  慈悲尖塔暗色主题覆盖
+# ============================================================
+## 在塔模式启动时调用，将暖白纸面风格替换为暗黑塔门风格
+func apply_tower_theme() -> void:
+	var C_DARK_BG     := Color("#1A1714")
+	var C_DARK_PANEL  := Color("#1C1915")
+	var C_DARK_BORDER := Color("#3A342A")
+	var C_DARK_CARD   := Color("#222018")
+	var C_DARK_TEXT   := Color("#E8E2D5")
+
+	# 日志面板
+	var log_panel: Panel = $LogPanelBg
+	log_panel.add_theme_stylebox_override("panel", _make_flat(C_DARK_PANEL, C_DARK_BORDER, 2, 4))
+
+	# 右侧面板
+	var right_panel: Panel = $RightPanelBg
+	right_panel.add_theme_stylebox_override("panel", _make_flat(C_DARK_PANEL, C_DARK_BORDER, 2, 4))
+
+	# 竞技场边框
+	var border_panel: Panel = $BorderFrame
+	var border_style := StyleBoxFlat.new()
+	border_style.bg_color = Color(1, 1, 1, 0)
+	border_style.border_color = C_DARK_BORDER
+	border_style.set_border_width_all(3)
+	border_style.set_corner_radius_all(6)
+	border_panel.add_theme_stylebox_override("panel", border_style)
+
+	# 全局暗色叠加（微调底色为暗色调）
+	var dark_overlay := ColorRect.new()
+	dark_overlay.color = Color(C_DARK_BG.r, C_DARK_BG.g, C_DARK_BG.b, 0.92)
+	dark_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dark_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dark_overlay.show_behind_parent = true
+	add_child(dark_overlay)
+	move_child(dark_overlay, 0)
+
+	# 刷新已有玩家卡为暗色（在 setup_players 之后的卡片也会被覆盖）
+	# 标记标记：塔模式下的玩家卡在 _make_player_card 中检查
+	_tower_theme_active = true
+
+var _tower_theme_active: bool = false
