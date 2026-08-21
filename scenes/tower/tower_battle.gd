@@ -163,22 +163,29 @@ func _inject_tower_buffs() -> void:
 ## 应用单个 buff 到 PlayerState
 func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 	match buff.get("id", ""):
-		"blade_power":
+		"blade_power", "blade_power_2":
 			p.damage_bonus_basic += buff.get("value", 1.0)
 		"charge_bonus":
 			p.charge_bonus += buff.get("value", 1)
 		"shield_wall":
 			p.damage_reduction += buff.get("value", 1.0)
-		"regen":
+		"regen", "regen_2":
 			p.regen_per_round += buff.get("value", 1.0)
 		"clone":
 			p.clone_count += buff.get("value", 1)
-		"swift":
+		"swift", "swift_2":
 			p.add_energy(buff.get("value", 2))
-		"energy_cap":
+		"energy_cap", "energy_cap_2":
 			p.max_energy += buff.get("value", 2)
-		"protect":
+		"protect", "protect_2":
 			p.shield += buff.get("value", 2)
+		"vitality", "vitality_2":
+			var max_bonus: float = buff.get("value", 3.0)
+			p.max_hp_bonus += max_bonus
+			p.hp += max_bonus  # 同步补血
+		"opening_qi":
+			p.start_energy_bonus += buff.get("value", 2)
+			p.add_energy(buff.get("value", 2))
 
 # ============================================================
 #  层间推进
@@ -210,6 +217,7 @@ func _on_dialogue_generic_finished() -> void:
 	# 战斗中的叙事对话不改变 phase，只是弹出后消失
 
 ## 弹出层间奖励选择界面
+## 精英层（第4/8/12层）通关后可随机到高级祝福
 func _show_reward_selection() -> void:
 	_phase = "reward"
 	if fast_mode:
@@ -219,7 +227,9 @@ func _show_reward_selection() -> void:
 		_on_reward_selected(buff)
 		return
 	_reward_ui.visible = true
-	_reward_ui.start()
+	var cleared_floor: int = tower_mgr.get_current_floor()
+	var is_elite_floor: bool = cleared_floor > 0 and cleared_floor < TowerManager.MAX_FLOORS and cleared_floor % 4 == 0
+	_reward_ui.start(is_elite_floor)
 
 ## 奖励选择完成 → 保存 buff 到 SceneManager → 推进下一层
 func _on_reward_selected(buff: Dictionary) -> void:

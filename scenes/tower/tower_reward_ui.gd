@@ -21,15 +21,26 @@ const C_RED      := Color("#C83030")
 const C_RED_GLOW := Color("#FF6060")
 
 ## ---- 奖励池定义 ----
+## tier: "normal"=小怪层可出；"elite"=仅精英层可出
 const REWARD_POOL := [
-	{ "id": "blade_power",  "name": "锋刃之力", "icon": "⚔", "desc": "普攻伤害 +1", "value": 1.0, "color": Color("#C83030") },
-	{ "id": "charge_bonus", "name": "蓄锐",     "icon": "✦", "desc": "每回合额外聚气 +1", "value": 1, "color": Color("#FAC775") },
-	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -1", "value": 1.0, "color": Color("#6080A0") },
-	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "每回合回复 1 点生命", "value": 1.0, "color": Color("#60C060") },
-	{ "id": "clone",        "name": "影分身",   "icon": "◆", "desc": "开局获得 1 个影分身", "value": 1, "color": Color("#A060C0") },
-	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气", "value": 2, "color": Color("#FAC775") },
-	{ "id": "energy_cap",   "name": "气海",     "icon": "◉", "desc": "气上限 +2", "value": 2, "color": Color("#60C0F0") },
-	{ "id": "protect",      "name": "庇护",     "icon": "❂", "desc": "开局获得 2 点护盾", "value": 2, "color": Color("#C0C0A0") },
+	# ── 普通祝福（小怪层/精英层均可出）──
+	{ "id": "blade_power",  "name": "锋刃之力", "icon": "⚔", "desc": "普攻伤害 +1", "value": 1.0, "color": Color("#C83030"), "tier": "normal" },
+	{ "id": "charge_bonus", "name": "蓄锐",     "icon": "✦", "desc": "每回合额外聚气 +1", "value": 1, "color": Color("#FAC775"), "tier": "normal" },
+	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -0.5", "value": 0.5, "color": Color("#6080A0"), "tier": "normal" },
+	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "自己回合开始时回复 1 点生命", "value": 1.0, "color": Color("#60C060"), "tier": "normal" },
+	{ "id": "clone",        "name": "影分身",   "icon": "◆", "desc": "开局获得 1 个影分身", "value": 1, "color": Color("#A060C0"), "tier": "normal" },
+	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
+	{ "id": "energy_cap",   "name": "气海",     "icon": "◉", "desc": "气上限 +2", "value": 2, "color": Color("#60C0F0"), "tier": "normal" },
+	{ "id": "protect",      "name": "庇护",     "icon": "❂", "desc": "开局获得 2 点护盾", "value": 2, "color": Color("#C0C0A0"), "tier": "normal" },
+	{ "id": "vitality",     "name": "生机",     "icon": "✚", "desc": "生命上限 +3", "value": 3, "color": Color("#60C060"), "tier": "normal" },
+	{ "id": "opening_qi",   "name": "起势",     "icon": "☀", "desc": "开局额外获得 2 点气", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
+	# ── 高级祝福（仅精英层可出）──
+	{ "id": "blade_power_2", "name": "锋芒",     "icon": "⚔", "desc": "普攻伤害 +2", "value": 2.0, "color": Color("#E04040"), "tier": "elite" },
+	{ "id": "regen_2",      "name": "再生",     "icon": "♥", "desc": "自己回合开始时回复 2 点生命", "value": 2.0, "color": Color("#40A040"), "tier": "elite" },
+	{ "id": "swift_2",      "name": "疾风",     "icon": "⚡", "desc": "开局获得 5 点气", "value": 5, "color": Color("#FAC775"), "tier": "elite" },
+	{ "id": "vitality_2",   "name": "龙血",     "icon": "✚", "desc": "生命上限 +5", "value": 5, "color": Color("#40C060"), "tier": "elite" },
+	{ "id": "protect_2",    "name": "铁壁",     "icon": "❂", "desc": "开局获得 5 点护盾", "value": 5, "color": Color("#90B0C0"), "tier": "elite" },
+	{ "id": "energy_cap_2", "name": "天罡",     "icon": "◉", "desc": "气上限 +4", "value": 4, "color": Color("#40C0F0"), "tier": "elite" },
 ]
 
 ## ---- UI 引用 ----
@@ -69,8 +80,9 @@ func _process(delta: float) -> void:
 		stylebox.border_color = border_color
 
 ## 启动奖励选择：随机 3 种不重复奖励
-func start() -> void:
-	_current_choices = _pick_random_rewards(3)
+## allow_elite：true=允许高级祝福（精英层通关后），false=仅普通祝福
+func start(allow_elite: bool = false) -> void:
+	_current_choices = _pick_random_rewards(3, allow_elite)
 	_show_cards(_current_choices)
 	_is_active = true
 	visible = true
@@ -83,8 +95,12 @@ func start_with_choices(choices: Array[Dictionary]) -> void:
 	visible = true
 
 ## 随机选取 n 个不重复奖励
-func _pick_random_rewards(count: int) -> Array[Dictionary]:
-	var pool := REWARD_POOL.duplicate(true)
+## allow_elite=false：仅从 normal 池抽取；true：从 normal+elite 全池抽取
+func _pick_random_rewards(count: int, allow_elite: bool = false) -> Array[Dictionary]:
+	var pool: Array = []
+	for reward in REWARD_POOL:
+		if allow_elite or reward.get("tier", "normal") == "normal":
+			pool.append(reward)
 	pool.shuffle()
 	var result: Array[Dictionary] = []
 	for i in range(min(count, pool.size())):
@@ -94,9 +110,14 @@ func _pick_random_rewards(count: int) -> Array[Dictionary]:
 ## 显示卡片
 func _show_cards(choices: Array[Dictionary]) -> void:
 	# 清除旧卡片
-	for card in _cards:
+	for i in range(_cards.size()):
+		var card := _cards[i]
 		if card != null and is_instance_valid(card):
 			card.queue_free()
+		if i < _card_tweens.size():
+			var tw := _card_tweens[i]
+			if tw != null and is_instance_valid(tw):
+				tw.kill()
 	_cards.clear()
 	_card_tweens.clear()
 
@@ -199,6 +220,7 @@ func _build_card(reward: Dictionary, index: int) -> Panel:
 	# 鼠标悬停信号
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.gui_input.connect(_on_card_input.bind(index))
+	card.mouse_exited.connect(_on_card_unhover.bind(index))
 
 	return card
 
@@ -246,14 +268,40 @@ func _on_card_hover(index: int) -> void:
 	tw.set_parallel(true)
 	tw.tween_method(
 		func(c: Color): stylebox.border_color = c,
-		C_BORDER, C_BORDER_HOVER, 0.2
+		stylebox.border_color, C_BORDER_HOVER, 0.2
 	)
 	tw.tween_method(
 		func(c: Color): stylebox.bg_color = c,
-		C_CARD_BG, C_CARD_HOVER, 0.2
+		stylebox.bg_color, C_CARD_HOVER, 0.2
 	)
 	tw.tween_property(card, "scale", Vector2(1.05, 1.05), 0.2).set_trans(Tween.TRANS_SINE)
 	_card_tweens[index] = tw
+
+## 卡片离开悬停：恢复原样式
+func _on_card_unhover(index: int) -> void:
+	var card := _cards[index]
+	if card == null:
+		return
+	var stylebox := card.get_theme_stylebox("panel") as StyleBoxFlat
+	if stylebox == null:
+		return
+	# 清除悬停动画
+	var tw := _card_tweens[index]
+	if tw != null and is_instance_valid(tw):
+		tw.kill()
+	_card_tweens[index] = null
+	# 恢复边框/背景/缩放
+	var rt := create_tween()
+	rt.set_parallel(true)
+	rt.tween_method(
+		func(c: Color): stylebox.border_color = c,
+		stylebox.border_color, C_BORDER, 0.2
+	)
+	rt.tween_method(
+		func(c: Color): stylebox.bg_color = c,
+		stylebox.bg_color, C_CARD_BG, 0.2
+	)
+	rt.tween_property(card, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_SINE)
 
 ## 卡片离开悬停（通过 mouse_entered/exited 也可以，这里简化处理）
 ## 卡片点击：选中奖励

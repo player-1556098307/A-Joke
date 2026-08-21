@@ -151,10 +151,18 @@ var fury_marks: int = 0
 var damage_bonus_basic: float = 0.0
 ## 每回合额外聚气（蓄锐：+1）
 var charge_bonus: int = 0
-## 固定减伤（坚壁：-1）
+## 固定减伤（坚壁：-0.5）
 var damage_reduction: float = 0.0
-## 每回合回血（回生：+1）
+## 每回合回血（回生：自己回合开始时+1）
 var regen_per_round: float = 0.0
+## 生命上限加成（生机/龙血：+N，注入时加到 max_hp 并同步补血）
+var max_hp_bonus: float = 0.0
+## 开局额外气量（起势/疾风：+N，注入时加到 energy）
+var start_energy_bonus: int = 0
+
+## 有效最大生命值 = 角色基础 + 慈悲尖塔 buff 加成（不污染共享 CharacterData 资源）
+func get_max_hp() -> float:
+	return character.max_hp + max_hp_bonus
 
 ## ── 回合临时数据（每回合开始时重置）───────────────────────────────────────────
 var current_gesture: Gesture           ## 本回合出的手势
@@ -185,6 +193,8 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	charge_bonus        = 0
 	damage_reduction    = 0.0
 	regen_per_round     = 0.0
+	max_hp_bonus        = 0.0
+	start_energy_bonus  = 0
 	pending_skill_index = -1
 	# 秽土柱间·仙人之力：气上限6
 	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判

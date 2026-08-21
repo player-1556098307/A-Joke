@@ -886,6 +886,9 @@ func _start_action_input() -> void:
 		winner.consecutive_rounds = 1
 	_prev_winner_id = _sole_winner_id
 
+	# 慈悲尖塔 buff：回生 — 自己回合开始时回复 regen_per_round 点 HP
+	_process_tower_regen(winner)
+
 	# 鬼才（司马懿）：连续获得两回合时，额外获得一个回合（下回合强制判胜）
 	_process_genius(winner)
 
@@ -895,6 +898,15 @@ func _start_action_input() -> void:
 		var decision := _ai_controller.decide_action(winner, get_alive_players(), _distance_system)
 		print("[GameManager] _start_action_input: AI winner auto-decides action=%d skill=%d target=%d" % [decision["action"], decision["skill_index"], decision["target_id"]])
 		submit_action(_sole_winner_id, decision["action"], decision["skill_index"], decision["target_id"])
+
+## 慈悲尖塔 buff：回生 — 行动权拥有者自己回合开始时回复 regen_per_round 点 HP
+func _process_tower_regen(player: PlayerState) -> void:
+	if player == null or not player.is_alive or player.regen_per_round <= 0 or player.hp <= 0:
+		return
+	var heal: float = min(player.regen_per_round, player.get_max_hp() - player.hp)
+	if heal > 0:
+		player.hp += heal
+		burn_damage_triggered.emit(player.player_id, -heal, player.hp, "回生")
 
 ## 执行胜者行动：CHARGE充能（含影分身加成）或 USE_SKILL释放技能
 func _apply_actions() -> void:
@@ -2122,19 +2134,8 @@ func _process_end_phase() -> void:
 				bell_gained.emit(player.player_id, player.bell_count)
 	# 2. 燃烧/狂战士结算
 	_process_burn_and_berserker()
-	# 2.5 慈悲尖塔 buff：回生每回合回血
-	_process_tower_regen()
 	# 3. 有钟的存活玩家决定是否招架
 	_process_bell_decisions()
-
-## 慈悲尖塔 buff：回生 — 每回合结束回复 regen_per_round 点 HP
-func _process_tower_regen() -> void:
-	for player in _players:
-		if player.is_alive and player.regen_per_round > 0 and player.hp > 0:
-			var heal: float = min(player.regen_per_round, player.character.max_hp - player.hp)
-			if heal > 0:
-				player.hp += heal
-				burn_damage_triggered.emit(player.player_id, -heal, player.hp, "回生")
 
 ## 检查角色是否拥有钟机制（有招架或砸钟技能）
 func _has_bell_mechanic(player: PlayerState) -> bool:

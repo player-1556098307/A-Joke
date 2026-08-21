@@ -560,7 +560,7 @@ func _build_player_card(player: PlayerState) -> Control:
 	# HP text (above bar)
 	var hp_lbl := Label.new()
 	hp_lbl.name = "HpText"
-	hp_lbl.text = "HP %.1f/%.1f" % [player.hp, player.character.max_hp]
+	hp_lbl.text = "HP %.1f/%.1f" % [player.hp, player.get_max_hp()]
 	hp_lbl.add_theme_font_size_override("font_size", 8)
 	hp_lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
 	hp_lbl.position = Vector2(4.0, 0.0)
@@ -580,9 +580,9 @@ func _build_player_card(player: PlayerState) -> Control:
 	# HP bar fill
 	var hp_fill := ColorRect.new()
 	hp_fill.name = "HpBarFill"
-	hp_fill.color = _hp_color(player.hp, player.character.max_hp)
+	hp_fill.color = _hp_color(player.hp, player.get_max_hp())
 	hp_fill.position = Vector2(4.0, 11.0)
-	hp_fill.size = Vector2(96.0 * float(player.hp) / float(player.character.max_hp), 8.0)
+	hp_fill.size = Vector2(96.0 * float(player.hp) / float(player.get_max_hp()), 8.0)
 	hp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	wrap.add_child(hp_fill)
 
@@ -662,7 +662,7 @@ func _build_player_card(player: PlayerState) -> Control:
 	energy_diamond.name = "EnergyDiamond"
 	energy_diamond.color = Color("#185FA5")
 	energy_diamond.size = Vector2(20.0, 20.0)
-	energy_diamond.position = Vector2(82.0, -4.0)  # 右上角，半个菱形露出卡片边缘
+	energy_diamond.position = Vector2(88.0, -14.0)  # 右上角贴边，菱形露出卡片边缘
 	energy_diamond.rotation = PI / 4.0  # 旋转45°成菱形
 	energy_diamond.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	energy_diamond.z_index = 5
@@ -678,7 +678,7 @@ func _build_player_card(player: PlayerState) -> Control:
 	energy_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	energy_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	energy_lbl.size = Vector2(20.0, 20.0)
-	energy_lbl.position = Vector2(78.0, -2.0)  # 不旋转，叠在菱形上
+	energy_lbl.position = Vector2(88.0, -14.0)  # 与菱形中心重合，不旋转
 	energy_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	energy_lbl.z_index = 6
 	body.add_child(energy_lbl)
@@ -990,7 +990,7 @@ func _refresh_player_card(player_id: int) -> void:
 	if player == null or card == null:
 		return
 
-	var max_hp := player.character.max_hp
+	var max_hp := player.get_max_hp()
 
 	# 头像刷新：八门全开时切换到死门形态
 	_refresh_player_avatar(card, player)
