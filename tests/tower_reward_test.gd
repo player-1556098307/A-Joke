@@ -201,7 +201,6 @@ func _test_inject_tower_buffs() -> void:
 		{ "id": "energy_cap", "value": 2 },
 		{ "id": "protect", "value": 2 },
 		{ "id": "vitality", "value": 3 },
-		{ "id": "opening_qi", "value": 2 },
 	]
 
 	tower.start_tower([{ "character": char_data, "is_human": true }])
@@ -236,21 +235,17 @@ func _test_inject_tower_buffs() -> void:
 			"vitality":
 				player.max_hp_bonus += b.get("value", 3)
 				player.hp += b.get("value", 3)
-			"opening_qi":
-				player.start_energy_bonus += b.get("value", 2)
-				player.add_energy(b.get("value", 2))
 
 	_assert(player.damage_bonus_basic == 1.0, "6b: damage_bonus_basic=1（实际=%.1f）" % player.damage_bonus_basic)
 	_assert(player.damage_reduction == 0.5, "6c: damage_reduction=0.5（实际=%.1f）" % player.damage_reduction)
 	_assert(player.charge_bonus == 1, "6d: charge_bonus=1（实际=%d）" % player.charge_bonus)
 	_assert(player.regen_per_round == 1.0, "6e: regen_per_round=1（实际=%.1f）" % player.regen_per_round)
 	_assert(player.clone_count == 1, "6f: clone_count=1（实际=%d）" % player.clone_count)
-	_assert(player.energy == 4, "6g: swift2+opening_qi2=4气（实际=%d）" % player.energy)
+	_assert(player.energy == 2, "6g: swift开局+2气（实际=%d）" % player.energy)
 	_assert(player.max_energy == 1001, "6h: max_energy=999+2=1001（实际=%d）" % player.max_energy)
 	_assert(player.shield == 2, "6i: shield=2（实际=%d）" % player.shield)
 	_assert(player.max_hp_bonus == 3.0, "6j: max_hp_bonus=3（实际=%.1f）" % player.max_hp_bonus)
 	_assert(player.get_max_hp() == player.character.max_hp + 3.0, "6k: get_max_hp=原始上限+3（实际=%.1f）" % player.get_max_hp())
-	_assert(player.start_energy_bonus == 2, "6l: start_energy_bonus=2（实际=%d）" % player.start_energy_bonus)
 
 	# 清理
 	SceneManager.last_tower_config.erase("tower_buffs")
@@ -263,7 +258,7 @@ func _test_reward_ui_pool() -> void:
 	add_child(ui)
 
 	var pool := ui.get_reward_pool()
-	_assert(pool.size() == 16, "7a: 奖励池16种（实际=%d）" % pool.size())
+	_assert(pool.size() == 15, "7a: 奖励池15种（实际=%d）" % pool.size())
 
 	# 每个奖励都有 tier 字段，且只允许 normal/elite 两种值
 	for i in range(pool.size()):
@@ -283,8 +278,8 @@ func _test_reward_ui_pool() -> void:
 		_assert(not rid in ids_seen, "7g%d: 奖励id不重复=%s" % [i, rid])
 		ids_seen.append(rid)
 
-	# 检查 16 种 id 都存在
-	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "energy_cap", "protect", "vitality", "opening_qi", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2", "energy_cap_2"]
+	# 检查 15 种 id 都存在
+	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "energy_cap", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2", "energy_cap_2"]
 	for eid in expected_ids:
 		_assert(eid in ids_seen, "7h: 奖励id=%s 存在" % eid)
 
@@ -296,7 +291,7 @@ func _test_reward_ui_pool() -> void:
 			elite_count += 1
 		else:
 			normal_count += 1
-	_assert(normal_count == 10, "7i: normal池10种（实际=%d）" % normal_count)
+	_assert(normal_count == 9, "7i: normal池9种（实际=%d）" % normal_count)
 	_assert(elite_count == 6, "7j: elite池6种（实际=%d）" % elite_count)
 
 	ui.queue_free()
@@ -492,13 +487,6 @@ func _test_all_buff_types_inject() -> void:
 	_apply_single_buff(player, { "id": "vitality_2", "value": 5 })
 	_assert(player.max_hp_bonus == 5.0, "10m: vitality_2提升max_hp_bonus=5")
 
-	# opening_qi（起势）：开局额外气
-	player.energy = 0
-	player.start_energy_bonus = 0
-	_apply_single_buff(player, { "id": "opening_qi", "value": 2 })
-	_assert(player.start_energy_bonus == 2, "10n: opening_qi记录start_energy_bonus=2")
-	_assert(player.energy == 2, "10o: opening_qi开局+2气")
-
 	# blade_power_2（锋芒/精英）：普攻+2
 	player.damage_bonus_basic = 0.0
 	_apply_single_buff(player, { "id": "blade_power_2", "value": 2.0 })
@@ -564,9 +552,6 @@ func _apply_single_buff(p: PlayerState, buff: Dictionary) -> void:
 		"vitality", "vitality_2":
 			p.max_hp_bonus += buff.get("value", 3)
 			p.hp += buff.get("value", 3)
-		"opening_qi":
-			p.start_energy_bonus += buff.get("value", 2)
-			p.add_energy(buff.get("value", 2))
 
 func _assert(cond: bool, msg: String) -> void:
 	if cond:

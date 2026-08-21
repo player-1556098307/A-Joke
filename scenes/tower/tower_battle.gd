@@ -183,9 +183,6 @@ func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 			var max_bonus: float = buff.get("value", 3.0)
 			p.max_hp_bonus += max_bonus
 			p.hp += max_bonus  # 同步补血
-		"opening_qi":
-			p.start_energy_bonus += buff.get("value", 2)
-			p.add_energy(buff.get("value", 2))
 
 # ============================================================
 #  层间推进

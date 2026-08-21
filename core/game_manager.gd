@@ -871,7 +871,7 @@ func _start_action_input() -> void:
 		_enter_phase(GamePhase.APPLYING)
 		return
 
-	# 防反状态持续到自己的下个回合开始时清除
+	# 防反状态：触发后已在结算时取消；此处清理未触发而残留到下回合开始的防反
 	if winner.counter_stance:
 		winner.counter_stance = false
 		counter_stance_ended.emit(winner.player_id)
@@ -1359,6 +1359,7 @@ func _emit_effect_signals(entry: Dictionary) -> void:
 				clone_destroyed.emit(entry["target_id"])
 			if res.get("counter_stance_triggered", false):
 				counter_stance_triggered.emit(entry["target_id"], entry.get("attacker_id", -1))
+				counter_stance_ended.emit(entry["target_id"])  # 防反触发后取消招架状态
 			if res.get("uchiha_counter_triggered", false):
 				uchiha_counter_triggered.emit(entry["target_id"], entry.get("attacker_id", -1))
 		SkillEffect.EffectType.SHIELD:
@@ -1389,6 +1390,10 @@ func _emit_effect_signals(entry: Dictionary) -> void:
 		SkillEffect.EffectType.COUNTER_STANCE:
 			counter_stance_entered.emit(entry["target_id"])
 		SkillEffect.EffectType.TRUE_DAMAGE:
+			# 真实伤害中防反触发后取消招架状态
+			if res.get("counter_stance_triggered", false):
+				counter_stance_triggered.emit(entry["target_id"], entry.get("attacker_id", -1))
+				counter_stance_ended.emit(entry["target_id"])
 			# 真实伤害日志已通过 skill_applied 信号传递，此处无需额外信号
 			pass
 		SkillEffect.EffectType.PIERCE_DAMAGE:
@@ -1404,6 +1409,9 @@ func _emit_effect_signals(entry: Dictionary) -> void:
 		SkillEffect.EffectType.FTG_MARK:
 			if res.get("ftg_marked", false):
 				ftg_mark_applied.emit(entry["target_id"], entry.get("attacker_id", -1))
+			if res.get("counter_stance_triggered", false):
+				counter_stance_triggered.emit(entry["target_id"], entry.get("attacker_id", -1))
+				counter_stance_ended.emit(entry["target_id"])
 		SkillEffect.EffectType.FTG_CHARGE:
 			ftg_marks_changed.emit(entry["target_id"], res.get("ftg_marks", 0))
 		SkillEffect.EffectType.FTG_REMOVE:
@@ -2324,6 +2332,9 @@ func _apply_delayed_damage(player: PlayerState, damage: float, attacker_id: int 
 				if a_stats:
 					a_stats.total_damage_taken += 1.0
 				counter_stance_triggered.emit(player.player_id, attacker_id)
+		# 触发后取消招架状态
+		player.counter_stance = false
+		counter_stance_ended.emit(player.player_id)
 	elif player.clone_count > 0:
 		# 影分身吸收
 		player.clone_count -= 1
@@ -3042,6 +3053,7 @@ func _apply_nine_tails_damage(target: PlayerState, damage: float, caster: Player
 	var dmg: float = damage
 	# 防反拦截
 	## 被控制（麻痹/封技）期间：招架状态保留但不触发
+	## 触发后立即取消招架状态（一次性的防反）
 	if target.counter_stance and not RoundResolver.is_controlled(target):
 		dmg = ceilf(dmg / 2.0)
 		target.add_energy(1)
@@ -3054,6 +3066,9 @@ func _apply_nine_tails_damage(target: PlayerState, damage: float, caster: Player
 		if a_stats:
 			a_stats.total_damage_taken += 1.0
 		counter_stance_triggered.emit(target.player_id, caster.player_id)
+		# 触发后取消招架状态
+		target.counter_stance = false
+		counter_stance_ended.emit(target.player_id)
 	elif target.clone_count > 0:
 		target.clone_count -= 1
 		dmg = 0

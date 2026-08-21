@@ -29,11 +29,10 @@ const REWARD_POOL := [
 	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -0.5", "value": 0.5, "color": Color("#6080A0"), "tier": "normal" },
 	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "自己回合开始时回复 1 点生命", "value": 1.0, "color": Color("#60C060"), "tier": "normal" },
 	{ "id": "clone",        "name": "影分身",   "icon": "◆", "desc": "开局获得 1 个影分身", "value": 1, "color": Color("#A060C0"), "tier": "normal" },
-	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
+	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气（可叠加）", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
 	{ "id": "energy_cap",   "name": "气海",     "icon": "◉", "desc": "气上限 +2", "value": 2, "color": Color("#60C0F0"), "tier": "normal" },
 	{ "id": "protect",      "name": "庇护",     "icon": "❂", "desc": "开局获得 2 点护盾", "value": 2, "color": Color("#C0C0A0"), "tier": "normal" },
 	{ "id": "vitality",     "name": "生机",     "icon": "✚", "desc": "生命上限 +3", "value": 3, "color": Color("#60C060"), "tier": "normal" },
-	{ "id": "opening_qi",   "name": "起势",     "icon": "☀", "desc": "开局额外获得 2 点气", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
 	# ── 高级祝福（仅精英层可出）──
 	{ "id": "blade_power_2", "name": "锋芒",     "icon": "⚔", "desc": "普攻伤害 +2", "value": 2.0, "color": Color("#E04040"), "tier": "elite" },
 	{ "id": "regen_2",      "name": "再生",     "icon": "♥", "desc": "自己回合开始时回复 2 点生命", "value": 2.0, "color": Color("#40A040"), "tier": "elite" },

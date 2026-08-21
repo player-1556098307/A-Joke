@@ -150,6 +150,7 @@ static func apply_effects(
 
 ## 判断目标是否处于被控制状态（麻痹或封技）
 ## 规则：招架（防反）状态在被控制期间保留但不触发，控制解除后自然按原有规则过期
+## 防反为一次性状态：触发后立即取消，未触发则持续到自身下回合开始时清除
 static func is_controlled(player: PlayerState) -> bool:
 	return player.paralyze_turns > 0 or player.skill_disabled_turns > 0 or player.knockdown_turns > 0
 
@@ -296,13 +297,14 @@ static func _apply_single_effect(
 				# 招架受击后解除
 				target.uchiha_stance = false
 			# 防反拦截：减半伤害+免疫控制+获得1气+反击1伤
-			## 防反为持续状态：触发后保持到自身下回合开始（_start_action_input）才清除
+			## 防反触发后立即取消招架状态（一次性的防反）
 			## 被控制（麻痹/封技）期间：招架状态保留但不触发（不减伤、不得气、不反击）
 			if target.counter_stance and not is_controlled(target):
 				dmg = ceilf(dmg / 2.0)
 				counter_stance_triggered = true
 				target.add_energy(1)
 				attacker.hp = max(0.0, attacker.hp - 1.0)
+				target.counter_stance = false  # 触发后取消招架
 			if target.clone_count > 0:
 				target.clone_count -= 1
 				absorbed = raw
@@ -346,11 +348,13 @@ static func _apply_single_effect(
 				attacker.skill_disabled_turns = max(attacker.skill_disabled_turns, 1)
 				target.uchiha_stance = false
 			# 防反：减半 + 获得1气 + 反击1伤（伤害减免状态照常生效）
+			## 触发后立即取消招架状态（一次性的防反）
 			if target.counter_stance and not is_controlled(target):
 				tdmg = ceilf(tdmg / 2.0)
 				counter_stance_triggered = true
 				target.add_energy(1)
 				attacker.hp = max(0.0, attacker.hp - 1.0)
+				target.counter_stance = false  # 触发后取消招架
 			# 分身抵挡（防御机制照常生效）
 			if target.clone_count > 0:
 				target.clone_count -= 1
@@ -505,6 +509,7 @@ static func _apply_single_effect(
 				ftg_counter_triggered = true
 				target.add_energy(1)
 				attacker.hp = max(0.0, attacker.hp - 1.0)
+				target.counter_stance = false  # 触发后取消招架
 			if target.clone_count > 0:
 				target.clone_count -= 1
 				ftg_dmg = 0

@@ -413,7 +413,8 @@ func _ready() -> void:
 	_assert(h26_skills.size() == 1 and h26_skills[0].skill_name == "普攻", "26f: 禁锢后仅保留普攻（招架不可用）")
 
 	# ── 测试27：带伤害技能的控制效果仍被招架免疫 ──────────────────
-	# 树界降诞（1伤+禁锢2）打在招架目标上：伤害减半、控制免疫、防反触发
+	# 树界降诞（1伤+禁锢2）打在招架目标上：伤害减半、防反触发后取消招架状态
+	# 防反为一次性：DAMAGE效果触发防反后counter_stance=false，后续PARALYZE/DISABLE_SKILL不再被免疫
 	var e27 := PlayerState.new(0, "秽土柱间", edo_char, true)
 	var h27 := PlayerState.new(1, "侠影柱间", orig_hashirama, false)
 	h27.counter_stance = true
@@ -422,9 +423,9 @@ func _ready() -> void:
 	e27.energy = 2
 	var logs27 := RoundResolver.apply_effects(e27, sjj, [h27], dist27)
 	_assert(h27.hp == 9.0, "27a: 侠影柱间HP10-树界1伤(减半取整1)=9 实际=" + str(h27.hp))
-	_assert(h27.paralyze_turns == 0, "27b: 招架免疫麻痹实际=" + str(h27.paralyze_turns))
-	_assert(h27.skill_disabled_turns == 0, "27c: 招架免疫封技实际=" + str(h27.skill_disabled_turns))
-	_assert(h27.counter_stance, "27d: 招架状态持续（防反为持续状态）")
+	_assert(h27.paralyze_turns == 2, "27b: 防反触发后取消招架，麻痹生效2回合实际=" + str(h27.paralyze_turns))
+	_assert(h27.skill_disabled_turns == 2, "27c: 防反触发后取消招架，封技生效2回合实际=" + str(h27.skill_disabled_turns))
+	_assert(not h27.counter_stance, "27d: 防反触发后招架状态已取消（一次性防反）")
 
 	# ── 测试28：招架状态被控制（麻痹/封技）后，受击不触发防反 ─────
 	# 用户规则：招架状态保留但不触发——被麻痹/封技期间受击不减伤、不得气、不反击
