@@ -17,6 +17,7 @@ var _phase: String = "idle"  ## "idle", "transition", "entry_dialogue", "battle"
 var _reward_ui: TowerRewardUI
 var _buff_btn: Button
 var _buff_panel: Panel
+var _buff_panel_box: VBoxContainer  ## 面板内布局容器（Panel 非容器，须用 VBox 排布子控件）
 var _buff_panel_visible: bool = false
 
 ## 测试快速模式：跳过所有过渡动画和对话，直接启动战斗/推进层
@@ -255,18 +256,24 @@ func _build_buff_panel() -> Panel:
 	style.content_margin_top = 10
 	style.content_margin_bottom = 10
 	panel.add_theme_stylebox_override("panel", style)
-	# 浮窗位置：右下角按钮上方
-	panel.anchor_left = 1.0
-	panel.anchor_right = 1.0
-	panel.anchor_top = 1.0
-	panel.anchor_bottom = 1.0
-	panel.offset_left = -260
-	panel.offset_right = -10
-	panel.offset_top = -320
-	panel.offset_bottom = -50
+	# 浮窗位置：左侧战斗日志旁（避开右侧手势选择区 774~956）
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left = 204.0
+	panel.offset_right = 204.0 + 250.0
+	panel.offset_top = 200.0
+	panel.offset_bottom = 200.0 + 270.0
 	panel.z_index = 5
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.visible = false
+	# 内部 VBox 容器：负责标题/分隔线/buff条目/提示的垂直布局
+	_buff_panel_box = VBoxContainer.new()
+	_buff_panel_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_buff_panel_box.add_theme_constant_override("separation", 6)
+	_buff_panel_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(_buff_panel_box)
 	return panel
 
 ## 切换 buff 浮窗显示/隐藏
@@ -280,8 +287,10 @@ func _toggle_buff_panel() -> void:
 
 ## 刷新浮窗内容：清空并重建已获取 buff 列表
 func _refresh_buff_panel() -> void:
-	# 清空旧内容
-	for child in _buff_panel.get_children():
+	# 清空旧内容：立即移出并释放，避免 queue_free 延迟导致新旧节点短暂共存
+	var old_children := _buff_panel_box.get_children()
+	for child in old_children:
+		_buff_panel_box.remove_child(child)
 		child.queue_free()
 
 	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
@@ -293,14 +302,14 @@ func _refresh_buff_panel() -> void:
 	title.add_theme_color_override("font_color", Color("#FAC775"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_buff_panel.add_child(title)
+	_buff_panel_box.add_child(title)
 
 	# 分隔线
 	var sep := ColorRect.new()
 	sep.color = Color("#8B2020")
 	sep.custom_minimum_size = Vector2(0, 1)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_buff_panel.add_child(sep)
+	_buff_panel_box.add_child(sep)
 
 	# 逐条显示
 	for b in buffs:
@@ -336,7 +345,7 @@ func _refresh_buff_panel() -> void:
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(desc)
-		_buff_panel.add_child(row)
+		_buff_panel_box.add_child(row)
 
 	# 关闭提示
 	var hint := Label.new()
@@ -345,7 +354,7 @@ func _refresh_buff_panel() -> void:
 	hint.add_theme_color_override("font_color", Color("#605040"))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_buff_panel.add_child(hint)
+	_buff_panel_box.add_child(hint)
 
 ## 根据 buff id 从奖励池查找完整信息（图标/名称/效果）
 func _find_reward_by_id(buff_id: String) -> Dictionary:

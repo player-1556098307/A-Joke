@@ -65,9 +65,30 @@ func _ready() -> void:
 	battle._toggle_buff_panel()
 	_assert(battle._buff_panel_visible and battle._buff_panel.visible, "13: 点击后面板弹出")
 
-	# 面板内容：标题+分隔线+2行buff+关闭提示 = 5 个子节点
-	var child_count: int = battle._buff_panel.get_child_count()
+	# 等待一帧让 VBox 完成子节点布局
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# 面板内容：标题+分隔线+2行buff+关闭提示 = 5 个子节点（VBox 容器内）
+	var child_count: int = battle._buff_panel_box.get_child_count()
 	_assert(child_count == 5, "14: 面板有5个子节点（标题+分隔+2行+提示）（实际=%d）" % child_count)
+
+	# 布局验证：VBox 内子节点纵向排列且不重叠（位置递增）
+	var prev_bottom: float = -1.0
+	var layout_ok: bool = true
+	for c in battle._buff_panel_box.get_children():
+		if c is Control:
+			var ctl: Control = c
+			if ctl.position.y < prev_bottom:
+				layout_ok = false
+			prev_bottom = ctl.position.y + ctl.size.y
+	_assert(layout_ok, "14b: 面板子节点纵向排列不重叠（位置递增）")
+
+	# 面板位置避开右侧手势区（game_ui.tscn GesturePanel: 774,88 - 946,532）
+	var panel_rect: Rect2 = battle._buff_panel.get_global_rect()
+	var gesture_rect := Rect2(774, 88, 172, 444)
+	var inter: Rect2 = panel_rect.intersection(gesture_rect)
+	_assert(not inter.has_area(), "14c: buff面板不与右侧手势区重叠（面板=%s 手势区=%s 重叠=%s）" % [panel_rect, gesture_rect, inter])
 
 	# 再次点击 → 面板隐藏
 	battle._toggle_buff_panel()
