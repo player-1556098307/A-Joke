@@ -655,15 +655,30 @@ func _build_player_card(player: PlayerState) -> Control:
 	name_lbl.anchor_right = 1.0; name_lbl.anchor_bottom = 1.0
 	name_bar.add_child(name_lbl)
 
-	# Energy (top-right of body)
+	# Energy — 右上角菱形蓝色方片 + 白色黑体数字
+	var energy_diamond := ColorRect.new()
+	energy_diamond.name = "EnergyDiamond"
+	energy_diamond.color = Color("#185FA5")
+	energy_diamond.size = Vector2(20.0, 20.0)
+	energy_diamond.position = Vector2(82.0, -4.0)  # 右上角，半个菱形露出卡片边缘
+	energy_diamond.rotation = PI / 4.0  # 旋转45°成菱形
+	energy_diamond.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	energy_diamond.z_index = 5
+	body.add_child(energy_diamond)
+
 	var energy_lbl := Label.new()
 	energy_lbl.name = "EnergyLabel"
-	energy_lbl.text = "⚡%d" % player.energy
-	energy_lbl.add_theme_font_size_override("font_size", 9)
-	energy_lbl.add_theme_color_override("font_color", Color("#BA7517"))
-	energy_lbl.position = Vector2(72.0, 2.0)
-	energy_lbl.size = Vector2(28.0, 14.0)
+	energy_lbl.text = "%d" % player.energy
+	energy_lbl.add_theme_font_size_override("font_size", 13)
+	energy_lbl.add_theme_color_override("font_color", Color("#FFFFFF"))
+	energy_lbl.add_theme_color_override("font_outline_color", Color("#0A2A50"))
+	energy_lbl.add_theme_constant_override("outline_size", 1)
+	energy_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	energy_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	energy_lbl.size = Vector2(20.0, 20.0)
+	energy_lbl.position = Vector2(78.0, -2.0)  # 不旋转，叠在菱形上
 	energy_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	energy_lbl.z_index = 6
 	body.add_child(energy_lbl)
 
 	# Distance (non-human, top-left of body)
@@ -772,7 +787,7 @@ func _refresh_player_card(player_id: int) -> void:
 	if body:
 		var energy_lbl: Label = body.get_node_or_null("EnergyLabel")
 		if energy_lbl:
-			energy_lbl.text = "⚡%d" % player.energy
+			energy_lbl.text = "%d" % player.energy
 		var dist_lbl: Label = body.get_node_or_null("DistLabel")
 		if dist_lbl and _human_player_id >= 0 and player_id != _human_player_id:
 			dist_lbl.text = "↔%d" % GameManager.get_distance(_human_player_id, player_id)
