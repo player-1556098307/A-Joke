@@ -533,8 +533,14 @@ func setup_players(players: Array[PlayerState]) -> void:
 	_refresh_all_distances()
 	_rebuild_distance_labels()
 
+	# 重建日志过滤按钮：清空旧按钮，避免塔模式每层 setup_players 累积
+	for child in _log_filter_buttons.get_children():
+		child.queue_free()
+	_log_filter_pid = -1
+	_add_filter_button("全部", -1)
 	for p in players:
 		_add_filter_button(p.character.character_name, p.player_id)
+	_rebuild_log_display()
 
 func _get_cls(player: PlayerState) -> String:
 	return player.character.tags[0] if player.character.tags.size() > 0 else "战士"
