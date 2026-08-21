@@ -15,6 +15,9 @@ var _glow_base_a: float = 0.0  ## 光晕基础透明度
 var _glow_timer: float = 0.0
 var _phase: String = "idle"  ## "idle", "transition", "entry_dialogue", "battle", "exit_dialogue", "reward", "result"
 var _reward_ui: TowerRewardUI
+var _buff_btn: Button
+var _buff_panel: Panel
+var _buff_panel_visible: bool = false
 
 ## 测试快速模式：跳过所有过渡动画和对话，直接启动战斗/推进层
 var fast_mode: bool = false
@@ -89,6 +92,32 @@ func _ready() -> void:
 	_reward_ui.visible = false
 	add_child(_reward_ui)
 
+	# 查看已获取 buff 的小按钮（右下角）
+	_buff_btn = Button.new()
+	_buff_btn.text = "✦ 祝福"
+	_buff_btn.add_theme_font_size_override("font_size", 13)
+	_buff_btn.add_theme_color_override("font_color", Color("#FAC775"))
+	_buff_btn.add_theme_color_override("font_hover_color", Color("#FFD080"))
+	_buff_btn.add_theme_stylebox_override("normal", _make_buff_btn_style(Color("#1A0A0A"), Color("#8B2020")))
+	_buff_btn.add_theme_stylebox_override("hover", _make_buff_btn_style(Color("#2A1010"), Color("#FF4040")))
+	_buff_btn.add_theme_stylebox_override("pressed", _make_buff_btn_style(Color("#0D0A08"), Color("#8B2020")))
+	_buff_btn.anchor_left = 1.0
+	_buff_btn.anchor_right = 1.0
+	_buff_btn.anchor_top = 1.0
+	_buff_btn.anchor_bottom = 1.0
+	_buff_btn.offset_left = -100
+	_buff_btn.offset_right = -10
+	_buff_btn.offset_top = -40
+	_buff_btn.offset_bottom = -10
+	_buff_btn.z_index = 4
+	_buff_btn.visible = false
+	_buff_btn.pressed.connect(_toggle_buff_panel)
+	add_child(_buff_btn)
+
+	# buff 浮窗面板（默认隐藏，点击按钮切换）
+	_buff_panel = _build_buff_panel()
+	add_child(_buff_panel)
+
 	# 连接 TowerManager 信号
 	tower_mgr.floor_changed.connect(_on_floor_changed)
 	tower_mgr.floor_cleared.connect(_on_floor_cleared)
@@ -146,6 +175,8 @@ func _begin_floor_battle(_floor_num: int) -> void:
 	_ui.setup_players(GameManager.get_alive_players())
 	_enemy_name = tower_mgr.get_current_enemy_name()
 	_floor_label.text = "慈悲尖塔 第%d层 — %s" % [tower_mgr.get_current_floor(), _enemy_name]
+	# 战斗阶段显示 buff 查看按钮（有祝福时才显示）
+	_update_buff_btn_visibility()
 
 ## 注入慈悲尖塔层间奖励 buff 到玩家队（每层 setup_game 后调用）
 func _inject_tower_buffs() -> void:
@@ -183,6 +214,159 @@ func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 			p.hp += max_bonus  # 同步补血
 
 # ============================================================
+#  Buff 查看浮窗
+# ============================================================
+
+## buff 按钮样式辅助
+func _make_buff_btn_style(bg: Color, border: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.border_width_left = 1
+	s.border_width_right = 1
+	s.border_width_top = 1
+	s.border_width_bottom = 1
+	s.border_color = border
+	s.corner_radius_top_left = 6
+	s.corner_radius_top_right = 6
+	s.corner_radius_bottom_left = 6
+	s.corner_radius_bottom_right = 6
+	s.content_margin_left = 8
+	s.content_margin_right = 8
+	s.content_margin_top = 4
+	s.content_margin_bottom = 4
+	return s
+
+## 构建 buff 浮窗面板（默认隐藏）
+func _build_buff_panel() -> Panel:
+	var panel := Panel.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#0D0A08", 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color("#8B2020")
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+	# 浮窗位置：右下角按钮上方
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = -260
+	panel.offset_right = -10
+	panel.offset_top = -320
+	panel.offset_bottom = -50
+	panel.z_index = 5
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.visible = false
+	return panel
+
+## 切换 buff 浮窗显示/隐藏
+func _toggle_buff_panel() -> void:
+	_buff_panel_visible = not _buff_panel_visible
+	if _buff_panel_visible:
+		_refresh_buff_panel()
+		_buff_panel.visible = true
+	else:
+		_buff_panel.visible = false
+
+## 刷新浮窗内容：清空并重建已获取 buff 列表
+func _refresh_buff_panel() -> void:
+	# 清空旧内容
+	for child in _buff_panel.get_children():
+		child.queue_free()
+
+	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+
+	# 标题
+	var title := Label.new()
+	title.text = "已获祝福" if not buffs.is_empty() else "尚未获得祝福"
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color("#FAC775"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buff_panel.add_child(title)
+
+	# 分隔线
+	var sep := ColorRect.new()
+	sep.color = Color("#8B2020")
+	sep.custom_minimum_size = Vector2(0, 1)
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buff_panel.add_child(sep)
+
+	# 逐条显示
+	for b in buffs:
+		var reward: Dictionary = _find_reward_by_id(b.get("id", ""))
+		if reward.is_empty():
+			continue
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 6)
+		# 图标
+		var icon := Label.new()
+		icon.text = reward.get("icon", "?")
+		icon.add_theme_font_size_override("font_size", 16)
+		icon.add_theme_color_override("font_color", reward.get("color", Color("#FAC775")))
+		icon.custom_minimum_size = Vector2(24, 0)
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+		# 名称
+		var name := Label.new()
+		name.text = reward.get("name", "")
+		name.add_theme_font_size_override("font_size", 13)
+		name.add_theme_color_override("font_color", Color("#E8E2D5"))
+		name.custom_minimum_size = Vector2(70, 0)
+		name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(name)
+		# 效果
+		var desc := Label.new()
+		desc.text = reward.get("desc", "")
+		desc.add_theme_font_size_override("font_size", 12)
+		desc.add_theme_color_override("font_color", Color("#9A9182"))
+		desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(desc)
+		_buff_panel.add_child(row)
+
+	# 关闭提示
+	var hint := Label.new()
+	hint.text = "再次点击关闭"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color("#605040"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buff_panel.add_child(hint)
+
+## 根据 buff id 从奖励池查找完整信息（图标/名称/效果）
+func _find_reward_by_id(buff_id: String) -> Dictionary:
+	for reward in TowerRewardUI.REWARD_POOL:
+		if reward.get("id", "") == buff_id:
+			return reward
+	return {}
+
+## 隐藏 buff 面板（奖励选择/对话/过渡等阶段时调用）
+func _hide_buff_panel() -> void:
+	_buff_panel_visible = false
+	_buff_panel.visible = false
+
+## 更新 buff 按钮可见性（有已获取祝福且在战斗阶段时显示）
+func _update_buff_btn_visibility() -> void:
+	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	_buff_btn.visible = _phase == "battle" and not buffs.is_empty()
+	if not _buff_btn.visible:
+		_hide_buff_panel()
+
+# ============================================================
 #  层间推进
 # ============================================================
 
@@ -195,6 +379,8 @@ func _on_floor_cleared(floor_num: int, enemy_name: String) -> void:
 	if fast_mode:
 		_show_reward_selection()
 		return
+	_hide_buff_panel()
+	_buff_btn.visible = false
 	_phase = "exit_dialogue"
 	var exit_dlg: Dictionary = tower_mgr.get_exit_dialogue()
 	if exit_dlg.is_empty():
@@ -215,6 +401,8 @@ func _on_dialogue_generic_finished() -> void:
 ## 精英层（第4/8/12层）通关后可随机到高级祝福
 func _show_reward_selection() -> void:
 	_phase = "reward"
+	_hide_buff_panel()
+	_buff_btn.visible = false
 	if fast_mode:
 		# fast_mode：自动选择第一个奖励（测试用）
 		var pool := TowerRewardUI.REWARD_POOL
@@ -238,6 +426,7 @@ func _on_reward_selected(buff: Dictionary) -> void:
 	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
 	buffs.append(buff)
 	SceneManager.last_tower_config["tower_buffs"] = buffs
+	# 下一层战斗开始时由 _update_buff_btn_visibility 重新显示按钮
 	_proceed_to_next_floor()
 
 ## 推进到下一层（正常模式=过渡动画，fast_mode=直接启动）

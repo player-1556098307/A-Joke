@@ -46,6 +46,38 @@ func _ready() -> void:
 	await get_tree().create_timer(1.5).timeout
 	_assert(ui._player_cards.size() >= 2, "9: 结算后卡片仍在（实际=%d）" % ui._player_cards.size())
 
+	# --- buff 查看按钮测试 ---
+	# 无祝福时按钮应隐藏
+	SceneManager.last_tower_config.erase("tower_buffs")
+	battle._update_buff_btn_visibility()
+	_assert(not battle._buff_btn.visible, "10: 无祝福时buff按钮隐藏")
+	_assert(not battle._buff_panel.visible, "11: 无祝福时buff面板隐藏")
+
+	# 模拟获得一个 buff
+	SceneManager.last_tower_config["tower_buffs"] = [
+		{ "id": "blade_power", "value": 1.0 },
+		{ "id": "shield_wall", "value": 0.5 },
+	]
+	battle._update_buff_btn_visibility()
+	_assert(battle._buff_btn.visible, "12: 有祝福+战斗阶段时buff按钮显示")
+
+	# 点击按钮 → 面板弹出
+	battle._toggle_buff_panel()
+	_assert(battle._buff_panel_visible and battle._buff_panel.visible, "13: 点击后面板弹出")
+
+	# 面板内容：标题+分隔线+2行buff+关闭提示 = 5 个子节点
+	var child_count: int = battle._buff_panel.get_child_count()
+	_assert(child_count == 5, "14: 面板有5个子节点（标题+分隔+2行+提示）（实际=%d）" % child_count)
+
+	# 再次点击 → 面板隐藏
+	battle._toggle_buff_panel()
+	_assert(not battle._buff_panel_visible and not battle._buff_panel.visible, "15: 再次点击面板隐藏")
+
+	# 切换到非战斗阶段 → 按钮应隐藏
+	battle._phase = "reward"
+	battle._update_buff_btn_visibility()
+	_assert(not battle._buff_btn.visible, "16: 非战斗阶段按钮隐藏")
+
 	print("=== 塔战斗冒烟测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
 
