@@ -9,6 +9,10 @@ extends Control
 var _floor_label: Label
 var _transition: TowerFloorTransition
 var _dialogue_box: DialogueBox
+var _portrait: TextureRect
+var _glow: ColorRect
+var _glow_base_a: float = 0.0  ## 光晕基础透明度
+var _glow_timer: float = 0.0
 var _phase: String = "idle"  ## "idle", "transition", "entry_dialogue", "battle", "exit_dialogue", "result"
 
 ## 测试快速模式：跳过所有过渡动画和对话，直接启动战斗/推进层
@@ -45,10 +49,36 @@ func _ready() -> void:
 	_transition.transition_finished.connect(_on_transition_finished)
 	add_child(_transition)
 
+	# 梅塔特隆立绘（全屏背景，半透明，退场/战斗中叙事对话时淡入淡出）
+	_portrait = TextureRect.new()
+	var portrait_tex: Texture2D = load("res://resources/portraits/metatron_gate.png")
+	if portrait_tex:
+		_portrait.texture = portrait_tex
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_portrait.self_modulate = Color(1, 1, 1, 0)
+	_portrait.z_index = 0
+	_portrait.visible = false
+	add_child(_portrait)
+
+	# 金色光晕（全屏背景，脉冲呼吸）
+	_glow = ColorRect.new()
+	_glow.color = Color("#FAC775")
+	_glow.self_modulate = Color(1, 1, 1, 0)
+	_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_glow.z_index = 0
+	_glow.visible = false
+	add_child(_glow)
+
 	# 退场/战斗中叙事 DialogueBox
 	_dialogue_box = DialogueBox.new()
 	_dialogue_box.dialogue_finished.connect(_on_dialogue_generic_finished)
+	_dialogue_box.line_shown.connect(_on_line_shown)
 	_dialogue_box.visible = false
+	_dialogue_box.z_index = 2
 	add_child(_dialogue_box)
 
 	# 连接 TowerManager 信号
@@ -132,6 +162,7 @@ func _on_floor_cleared(floor_num: int, enemy_name: String) -> void:
 ## 退场对话结束 → 推进下一层
 func _on_dialogue_generic_finished() -> void:
 	_dialogue_box.visible = false
+	_fade_portrait(false)
 	if _phase == "exit_dialogue":
 		_proceed_to_next_floor()
 	# 战斗中的叙事对话不改变 phase，只是弹出后消失
@@ -168,6 +199,7 @@ func _on_tower_victory() -> void:
 		_go_to_victory_result()
 
 func _on_victory_dialogue_finished() -> void:
+	_fade_portrait(false)
 	_go_to_victory_result()
 
 func _go_to_victory_result() -> void:
@@ -246,3 +278,32 @@ func _on_player_eliminated(_player_id: int) -> void:
 	}
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
+
+# ============================================================
+#  梅塔特隆立绘
+# ============================================================
+
+func _process(delta: float) -> void:
+	# 光晕脉冲呼吸
+	if _glow != null and is_instance_valid(_glow) and _glow.visible:
+		_glow_timer += delta
+		var pulse := _glow_base_a + 0.04 * sin(_glow_timer * 2.0)
+		_glow.self_modulate.a = pulse
+
+## 对话行显示时：梅塔特隆说话→立绘淡入，其他（旁白/敌人）→淡出
+func _on_line_shown(speaker: String, _text: String, _index: int) -> void:
+	if speaker == "神官 · 梅塔特隆":
+		_fade_portrait(true)
+	else:
+		_fade_portrait(false)
+
+## 立绘淡入/淡出
+func _fade_portrait(visible_in: bool) -> void:
+	if _portrait == null or not is_instance_valid(_portrait):
+		return
+	_portrait.visible = true
+	_glow.visible = true
+	var target_a := 0.8 if visible_in else 0.0
+	_glow_base_a = 0.15 if visible_in else 0.0
+	var tw := create_tween()
+	tw.tween_property(_portrait, "self_modulate:a", target_a, 0.5).set_trans(Tween.TRANS_SINE)

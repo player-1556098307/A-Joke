@@ -17,6 +17,10 @@ var _floor_label: Label
 var _enemy_label: Label
 var _subtitle_label: Label
 var _dialogue_box: DialogueBox
+var _portrait: TextureRect
+var _glow: ColorRect
+var _glow_base_a: float = 0.0  ## 光晕基础透明度（由 _fade_portrait 控制）
+var _glow_timer: float = 0.0
 var _fade_duration: float = 0.6
 var _hold_duration: float = 1.5
 var _elapsed: float = 0.0
@@ -30,6 +34,11 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 func _process(delta: float) -> void:
+	# 光晕脉冲呼吸（在基础透明度上叠加 ±0.04 脉冲）
+	if _glow != null and is_instance_valid(_glow):
+		_glow_timer += delta
+		var pulse := _glow_base_a + 0.04 * sin(_glow_timer * 2.0)
+		_glow.self_modulate.a = pulse
 	if _phase == "fade_in":
 		_elapsed += delta
 		var alpha := clampf(_elapsed / _fade_duration, 0.0, 1.0)
@@ -67,6 +76,8 @@ func start(floor_num: int, enemy_name: String, dialogue_data: Dictionary = {}) -
 		_dialogue_box.visible = true
 		_dialogue_box.start(dialogue_data)
 		await _dialogue_box.dialogue_finished
+		# 对话结束后淡出立绘
+		_fade_portrait(false)
 		# 对话结束后短暂停顿再淡出
 		await get_tree().create_timer(0.3).timeout
 		_fade_out()
@@ -94,6 +105,30 @@ func _build_ui() -> void:
 	_overlay.color = Color(C_BG, 0.0)
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_overlay)
+
+	# 神官立绘（全屏背景，半透明，对话时淡入淡出）
+	_portrait = TextureRect.new()
+	var tex: Texture2D = load("res://resources/portraits/metatron_gate.png")
+	if tex:
+		_portrait.texture = tex
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_portrait.self_modulate = Color(1, 1, 1, 0)
+	_portrait.z_index = 0
+	_portrait.visible = false
+	add_child(_portrait)
+
+	# 金色光晕（全屏背景，脉冲呼吸，立绘之后）
+	_glow = ColorRect.new()
+	_glow.color = C_GOLD
+	_glow.self_modulate = Color(1, 1, 1, 0)
+	_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_glow.z_index = 0
+	_glow.visible = false
+	add_child(_glow)
 
 	# 层号（大金字，上方）
 	_floor_label = Label.new()
@@ -134,7 +169,9 @@ func _build_ui() -> void:
 	# 嵌入 DialogueBox（用于层间对话）
 	_dialogue_box = DialogueBox.new()
 	_dialogue_box.visible = false
+	_dialogue_box.z_index = 2
 	add_child(_dialogue_box)
+	_dialogue_box.line_shown.connect(_on_line_shown)
 
 func _input(event: InputEvent) -> void:
 	if not visible or _phase == "done":
@@ -144,3 +181,21 @@ func _input(event: InputEvent) -> void:
 		if _phase == "hold" and not _has_dialogue:
 			_fade_out()
 			accept_event()
+
+## 梅塔特隆说话时立绘淡入，否则淡出
+func _on_line_shown(speaker: String, _text: String, _index: int) -> void:
+	if speaker.is_empty():
+		_fade_portrait(false)
+	else:
+		_fade_portrait(true)
+
+## 立绘淡入/淡出
+func _fade_portrait(visible_in: bool) -> void:
+	if _portrait == null or not is_instance_valid(_portrait):
+		return
+	_portrait.visible = true
+	_glow.visible = true
+	var target_a := 0.8 if visible_in else 0.0
+	_glow_base_a = 0.15 if visible_in else 0.0
+	var tw := create_tween()
+	tw.tween_property(_portrait, "self_modulate:a", target_a, 0.5).set_trans(Tween.TRANS_SINE)
