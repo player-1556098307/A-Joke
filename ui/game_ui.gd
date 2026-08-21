@@ -658,11 +658,15 @@ func _build_player_card(player: PlayerState) -> Control:
 	name_bar.add_child(name_lbl)
 
 	# Energy — 右上角菱形蓝色方片 + 白色黑体数字
+	# pivot_offset 设为 size/2，使旋转围绕几何中心进行；菱形向右突出卡片边缘
+	var _dia_size := 18.0
+	var _dia_pos := Vector2(91.0, 5.0)   # body 坐标系，中心=(100,14)
 	var energy_diamond := ColorRect.new()
 	energy_diamond.name = "EnergyDiamond"
 	energy_diamond.color = Color("#185FA5")
-	energy_diamond.size = Vector2(20.0, 20.0)
-	energy_diamond.position = Vector2(88.0, -14.0)  # 右上角贴边，菱形露出卡片边缘
+	energy_diamond.size = Vector2(_dia_size, _dia_size)
+	energy_diamond.position = _dia_pos
+	energy_diamond.pivot_offset = Vector2(_dia_size / 2.0, _dia_size / 2.0)  # 围绕中心旋转
 	energy_diamond.rotation = PI / 4.0  # 旋转45°成菱形
 	energy_diamond.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	energy_diamond.z_index = 5
@@ -677,8 +681,8 @@ func _build_player_card(player: PlayerState) -> Control:
 	energy_lbl.add_theme_constant_override("outline_size", 1)
 	energy_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	energy_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	energy_lbl.size = Vector2(20.0, 20.0)
-	energy_lbl.position = Vector2(88.0, -14.0)  # 与菱形中心重合，不旋转
+	energy_lbl.size = Vector2(_dia_size, _dia_size)
+	energy_lbl.position = _dia_pos  # 与菱形同位，文字在 size 框内居中 = 菱形中心
 	energy_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	energy_lbl.z_index = 6
 	body.add_child(energy_lbl)
