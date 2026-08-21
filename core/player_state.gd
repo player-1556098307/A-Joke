@@ -146,6 +146,16 @@ var blade_stage: int = 0
 ## 反馈怒标记数（司马懿，0-4）
 var fury_marks: int = 0
 
+## ── 慈悲尖塔玩家 buff 字段（层间奖励，每层注入）──────────────────
+## 普攻固定增伤（锋刃之力：+1）
+var damage_bonus_basic: float = 0.0
+## 每回合额外聚气（蓄锐：+1）
+var charge_bonus: int = 0
+## 固定减伤（坚壁：-1）
+var damage_reduction: float = 0.0
+## 每回合回血（回生：+1）
+var regen_per_round: float = 0.0
+
 ## ── 回合临时数据（每回合开始时重置）───────────────────────────────────────────
 var current_gesture: Gesture           ## 本回合出的手势
 var pending_action: ActionType         ## 待执行的行动类型
@@ -169,6 +179,12 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	current_gesture     = Gesture.NONE
 	pending_action      = ActionType.NONE
 	skill_target_id     = -1
+	pending_skill_index = -1
+	# 慈悲尖塔 buff 字段默认值（每层注入前为 0）
+	damage_bonus_basic  = 0.0
+	charge_bonus        = 0
+	damage_reduction    = 0.0
+	regen_per_round     = 0.0
 	pending_skill_index = -1
 	# 秽土柱间·仙人之力：气上限6
 	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判

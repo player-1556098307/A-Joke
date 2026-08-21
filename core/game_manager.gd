@@ -918,6 +918,8 @@ func _apply_actions() -> void:
 			# 注意：不能用"仙人之力"技能名判断——秽土柱间也有同名被动（跺脚+气上限6），会误判给柱间加聚气
 			if _tower_has_skill(winner, "蛙组手"):
 				gain += 1
+			# ── 慈悲尖塔 buff：蓄锐每回合额外聚气 ──
+			gain += winner.charge_bonus
 			winner.add_energy(gain)
 			player_charged.emit(_sole_winner_id, winner.energy)
 			var cs: PlayerMatchStats = _match_record.player_stats.get(_sole_winner_id)
@@ -2120,8 +2122,19 @@ func _process_end_phase() -> void:
 				bell_gained.emit(player.player_id, player.bell_count)
 	# 2. 燃烧/狂战士结算
 	_process_burn_and_berserker()
+	# 2.5 慈悲尖塔 buff：回生每回合回血
+	_process_tower_regen()
 	# 3. 有钟的存活玩家决定是否招架
 	_process_bell_decisions()
+
+## 慈悲尖塔 buff：回生 — 每回合结束回复 regen_per_round 点 HP
+func _process_tower_regen() -> void:
+	for player in _players:
+		if player.is_alive and player.regen_per_round > 0 and player.hp > 0:
+			var heal: float = min(player.regen_per_round, player.character.max_hp - player.hp)
+			if heal > 0:
+				player.hp += heal
+				burn_damage_triggered.emit(player.player_id, -heal, player.hp, "回生")
 
 ## 检查角色是否拥有钟机制（有招架或砸钟技能）
 func _has_bell_mechanic(player: PlayerState) -> bool:

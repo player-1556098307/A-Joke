@@ -274,6 +274,8 @@ static func _apply_single_effect(
 			# 暴击：可暴击状态50%概率x2
 			var crit := crit_check(attacker)
 			raw *= crit["multiplier"]
+			# ── 慈悲尖塔 buff：普攻固定增伤（锋刃之力）──
+			raw += attacker.damage_bonus_basic
 			var dmg: float = raw
 			var absorbed: float = 0.0
 			var clone_broken: bool = false
@@ -314,6 +316,8 @@ static func _apply_single_effect(
 				absorbed = min(raw, target.shield)
 				dmg = max(0.0, raw - target.shield)
 				target.shield = max(0.0, target.shield - raw)
+			# ── 慈悲尖塔 buff：固定减伤（坚壁），吸收链后扣 HP 前应用 ──
+			dmg = max(0.0, dmg - target.damage_reduction)
 			target.hp = max(0.0, target.hp - dmg)
 			if dmg > 0:
 				target.took_damage_this_round = true

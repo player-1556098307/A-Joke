@@ -13,7 +13,8 @@ var _portrait: TextureRect
 var _glow: ColorRect
 var _glow_base_a: float = 0.0  ## 光晕基础透明度
 var _glow_timer: float = 0.0
-var _phase: String = "idle"  ## "idle", "transition", "entry_dialogue", "battle", "exit_dialogue", "result"
+var _phase: String = "idle"  ## "idle", "transition", "entry_dialogue", "battle", "exit_dialogue", "reward", "result"
+var _reward_ui: TowerRewardUI
 
 ## 测试快速模式：跳过所有过渡动画和对话，直接启动战斗/推进层
 var fast_mode: bool = false
@@ -81,6 +82,13 @@ func _ready() -> void:
 	_dialogue_box.z_index = 2
 	add_child(_dialogue_box)
 
+	# 层间奖励选择 UI（红黑风格）
+	_reward_ui = TowerRewardUI.new()
+	_reward_ui.reward_selected.connect(_on_reward_selected)
+	_reward_ui.z_index = 3
+	_reward_ui.visible = false
+	add_child(_reward_ui)
+
 	# 连接 TowerManager 信号
 	tower_mgr.floor_changed.connect(_on_floor_changed)
 	tower_mgr.floor_cleared.connect(_on_floor_cleared)
@@ -134,9 +142,43 @@ func _begin_floor_battle(_floor_num: int) -> void:
 		tower_mgr.start_tower(party)
 	else:
 		tower_mgr.start_next_floor()
+	_inject_tower_buffs()
 	_ui.setup_players(GameManager.get_alive_players())
 	_enemy_name = tower_mgr.get_current_enemy_name()
 	_floor_label.text = "慈悲尖塔 第%d层 — %s" % [tower_mgr.get_current_floor(), _enemy_name]
+
+## 注入慈悲尖塔层间奖励 buff 到玩家队（每层 setup_game 后调用）
+func _inject_tower_buffs() -> void:
+	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	if buffs.is_empty():
+		return
+	for p in GameManager.get_alive_players():
+		if p.team_id != 1:
+			continue
+		for b in buffs:
+			_apply_buff(p, b)
+	# 刷新 UI 显示（护盾/分身等可视化字段）
+	_ui.setup_players(GameManager.get_alive_players())
+
+## 应用单个 buff 到 PlayerState
+func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
+	match buff.get("id", ""):
+		"blade_power":
+			p.damage_bonus_basic += buff.get("value", 1.0)
+		"charge_bonus":
+			p.charge_bonus += buff.get("value", 1)
+		"shield_wall":
+			p.damage_reduction += buff.get("value", 1.0)
+		"regen":
+			p.regen_per_round += buff.get("value", 1.0)
+		"clone":
+			p.clone_count += buff.get("value", 1)
+		"swift":
+			p.add_energy(buff.get("value", 2))
+		"energy_cap":
+			p.max_energy += buff.get("value", 2)
+		"protect":
+			p.shield += buff.get("value", 2)
 
 # ============================================================
 #  层间推进
@@ -146,26 +188,47 @@ func _on_floor_changed(floor_num: int, enemy_name: String) -> void:
 	_floor_label.text = "慈悲尖塔 第%d层 — %s" % [floor_num, enemy_name]
 	_ui.setup_players(GameManager.get_alive_players())
 
-## 层胜利：显示退场对话 → 推进下一层
+## 层胜利：显示退场对话 → 奖励选择 → 推进下一层
 func _on_floor_cleared(floor_num: int, enemy_name: String) -> void:
 	if fast_mode:
-		_proceed_to_next_floor()
+		_show_reward_selection()
 		return
 	_phase = "exit_dialogue"
 	var exit_dlg: Dictionary = tower_mgr.get_exit_dialogue()
 	if exit_dlg.is_empty():
-		_proceed_to_next_floor()
+		_show_reward_selection()
 	else:
 		_dialogue_box.visible = true
 		_dialogue_box.start(exit_dlg)
 
-## 退场对话结束 → 推进下一层
+## 退场对话结束 → 弹出奖励选择（或直接推进）
 func _on_dialogue_generic_finished() -> void:
 	_dialogue_box.visible = false
 	_fade_portrait(false)
 	if _phase == "exit_dialogue":
-		_proceed_to_next_floor()
+		_show_reward_selection()
 	# 战斗中的叙事对话不改变 phase，只是弹出后消失
+
+## 弹出层间奖励选择界面
+func _show_reward_selection() -> void:
+	_phase = "reward"
+	if fast_mode:
+		# fast_mode：自动选择第一个奖励（测试用）
+		var pool := TowerRewardUI.REWARD_POOL
+		var buff: Dictionary = pool[0]
+		_on_reward_selected(buff)
+		return
+	_reward_ui.visible = true
+	_reward_ui.start()
+
+## 奖励选择完成 → 保存 buff 到 SceneManager → 推进下一层
+func _on_reward_selected(buff: Dictionary) -> void:
+	_reward_ui.visible = false
+	# 持久化 buff 到 SceneManager（下一层注入）
+	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	buffs.append(buff)
+	SceneManager.last_tower_config["tower_buffs"] = buffs
+	_proceed_to_next_floor()
 
 ## 推进到下一层（正常模式=过渡动画，fast_mode=直接启动）
 func _proceed_to_next_floor() -> void:
