@@ -669,7 +669,7 @@ func _build_player_card(player: PlayerState) -> Control:
 	energy_diamond.pivot_offset = Vector2(_dia_size / 2.0, _dia_size / 2.0)  # 围绕中心旋转
 	energy_diamond.rotation = PI / 4.0  # 旋转45°成菱形
 	energy_diamond.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	energy_diamond.z_index = 5
+	energy_diamond.z_index = 1  # 低于对话/奖励弹窗(2/3)，弹窗弹出时气标被覆盖
 	body.add_child(energy_diamond)
 
 	var energy_lbl := Label.new()
@@ -684,7 +684,7 @@ func _build_player_card(player: PlayerState) -> Control:
 	energy_lbl.size = Vector2(_dia_size, _dia_size)
 	energy_lbl.position = _dia_pos  # 与菱形同位，文字在 size 框内居中 = 菱形中心
 	energy_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	energy_lbl.z_index = 6
+	energy_lbl.z_index = 1  # 与菱形同级，弹窗弹出时一起被覆盖
 	body.add_child(energy_lbl)
 
 	# Distance (non-human, top-left of body)
