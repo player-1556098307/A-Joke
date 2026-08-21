@@ -553,7 +553,9 @@ func _build_player_card(player: PlayerState) -> Control:
 	var wrap := Control.new()
 	wrap.name = "Player_%d" % player.player_id
 	wrap.custom_minimum_size = Vector2(104.0, 128.0)
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	wrap.mouse_entered.connect(_on_player_card_hovered.bind(player.player_id))
+	wrap.mouse_exited.connect(_on_player_card_unhovered.bind(player.player_id))
 
 	# HP text (above bar)
 	var hp_lbl := Label.new()
@@ -742,6 +744,225 @@ func _build_player_card(player: PlayerState) -> Control:
 	think_bar.hide(); think_fill.hide(); think_lbl.hide()
 
 	return wrap
+
+# ── 技能详情悬浮面板 ──────────────────────────────────────────────────────────
+
+var _skill_tooltip: PanelContainer = null
+var _tooltip_hovered_pid: int = -1
+
+func _on_player_card_hovered(player_id: int) -> void:
+	_tooltip_hovered_pid = player_id
+	_show_skill_tooltip(player_id)
+
+func _on_player_card_unhovered(player_id: int) -> void:
+	if _tooltip_hovered_pid != player_id:
+		return
+	_tooltip_hovered_pid = -1
+	_hide_skill_tooltip()
+
+## 构建技能详情悬浮面板：角色名 + 全量技能列表（含被动技）
+func _show_skill_tooltip(player_id: int) -> void:
+	_hide_skill_tooltip()
+	var player := GameManager.get_player(player_id)
+	if player == null:
+		return
+
+	# 收集全量技能（含被动技、限定技），用于"查看"而非"操作"
+	var all_skills: Array[SkillData] = []
+	for skill in player.character.skills:
+		all_skills.append(skill)
+	for skill in player.unlocked_skills:
+		if not _has_skill_in_list(all_skills, skill.skill_name):
+			all_skills.append(skill)
+	if player.projected_skill != null and not _has_skill_in_list(all_skills, player.projected_skill.skill_name):
+		all_skills.append(player.projected_skill)
+	for bs in player.binding_field_skills:
+		if not _has_skill_in_list(all_skills, bs.skill_name):
+			all_skills.append(bs)
+	if all_skills.is_empty():
+		return
+
+	var card: Control = _player_cards.get(player_id)
+	if card == null:
+		return
+
+	# 面板配色
+	var panel_bg := Color("#FFFDF5")
+	var panel_bdr := Color("#185FA5")
+	var title_bg  := Color("#185FA5")
+	var skill_bg  := Color("#F1EFE8")
+	var skill_bdr := Color("#B4B2A9")
+	var name_fg   := Color("#042C53")
+	var desc_fg   := Color("#3A3A38")
+	var cost_fg   := Color("#185FA5")
+	var tag_passive_fg := Color("#9A9182")
+	var tag_limited_fg := Color("#993556")
+	if _tower_theme_active:
+		panel_bg = Color("#222018")
+		panel_bdr = Color("#5A4E38")
+		title_bg  = Color("#3A342A")
+		skill_bg  = Color("#2A2620")
+		skill_bdr = Color("#5A4E38")
+		name_fg   = Color("#FAC775")
+		desc_fg   = Color("#E8E2D5")
+		cost_fg   = Color("#FAC775")
+		tag_passive_fg = Color("#9A9182")
+		tag_limited_fg = Color("#C49A6A")
+
+	var panel := PanelContainer.new()
+	panel.name = "SkillTooltip"
+	panel.custom_minimum_size = Vector2(230.0, 0.0)
+	panel.z_index = 100
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", _make_flat(panel_bg, panel_bdr, 2, 6))
+
+	var outer_vbox := VBoxContainer.new()
+	outer_vbox.add_theme_constant_override("separation", 4)
+	outer_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(outer_vbox)
+
+	# 标题栏：角色名
+	var title_bar := Panel.new()
+	title_bar.custom_minimum_size = Vector2(0.0, 22.0)
+	title_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_bar.add_theme_stylebox_override("panel", _make_flat(title_bg, title_bg, 0, 4))
+	outer_vbox.add_child(title_bar)
+
+	var title_lbl := Label.new()
+	title_lbl.text = player.player_name
+	title_lbl.add_theme_font_size_override("font_size", 12)
+	title_lbl.add_theme_color_override("font_color", Color("#FFFFFF"))
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_lbl.anchor_right = 1.0; title_lbl.anchor_bottom = 1.0
+	title_bar.add_child(title_lbl)
+
+	# 技能条目
+	for skill in all_skills:
+		var entry := PanelContainer.new()
+		entry.custom_minimum_size = Vector2(0.0, 0.0)
+		entry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		entry.add_theme_stylebox_override("panel", _make_flat(skill_bg, skill_bdr, 1, 4))
+		outer_vbox.add_child(entry)
+
+		var evbox := VBoxContainer.new()
+		evbox.add_theme_constant_override("separation", 2)
+		evbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		entry.add_child(evbox)
+
+		# 第一行：技能名 + 耗气标签
+		var top_row := HBoxContainer.new()
+		top_row.add_theme_constant_override("separation", 4)
+		top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		evbox.add_child(top_row)
+
+		var sname := Label.new()
+		sname.text = skill.skill_name
+		sname.add_theme_font_size_override("font_size", 11)
+		sname.add_theme_color_override("font_color", name_fg)
+		sname.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sname.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_row.add_child(sname)
+
+		# 被动/限定标记
+		if skill.is_passive:
+			var tag := Label.new()
+			tag.text = "[被动]"
+			tag.add_theme_font_size_override("font_size", 8)
+			tag.add_theme_color_override("font_color", tag_passive_fg)
+			tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			top_row.add_child(tag)
+		if skill.is_limited:
+			var tag2 := Label.new()
+			tag2.text = "[限定]"
+			tag2.add_theme_font_size_override("font_size", 8)
+			tag2.add_theme_color_override("font_color", tag_limited_fg)
+			tag2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			top_row.add_child(tag2)
+
+		# 耗气标签
+		var cost_str := "⚡%d" % skill.energy_cost
+		if skill.bell_cost > 0:
+			cost_str += " 钟%d" % skill.bell_cost
+		if skill.ftg_cost > 0:
+			cost_str += " 标%d" % skill.ftg_cost
+		if skill.can_pay_with_hp:
+			cost_str += "/HP"
+		var cost_lbl := Label.new()
+		cost_lbl.text = cost_str
+		cost_lbl.add_theme_font_size_override("font_size", 9)
+		cost_lbl.add_theme_color_override("font_color", cost_fg)
+		cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		cost_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_row.add_child(cost_lbl)
+
+		# 第二行：范围 + 描述
+		var range_str := _skill_range_str(skill)
+		var desc_text := skill.description if skill.description != "" else "—"
+		var desc_lbl := Label.new()
+		desc_lbl.text = "%s · %s" % [range_str, desc_text]
+		desc_lbl.add_theme_font_size_override("font_size", 9)
+		desc_lbl.add_theme_color_override("font_color", desc_fg)
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc_lbl.custom_minimum_size = Vector2(200.0, 0)
+		desc_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		evbox.add_child(desc_lbl)
+
+	# 定位：放在卡片右侧，空间不够则放左侧
+	add_child(panel)
+	# 强制布局以获取实际尺寸
+	panel.update_minimum_size()
+	var panel_size := panel.get_combined_minimum_size()
+	if panel_size.x <= 0:
+		panel_size.x = 230.0
+	if panel_size.y <= 0:
+		panel_size.y = 200.0
+	panel.size = panel_size
+	panel.position = _calc_tooltip_pos(card, panel_size)
+
+	_skill_tooltip = panel
+
+func _hide_skill_tooltip() -> void:
+	if _skill_tooltip != null and is_instance_valid(_skill_tooltip):
+		_skill_tooltip.queue_free()
+	_skill_tooltip = null
+
+func _has_skill_in_list(skills: Array[SkillData], skill_name: String) -> bool:
+	for s in skills:
+		if s.skill_name == skill_name:
+			return true
+	return false
+
+func _skill_range_str(skill: SkillData) -> String:
+	if skill.max_range >= 999:
+		return "自身"
+	elif skill.min_range == skill.max_range:
+		return "范围%d" % skill.min_range
+	else:
+		return "范围%d~%d" % [skill.min_range, skill.max_range]
+
+func _calc_tooltip_pos(card: Control, panel_size: Vector2) -> Vector2:
+	var card_pos := card.global_position
+	var card_size := card.size
+	var view_width := 960.0
+	var view_height := 540.0
+	var gap := 8.0
+	# 优先放卡片右侧
+	var x := card_pos.x + card_size.x + gap
+	if x + panel_size.x > view_width:
+		# 放左侧
+		x = card_pos.x - panel_size.x - gap
+	if x < 0:
+		x = gap
+	# 垂直居中对齐卡片
+	var y := card_pos.y - (panel_size.y - card_size.y) / 2.0
+	if y < 4.0:
+		y = 4.0
+	if y + panel_size.y > view_height:
+		y = view_height - panel_size.y - 4.0
+	return Vector2(x, y)
 
 func _make_status_badge(text: String, bg: Color, fg: Color) -> PanelContainer:
 	var p := PanelContainer.new()
