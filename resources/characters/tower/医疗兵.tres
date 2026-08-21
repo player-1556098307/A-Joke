@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_he"]
+script = ExtResource("1_effect")
+effect_type = 4
+value = 2
+target = 0
+
+[sub_resource type="Resource" id="SD_he"]
+script = ExtResource("2_skill")
+skill_name = "治疗"
+description = "回复友方目标 2 点生命值。"
+energy_cost = 2
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_he")])
+
+[sub_resource type="Resource" id="SE_bl"]
+script = ExtResource("1_effect")
+effect_type = 37
+value = 2
+target = 2
+
+[sub_resource type="Resource" id="SD_bl"]
+script = ExtResource("2_skill")
+skill_name = "尖塔祝福"
+description = "开局获得2个气。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_bl")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "医疗兵"
+max_hp = 5
+basic_attack_cost = 1
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_he"), SubResource("SD_bl")])
+tags = Array[String](["辅助"])
+grade = "C"

@@ -29,8 +29,13 @@ func _ready() -> void:
 		if floors.size() >= 1:
 			break
 		var human: PlayerState = gm.get_player(0)
-		var enemy: PlayerState = gm.get_player(1)
-		if enemy == null or not enemy.is_alive or not human.is_alive:
+		# 找第一个还活着的敌方单位
+		var enemy: PlayerState = null
+		for p in gm.get_alive_players():
+			if p.team_id == 2:
+				enemy = p
+				break
+		if enemy == null or not human.is_alive:
 			break
 		human.current_gesture = PlayerState.Gesture.ROCK
 		enemy.current_gesture = PlayerState.Gesture.SCISSORS

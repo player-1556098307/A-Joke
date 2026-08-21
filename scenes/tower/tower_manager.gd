@@ -1,7 +1,7 @@
 ## TowerManager — 慈悲尖塔 PvE 闯关模式核心
-## 逐层挑战精英敌人（1-3层），复用 GameManager 猜拳回合制
-## 玩家队（team=1）vs 敌人（team=2）；全员死亡=失败，通关3层=胜利
-## 支持层间对话、层间过渡动画、退场对话
+## 16层闯关：3层小怪+1层精英怪循环，第16层为大Boss（暂未实现=通关）
+## 小怪随机生成（同层不重复），精英怪固定顺序不重复
+## 玩家队（team=1）vs 敌人（team=2）；全员死亡=失败，通关16层=胜利
 class_name TowerManager
 extends Node
 
@@ -10,12 +10,31 @@ signal floor_cleared(floor_num: int, enemy_name: String)  ## 层胜利，敌人�
 signal tower_victory
 signal tower_defeat
 
-const MAX_FLOORS := 3
-const ENEMY_PATHS := [
+const MAX_FLOORS := 16
+
+## 精英怪（固定顺序，第4/8/12层）
+const ELITE_PATHS := [
 	"res://resources/characters/tower/破败王者（怒）.tres",
 	"res://resources/characters/tower/漩涡鸣人（仙人模式）.tres",
 	"res://resources/characters/tower/司马懿（狂）.tres",
 ]
+
+## 小怪池（8种，索引0-7）
+const SMALL_ENEMY_PATHS := [
+	"res://resources/characters/tower/训练兵.tres",
+	"res://resources/characters/tower/铁盾兵.tres",
+	"res://resources/characters/tower/爆破手.tres",
+	"res://resources/characters/tower/术师.tres",
+	"res://resources/characters/tower/医疗兵.tres",
+	"res://resources/characters/tower/狂战士.tres",
+	"res://resources/characters/tower/影刃.tres",
+	"res://resources/characters/tower/石像鬼.tres",
+]
+
+## 前期小怪索引池（第1-2轮：训练兵~医疗兵）
+const EARLY_POOL := [0, 1, 2, 3, 4]
+## 全部小怪索引池（第3-4轮：加入狂战士/影刃/石像鬼）
+const FULL_POOL := [0, 1, 2, 3, 4, 5, 6, 7]
 
 ## 对话数据资源
 var _dialogue_data: TowerDialogueData
@@ -23,11 +42,106 @@ var _dialogue_data: TowerDialogueData
 var _player_chars: Array[CharacterData] = []
 var _current_floor: int = 0
 var _current_enemy_name: String = ""
+var _current_enemy_chars: Array[CharacterData] = []
 var _running: bool = false
 ## 队伍配置：Array[Dictionary]，每项 { character: CharacterData, is_human: bool }
 var _party: Array[Dictionary] = []
 ## 是否自动推进到下一层（true=层胜后立即start_next_floor，false=仅emit floor_cleared等外部调用）
 var _auto_advance: bool = true
+## 已使用的精英怪数量（递增，保证不重复）
+var _used_elite_count: int = 0
+## 随机数生成器
+var _rng := RandomNumberGenerator.new()
+
+func _ready() -> void:
+	_rng.randomize()
+
+## 设置随机种子（测试用）
+func set_seed(seed_val: int) -> void:
+	_rng.seed = seed_val
+
+# ============================================================
+#  层类型判定
+# ============================================================
+
+## 是否为精英怪层（第4/8/12层）
+func _is_elite_floor(floor_num: int) -> bool:
+	return floor_num > 0 and floor_num < MAX_FLOORS and floor_num % 4 == 0
+
+## 是否为大Boss层（第16层）
+func _is_boss_floor(floor_num: int) -> bool:
+	return floor_num == MAX_FLOORS
+
+## 获取循环轮次（1-4）
+func _get_cycle(floor_num: int) -> int:
+	return ceili(float(floor_num) / 4.0)
+
+## 获取小怪数量范围 [min, max]
+func _get_small_enemy_count_range(cycle: int) -> Array:
+	if cycle <= 2:
+		return [1, 2]
+	else:
+		return [2, 3]
+
+## 获取可用小怪索引池
+func _get_pool_indices(cycle: int) -> Array:
+	if cycle <= 2:
+		return EARLY_POOL.duplicate()
+	else:
+		return FULL_POOL.duplicate()
+
+## 预览下一层敌人名称（过渡动画用，不实际推进）
+func peek_next_floor_name() -> String:
+	var next_floor := _current_floor + 1
+	if next_floor > MAX_FLOORS:
+		return ""
+	if _is_boss_floor(next_floor):
+		return "???"
+	if _is_elite_floor(next_floor):
+		var elite_idx := _used_elite_count
+		if elite_idx < ELITE_PATHS.size():
+			var elite_char := load(ELITE_PATHS[elite_idx]) as CharacterData
+			if elite_char:
+				return elite_char.character_name
+		return "精英怪"
+	return "小怪群"
+
+# ============================================================
+#  小怪随机生成
+# ============================================================
+
+## 生成本层小怪（同层不重复种类）
+func _generate_small_enemies(floor_num: int) -> Array[CharacterData]:
+	var cycle := _get_cycle(floor_num)
+	var range_arr := _get_small_enemy_count_range(cycle)
+	var min_count: int = range_arr[0]
+	var max_count: int = range_arr[1]
+	var count: int = _rng.randi_range(min_count, max_count)
+
+	var pool := _get_pool_indices(cycle)
+	pool.shuffle()
+
+	var result: Array[CharacterData] = []
+	for i in range(min(count, pool.size())):
+		var idx: int = pool[i]
+		var char_data := load(SMALL_ENEMY_PATHS[idx]) as CharacterData
+		if char_data != null:
+			result.append(char_data)
+	return result
+
+## 测试用：直接指定小怪索引列表生成（不做随机）
+func _generate_small_enemies_with_indices(indices: Array[int]) -> Array[CharacterData]:
+	var result: Array[CharacterData] = []
+	for idx in indices:
+		if idx >= 0 and idx < SMALL_ENEMY_PATHS.size():
+			var char_data := load(SMALL_ENEMY_PATHS[idx]) as CharacterData
+			if char_data != null:
+				result.append(char_data)
+	return result
+
+# ============================================================
+#  闯关流程
+# ============================================================
 
 ## 开始闯关：传入队伍配置（1-3人，每项含角色与控制者类型）
 func start_tower(party: Array) -> void:
@@ -40,18 +154,15 @@ func start_tower(party: Array) -> void:
 	if _party.is_empty():
 		return
 	_current_floor = 0
+	_used_elite_count = 0
 	_running = true
-	# 加载对话数据
 	_dialogue_data = TowerDialogueData.new()
-	# 立即启动第1层（保持向后兼容）
 	_start_first_floor()
 
-## 内部启动第1层（start_tower 调用）
 func _start_first_floor() -> void:
 	_start_next_floor_impl()
 
 ## 启动下一层战斗（或通关判定）
-## 可由外部调用（如 TowerBattle 在层间过渡完成后）
 func start_next_floor() -> void:
 	_start_next_floor_impl()
 
@@ -62,12 +173,39 @@ func _start_next_floor_impl() -> void:
 		tower_victory.emit()
 		return
 	_current_floor += 1
-	var enemy_char := load(ENEMY_PATHS[_current_floor - 1]) as CharacterData
-	if enemy_char == null:
+
+	# 大Boss层（第16层）：暂时跳过=通关
+	if _is_boss_floor(_current_floor):
+		_running = false
+		tower_victory.emit()
+		return
+
+	# 生成本层敌人
+	var enemies: Array[CharacterData] = []
+	if _is_elite_floor(_current_floor):
+		# 精英怪层：按顺序取，不重复
+		var elite_idx := _used_elite_count
+		if elite_idx < ELITE_PATHS.size():
+			var elite_char := load(ELITE_PATHS[elite_idx]) as CharacterData
+			if elite_char != null:
+				enemies.append(elite_char)
+			_used_elite_count += 1
+	else:
+		# 小怪层：随机生成
+		enemies = _generate_small_enemies(_current_floor)
+
+	if enemies.is_empty():
 		_running = false
 		tower_defeat.emit()
 		return
-	_current_enemy_name = enemy_char.character_name
+
+	_current_enemy_chars = enemies
+	_current_enemy_name = ""
+	for i in range(enemies.size()):
+		if i > 0:
+			_current_enemy_name += "、"
+		_current_enemy_name += enemies[i].character_name
+
 	# 构建对局配置：玩家 team=1，敌人 team=2
 	var players: Array = []
 	for i in range(_party.size()):
@@ -79,12 +217,14 @@ func _start_next_floor_impl() -> void:
 			"is_human": entry.get("is_human", true),
 			"team_id": 1,
 		})
-	players.append({
-		"name": enemy_char.character_name,
-		"character": enemy_char,
-		"is_human": false,
-		"team_id": 2,
-	})
+	for enemy_char in enemies:
+		players.append({
+			"name": enemy_char.character_name,
+			"character": enemy_char,
+			"is_human": false,
+			"team_id": 2,
+		})
+
 	GameManager.setup_game({ "players": players, "tower_mode": true })
 	GameManager.game_over.connect(_on_game_over, CONNECT_ONE_SHOT)
 	floor_changed.emit(_current_floor, _current_enemy_name)
@@ -103,11 +243,15 @@ func _on_game_over(_winner_id: int, _record: MatchRecord) -> void:
 		_running = false
 		tower_defeat.emit()
 
-## 设置是否自动推进（tower_battle 场景设为 false，由过渡动画控制推进）
+# ============================================================
+#  外部接口
+# ============================================================
+
+## 设置是否自动推进
 func set_auto_advance(v: bool) -> void:
 	_auto_advance = v
 
-## 是否正在闯关（tower_battle 用）
+## 是否正在闯关
 func is_running() -> bool:
 	return _running
 
@@ -115,11 +259,15 @@ func is_running() -> bool:
 func get_current_floor() -> int:
 	return _current_floor
 
-## 当前层敌人名
+## 当前层敌人名（多怪时逗号分隔）
 func get_current_enemy_name() -> String:
 	return _current_enemy_name
 
-## 当前层退场对话（敌人临终遗言）
+## 当前层敌人角色列表
+func get_current_enemy_chars() -> Array[CharacterData]:
+	return _current_enemy_chars
+
+## 当前层退场对话
 func get_exit_dialogue() -> Dictionary:
 	if _dialogue_data == null:
 		return {}

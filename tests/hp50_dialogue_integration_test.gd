@@ -4,6 +4,9 @@
 ##   2. Boss半血+队友满血 → 触发
 ##   3. 两人都半血+Boss满血 → 不触发
 ##   4. 队友淘汰+Boss满血 → 不触发
+##
+## 适配16层结构：第1层是小怪层，半血对话只有精英怪有台词。
+## 用精英怪"破败王者（怒）"在 tower_battle 初始化后手动 setup_game 替换对局。
 extends Node
 
 var _pass: int = 0
@@ -15,6 +18,8 @@ func _ready() -> void:
 
 	var naruto := load("res://resources/characters/漩涡鸣人.tres") as CharacterData
 	var sasuke := load("res://resources/characters/宇智波佐助.tres") as CharacterData
+	var boss_char := load("res://resources/characters/tower/破败王者（怒）.tres") as CharacterData
+
 	SceneManager.last_tower_config = {
 		"players": [
 			{ "character": naruto, "is_human": true },
@@ -23,10 +28,12 @@ func _ready() -> void:
 	}
 	SceneManager.tower_death_count = 0
 
+	# 实例化 tower_battle，fast_mode 初始化第1层小怪层
 	var battle = (load("res://scenes/tower/tower_battle.tscn") as PackedScene).instantiate()
 	battle.fast_mode = true
 	add_child(battle)
 
+	# 等待第1层战斗启动
 	for i in range(100):
 		await get_tree().process_frame
 		if battle._phase == "battle":
@@ -34,7 +41,22 @@ func _ready() -> void:
 	await get_tree().create_timer(0.3).timeout
 	battle.fast_mode = false
 
+	# 手动用精英怪替换当前对局，覆盖小怪层
 	var gm := GameManager
+	gm.setup_game({
+		"players": [
+			{ "name": "玩家", "character": naruto, "is_human": true, "team_id": 1 },
+			{ "name": "AI队友", "character": sasuke, "is_human": false, "team_id": 1 },
+			{ "name": "破败王者", "character": boss_char, "is_human": false, "team_id": 2 },
+		],
+		"tower_mode": true,
+	})
+	await get_tree().process_frame
+
+	# 确保 _on_round_resolved 不被拦截
+	battle._phase = "battle"
+	battle._enemy_hp50_triggered = false
+
 	var boss: PlayerState = null
 	var teammate: PlayerState = null
 	var human: PlayerState = null

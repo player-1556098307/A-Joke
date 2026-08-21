@@ -79,7 +79,7 @@ func _ready() -> void:
 ## 正常模式：第1层过渡动画启动
 func _start_first_floor() -> void:
 	var entry_dlg: Dictionary = _get_floor_entry_dialogue(1)
-	_transition.start(1, "破败王者（怒）", entry_dlg)
+	_transition.start(1, "小怪群", entry_dlg)
 	_phase = "transition"
 
 ## 获取指定层的进场对话（不依赖 tower_mgr 已启动）
@@ -145,8 +145,7 @@ func _proceed_to_next_floor() -> void:
 	if fast_mode:
 		_begin_floor_battle(next_floor)
 		return
-	var enemy_names := ["破败王者（怒）", "漩涡鸣人（仙人模式）", "司马懿（狂）"]
-	var enemy_name: String = enemy_names[next_floor - 1] if next_floor - 1 < enemy_names.size() else "???"
+	var enemy_name: String = tower_mgr.peek_next_floor_name()
 	var entry_dlg := _get_floor_entry_dialogue(next_floor)
 	_phase = "transition"
 	_transition.start(next_floor, enemy_name, entry_dlg)

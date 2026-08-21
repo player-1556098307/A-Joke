@@ -24,7 +24,7 @@ func _ready() -> void:
 
 	var ui = battle._ui
 	_assert(ui != null, "1: GameUI 已从场景实例加载")
-	_assert(ui._player_cards.size() == 2, "2: 玩家卡片2张（1真人+1敌人）（实际=%d）" % ui._player_cards.size())
+	_assert(ui._player_cards.size() >= 2, "2: 玩家卡片至少2张（1真人+1+敌人）（实际=%d）" % ui._player_cards.size())
 	_assert(ui._human_player_id == 0, "3: 真人玩家ID=0（实际=%d）" % ui._human_player_id)
 	_assert(battle._floor_label.text.contains("第1层"), "4: 层标签=第1层（实际=%s）" % battle._floor_label.text)
 
@@ -40,11 +40,11 @@ func _ready() -> void:
 	gm.submit_gesture(0, PlayerState.Gesture.ROCK)
 	_assert(gm.get("_current_phase") == GameManager.GamePhase.RESOLVING, "6: 提交后进入RESOLVING（实际=%d）" % gm.get("_current_phase"))
 	_assert(ui._pending_reveals.is_empty(), "7: 揭示已播放（动画触发，队列清空）")
-	_assert(ui._player_cards.size() == 2, "8: 动画后卡片仍在")
+	_assert(ui._player_cards.size() >= 2, "8: 动画后卡片仍在（实际=%d）" % ui._player_cards.size())
 
 	# 等待结算完成
 	await get_tree().create_timer(1.5).timeout
-	_assert(ui._player_cards.size() == 2, "9: 结算后卡片仍在（实际=%d）" % ui._player_cards.size())
+	_assert(ui._player_cards.size() >= 2, "9: 结算后卡片仍在（实际=%d）" % ui._player_cards.size())
 
 	print("=== 塔战斗冒烟测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
