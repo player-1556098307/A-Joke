@@ -25,21 +25,19 @@ const C_RED_GLOW := Color("#FF6060")
 const REWARD_POOL := [
 	# ── 普通祝福（小怪层/精英层均可出）──
 	{ "id": "blade_power",  "name": "锋刃之力", "icon": "⚔", "desc": "普攻伤害 +1", "value": 1.0, "color": Color("#C83030"), "tier": "normal" },
-	{ "id": "charge_bonus", "name": "蓄锐",     "icon": "✦", "desc": "每回合额外聚气 +1", "value": 1, "color": Color("#FAC775"), "tier": "normal" },
-	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -0.5", "value": 0.5, "color": Color("#6080A0"), "tier": "normal" },
-	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "自己回合开始时回复 1 点生命", "value": 1.0, "color": Color("#60C060"), "tier": "normal" },
+	{ "id": "charge_bonus", "name": "蓄锐",     "icon": "✦", "desc": "每回合额外聚气 +1（唯一）", "value": 1, "color": Color("#FAC775"), "tier": "normal", "unique": true },
 	{ "id": "clone",        "name": "影分身",   "icon": "◆", "desc": "开局获得 1 个影分身", "value": 1, "color": Color("#A060C0"), "tier": "normal" },
 	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气（可叠加）", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
-	{ "id": "energy_cap",   "name": "气海",     "icon": "◉", "desc": "气上限 +2", "value": 2, "color": Color("#60C0F0"), "tier": "normal" },
 	{ "id": "protect",      "name": "庇护",     "icon": "❂", "desc": "开局获得 2 点护盾", "value": 2, "color": Color("#C0C0A0"), "tier": "normal" },
 	{ "id": "vitality",     "name": "生机",     "icon": "✚", "desc": "生命上限 +3", "value": 3, "color": Color("#60C060"), "tier": "normal" },
 	# ── 高级祝福（仅精英层可出）──
 	{ "id": "blade_power_2", "name": "锋芒",     "icon": "⚔", "desc": "普攻伤害 +2", "value": 2.0, "color": Color("#E04040"), "tier": "elite" },
+	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -0.5（唯一）", "value": 0.5, "color": Color("#6080A0"), "tier": "elite", "unique": true },
+	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "自己回合开始时回复 1 点生命（唯一）", "value": 1.0, "color": Color("#60C060"), "tier": "elite", "unique": true },
 	{ "id": "regen_2",      "name": "再生",     "icon": "♥", "desc": "自己回合开始时回复 2 点生命", "value": 2.0, "color": Color("#40A040"), "tier": "elite" },
 	{ "id": "swift_2",      "name": "疾风",     "icon": "⚡", "desc": "开局获得 5 点气", "value": 5, "color": Color("#FAC775"), "tier": "elite" },
 	{ "id": "vitality_2",   "name": "龙血",     "icon": "✚", "desc": "生命上限 +5", "value": 5, "color": Color("#40C060"), "tier": "elite" },
 	{ "id": "protect_2",    "name": "铁壁",     "icon": "❂", "desc": "开局获得 5 点护盾", "value": 5, "color": Color("#90B0C0"), "tier": "elite" },
-	{ "id": "energy_cap_2", "name": "天罡",     "icon": "◉", "desc": "气上限 +4", "value": 4, "color": Color("#40C0F0"), "tier": "elite" },
 ]
 
 ## ---- UI 引用 ----
@@ -80,8 +78,9 @@ func _process(delta: float) -> void:
 
 ## 启动奖励选择：随机 3 种不重复奖励
 ## allow_elite：true=允许高级祝福（精英层通关后），false=仅普通祝福
-func start(allow_elite: bool = false) -> void:
-	_current_choices = _pick_random_rewards(3, allow_elite)
+## obtained_ids：已获取的奖励 id 列表（unique 奖励已获取后不再出现）
+func start(allow_elite: bool = false, obtained_ids: Array = []) -> void:
+	_current_choices = _pick_random_rewards(3, allow_elite, obtained_ids)
 	_show_cards(_current_choices)
 	_is_active = true
 	visible = true
@@ -93,12 +92,16 @@ func start_with_choices(choices: Array[Dictionary]) -> void:
 	_is_active = true
 	visible = true
 
-## 随机选取 n 个不重复奖励
+## 随机抽取 n 个不重复奖励
 ## allow_elite=false：仅从 normal 池抽取；true：从 normal+elite 全池抽取
-func _pick_random_rewards(count: int, allow_elite: bool = false) -> Array[Dictionary]:
+## obtained_ids：已获取的奖励 id 列表。unique 奖励已获取后不再出现
+func _pick_random_rewards(count: int, allow_elite: bool = false, obtained_ids: Array = []) -> Array[Dictionary]:
 	var pool: Array = []
 	for reward in REWARD_POOL:
 		if allow_elite or reward.get("tier", "normal") == "normal":
+			# unique 奖励已获取过 → 跳过
+			if reward.get("unique", false) and reward.get("id", "") in obtained_ids:
+				continue
 			pool.append(reward)
 	pool.shuffle()
 	var result: Array[Dictionary] = []

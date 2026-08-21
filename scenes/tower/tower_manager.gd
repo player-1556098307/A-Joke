@@ -81,7 +81,7 @@ func _get_small_enemy_count_range(cycle: int) -> Array:
 	if cycle <= 2:
 		return [1, 2]
 	else:
-		return [2, 3]
+		return [3, 4]
 
 ## 获取可用小怪索引池
 func _get_pool_indices(cycle: int) -> Array:
@@ -126,8 +126,25 @@ func _generate_small_enemies(floor_num: int) -> Array[CharacterData]:
 		var idx: int = pool[i]
 		var char_data := load(SMALL_ENEMY_PATHS[idx]) as CharacterData
 		if char_data != null:
-			result.append(char_data)
+			# 后期小怪：克隆并叠加 HP 加成（按轮次递增）
+			var hp_bonus := get_small_enemy_hp_bonus(floor_num)
+			if hp_bonus > 0:
+				var boosted := char_data.duplicate(false) as CharacterData
+				boosted.max_hp = char_data.max_hp + hp_bonus
+				result.append(boosted)
+			else:
+				result.append(char_data)
 	return result
+
+## 获取指定层小怪的 HP 加成（正数=小怪层，0=精英层）
+func get_small_enemy_hp_bonus(floor_num: int) -> int:
+	if floor_num <= 0:
+		return 0
+	return get_cycle_hp_bonus(_get_cycle(floor_num))
+
+## 按轮次获取 HP 加成（第1轮+0，第2轮+2，第3轮+4，第4轮+6）
+func get_cycle_hp_bonus(cycle: int) -> int:
+	return (cycle - 1) * 2
 
 ## 测试用：直接指定小怪索引列表生成（不做随机）
 func _generate_small_enemies_with_indices(indices: Array[int]) -> Array[CharacterData]:

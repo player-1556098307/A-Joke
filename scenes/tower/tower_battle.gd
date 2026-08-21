@@ -175,8 +175,6 @@ func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 			p.clone_count += buff.get("value", 1)
 		"swift", "swift_2":
 			p.add_energy(buff.get("value", 2))
-		"energy_cap", "energy_cap_2":
-			p.max_energy += buff.get("value", 2)
 		"protect", "protect_2":
 			p.shield += buff.get("value", 2)
 		"vitality", "vitality_2":
@@ -226,7 +224,12 @@ func _show_reward_selection() -> void:
 	_reward_ui.visible = true
 	var cleared_floor: int = tower_mgr.get_current_floor()
 	var is_elite_floor: bool = cleared_floor > 0 and cleared_floor < TowerManager.MAX_FLOORS and cleared_floor % 4 == 0
-	_reward_ui.start(is_elite_floor)
+	# 已获取的 buff id 列表（unique 奖励已获取后不再出现在随机池）
+	var obtained_ids: Array = []
+	for b in SceneManager.last_tower_config.get("tower_buffs", []):
+		if b is Dictionary and b.has("id"):
+			obtained_ids.append(b.get("id"))
+	_reward_ui.start(is_elite_floor, obtained_ids)
 
 ## 奖励选择完成 → 保存 buff 到 SceneManager → 推进下一层
 func _on_reward_selected(buff: Dictionary) -> void:

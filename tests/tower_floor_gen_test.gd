@@ -52,7 +52,13 @@ func _test_floor_structure() -> void:
 	var r1 := tower._get_small_enemy_count_range(1)
 	_assert(r1[0] == 1 and r1[1] == 2, "1n: 第1轮小怪1-2只（实际=%s）" % str(r1))
 	var r3 := tower._get_small_enemy_count_range(3)
-	_assert(r3[0] == 2 and r3[1] == 3, "1o: 第3轮小怪2-3只（实际=%s）" % str(r3))
+	_assert(r3[0] == 3 and r3[1] == 4, "1o: 第3轮小怪3-4只（实际=%s）" % str(r3))
+
+	# 小怪 HP 加成（按轮次递增）
+	_assert(tower.get_cycle_hp_bonus(1) == 0, "1p: 第1轮HP加成0（实际=%d）" % tower.get_cycle_hp_bonus(1))
+	_assert(tower.get_cycle_hp_bonus(2) == 2, "1q: 第2轮HP加成2（实际=%d）" % tower.get_cycle_hp_bonus(2))
+	_assert(tower.get_cycle_hp_bonus(3) == 4, "1r: 第3轮HP加成4（实际=%d）" % tower.get_cycle_hp_bonus(3))
+	_assert(tower.get_cycle_hp_bonus(4) == 6, "1s: 第4轮HP加成6（实际=%d）" % tower.get_cycle_hp_bonus(4))
 
 	tower.queue_free()
 
@@ -103,6 +109,29 @@ func _test_small_enemy_generation() -> void:
 		if found_late:
 			break
 	_assert(found_late, "2c: 第3-4轮可出现M6-M8")
+
+	# 后期小怪 HP 递增：第3轮（floor=10）生成的训练兵 HP 应为 4+4=8
+	var has_boosted_hp := false
+	for seed_val in range(300, 320):
+		tower.set_seed(seed_val)
+		var late_enemies2 := tower._generate_small_enemies(10)
+		for e in late_enemies2:
+			var base := 0.0
+			match e.character_name:
+				"训练兵": base = 4.0
+				"铁盾兵": base = 6.0
+				"爆破手": base = 3.0
+				"术师": base = 5.0
+				"医疗兵": base = 5.0
+				"狂战士": base = 6.0
+				"影刃": base = 4.0
+				"石像鬼": base = 8.0
+			if base > 0.0 and e.max_hp > base:
+				has_boosted_hp = true
+				break
+		if has_boosted_hp:
+			break
+	_assert(has_boosted_hp, "2d: 第3轮小怪HP高于基础值（实际存在HP加成）")
 
 	tower.queue_free()
 

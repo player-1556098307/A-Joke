@@ -198,7 +198,6 @@ func _test_inject_tower_buffs() -> void:
 		{ "id": "regen", "value": 1.0 },
 		{ "id": "clone", "value": 1 },
 		{ "id": "swift", "value": 2 },
-		{ "id": "energy_cap", "value": 2 },
 		{ "id": "protect", "value": 2 },
 		{ "id": "vitality", "value": 3 },
 	]
@@ -228,8 +227,6 @@ func _test_inject_tower_buffs() -> void:
 				player.clone_count += b.get("value", 1)
 			"swift":
 				player.add_energy(b.get("value", 2))
-			"energy_cap":
-				player.max_energy += b.get("value", 2)
 			"protect":
 				player.shield += b.get("value", 2)
 			"vitality":
@@ -242,10 +239,9 @@ func _test_inject_tower_buffs() -> void:
 	_assert(player.regen_per_round == 1.0, "6e: regen_per_round=1（实际=%.1f）" % player.regen_per_round)
 	_assert(player.clone_count == 1, "6f: clone_count=1（实际=%d）" % player.clone_count)
 	_assert(player.energy == 2, "6g: swift开局+2气（实际=%d）" % player.energy)
-	_assert(player.max_energy == 1001, "6h: max_energy=999+2=1001（实际=%d）" % player.max_energy)
-	_assert(player.shield == 2, "6i: shield=2（实际=%d）" % player.shield)
-	_assert(player.max_hp_bonus == 3.0, "6j: max_hp_bonus=3（实际=%.1f）" % player.max_hp_bonus)
-	_assert(player.get_max_hp() == player.character.max_hp + 3.0, "6k: get_max_hp=原始上限+3（实际=%.1f）" % player.get_max_hp())
+	_assert(player.shield == 2, "6h: shield=2（实际=%d）" % player.shield)
+	_assert(player.max_hp_bonus == 3.0, "6i: max_hp_bonus=3（实际=%.1f）" % player.max_hp_bonus)
+	_assert(player.get_max_hp() == player.character.max_hp + 3.0, "6j: get_max_hp=原始上限+3（实际=%.1f）" % player.get_max_hp())
 
 	# 清理
 	SceneManager.last_tower_config.erase("tower_buffs")
@@ -258,14 +254,14 @@ func _test_reward_ui_pool() -> void:
 	add_child(ui)
 
 	var pool := ui.get_reward_pool()
-	_assert(pool.size() == 15, "7a: 奖励池15种（实际=%d）" % pool.size())
+	_assert(pool.size() == 13, "7a: 奖励池13种（实际=%d）" % pool.size())
 
 	# 每个奖励都有 tier 字段，且只允许 normal/elite 两种值
 	for i in range(pool.size()):
 		var tier: String = pool[i].get("tier", "")
 		_assert(tier == "normal" or tier == "elite", "7a%d: 奖励%d的tier合法=%s" % [i, i, tier])
 
-	# 检查每个奖励都有必要字段
+	# 每个奖励都有必要字段
 	var ids_seen: Array[String] = []
 	for i in range(pool.size()):
 		var r: Dictionary = pool[i]
@@ -278,12 +274,16 @@ func _test_reward_ui_pool() -> void:
 		_assert(not rid in ids_seen, "7g%d: 奖励id不重复=%s" % [i, rid])
 		ids_seen.append(rid)
 
-	# 检查 15 种 id 都存在
-	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "energy_cap", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2", "energy_cap_2"]
+	# 检查 13 种 id 都存在
+	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2"]
 	for eid in expected_ids:
 		_assert(eid in ids_seen, "7h: 奖励id=%s 存在" % eid)
 
-	# normal 池 10 种，elite 池 6 种
+	# 气上限祝福已删除（气海/天罡）
+	_assert(not "energy_cap" in ids_seen, "7h1: energy_cap 已删除")
+	_assert(not "energy_cap_2" in ids_seen, "7h2: energy_cap_2 已删除")
+
+	# normal 池 6 种，elite 池 7 种
 	var normal_count := 0
 	var elite_count := 0
 	for r in pool:
@@ -291,8 +291,18 @@ func _test_reward_ui_pool() -> void:
 			elite_count += 1
 		else:
 			normal_count += 1
-	_assert(normal_count == 9, "7i: normal池9种（实际=%d）" % normal_count)
-	_assert(elite_count == 6, "7j: elite池6种（实际=%d）" % elite_count)
+	_assert(normal_count == 6, "7i: normal池6种（实际=%d）" % normal_count)
+	_assert(elite_count == 7, "7j: elite池7种（实际=%d）" % elite_count)
+
+	# unique 字段校验：蓄锐/坚壁/回生 必须为 unique
+	var unique_map := {}
+	for r in pool:
+		if r.get("unique", false):
+			unique_map[r.get("id", "")] = true
+	_assert(unique_map.has("charge_bonus"), "7k: charge_bonus 为唯一祝福")
+	_assert(unique_map.has("shield_wall"), "7l: shield_wall 为唯一祝福")
+	_assert(unique_map.has("regen"), "7m: regen 为唯一祝福")
+	_assert(unique_map.size() == 3, "7n: 唯一祝福共3个（实际=%d）" % unique_map.size())
 
 	ui.queue_free()
 
@@ -369,6 +379,46 @@ func _test_reward_ui_random_pick() -> void:
 		if not all_in_full_pool:
 			break
 	_assert(all_in_full_pool, "8e: allow_elite=true 抽取的奖励都在全池中")
+
+	# --- unique：已获取的唯一祝福不再出现 ---
+	# 蓄锐已获取 → 20 次抽取都不应再出现 charge_bonus
+	var obtained := ["charge_bonus"]
+	var no_obtained_unique := true
+	for _i in range(30):
+		var choices5 := ui._pick_random_rewards(3, true, obtained)
+		for c in choices5:
+			if c.get("id", "") == "charge_bonus":
+				no_obtained_unique = false
+				break
+		if not no_obtained_unique:
+			break
+	_assert(no_obtained_unique, "8f: 已获取的unique祝福不再出现")
+
+	# 已获取的非 unique 祝福仍可出现（blade_power）
+	var obtained2 := ["blade_power"]
+	var saw_non_unique := false
+	for _i in range(30):
+		var choices6 := ui._pick_random_rewards(3, true, obtained2)
+		for c in choices6:
+			if c.get("id", "") == "blade_power":
+				saw_non_unique = true
+				break
+		if saw_non_unique:
+			break
+	_assert(saw_non_unique, "8g: 已获取的非唯一祝福仍可出现")
+
+	# 蓄锐/坚壁/回生 全部获取后，normal+elite 全池抽取时均不出现
+	var obtained3 := ["charge_bonus", "shield_wall", "regen"]
+	var none_obtained := true
+	for _i in range(30):
+		var choices7 := ui._pick_random_rewards(3, true, obtained3)
+		for c in choices7:
+			if c.get("id", "") in obtained3:
+				none_obtained = false
+				break
+		if not none_obtained:
+			break
+	_assert(none_obtained, "8h: 3个唯一祝福全获取后均不再出现")
 
 	ui.queue_free()
 
@@ -463,11 +513,6 @@ func _test_all_buff_types_inject() -> void:
 	_apply_single_buff(player, { "id": "swift", "value": 2 })
 	_assert(player.energy == 2, "10g: swift注入")
 
-	# energy_cap
-	player.max_energy = 999
-	_apply_single_buff(player, { "id": "energy_cap", "value": 2 })
-	_assert(player.max_energy == 1001, "10h: energy_cap注入")
-
 	# protect
 	player.shield = 0
 	_apply_single_buff(player, { "id": "protect", "value": 2 })
@@ -501,11 +546,6 @@ func _test_all_buff_types_inject() -> void:
 	player.energy = 0
 	_apply_single_buff(player, { "id": "swift_2", "value": 5 })
 	_assert(player.energy == 5, "10r: swift_2注入")
-
-	# energy_cap_2（天罡/精英）：气上限+4
-	player.max_energy = 999
-	_apply_single_buff(player, { "id": "energy_cap_2", "value": 4 })
-	_assert(player.max_energy == 1003, "10s: energy_cap_2注入")
 
 	# protect_2（铁壁/精英）：5护盾
 	player.shield = 0
@@ -545,8 +585,6 @@ func _apply_single_buff(p: PlayerState, buff: Dictionary) -> void:
 			p.clone_count += buff.get("value", 1)
 		"swift", "swift_2":
 			p.add_energy(buff.get("value", 2))
-		"energy_cap", "energy_cap_2":
-			p.max_energy += buff.get("value", 2)
 		"protect", "protect_2":
 			p.shield += buff.get("value", 2)
 		"vitality", "vitality_2":
