@@ -544,10 +544,13 @@ func _find_skill_index(all_skills: Array[SkillData], _player: PlayerState, skill
 			return i
 	return -1
 
-## 选择最佳目标（最低HP的敌人）
+## 选择最佳目标（最低HP的敌人，排除队友）
 func _pick_best_target(player: PlayerState, skill: SkillData, others: Array[PlayerState], distance_system: DistanceSystem) -> int:
 	var valid: Array[PlayerState] = []
 	for other in others:
+		# 防御性过滤：排除队友（塔模式 team_id != 0 时同队不打）
+		if player.team_id != 0 and other.team_id == player.team_id:
+			continue
 		if RoundResolver.can_use_skill(player, skill, other, distance_system):
 			valid.append(other)
 	if valid.size() == 0:
@@ -597,36 +600,38 @@ func _is_tower_enemy(player: PlayerState) -> bool:
 	]
 
 ## 塔敌人分发器：按角色名调用对应策略
-## alive_players 传入完整存活列表（含队友），策略内部自行过滤敌我
+## alive_players 传入完整存活列表，分发器统一过滤为敌方列表后传给策略（医疗兵除外）
 func _decide_tower_enemy_action(
 	player: PlayerState,
 	alive_players: Array[PlayerState],
 	distance_system: DistanceSystem
 ) -> Dictionary:
 	var name := player.character.character_name
+	# 医疗兵需要全场列表（含友方）以判断治疗/攻击目标，其余只传敌方
+	var enemies := _tower_enemies(player, alive_players)
 	match name:
 		"训练兵":
-			return _ai_trainee(player, alive_players, distance_system)
+			return _ai_trainee(player, enemies, distance_system)
 		"铁盾兵":
-			return _ai_shield_guard(player, alive_players, distance_system)
+			return _ai_shield_guard(player, enemies, distance_system)
 		"爆破手":
-			return _ai_bomber(player, alive_players, distance_system)
+			return _ai_bomber(player, enemies, distance_system)
 		"术师":
-			return _ai_mage(player, alive_players, distance_system)
+			return _ai_mage(player, enemies, distance_system)
 		"医疗兵":
 			return _ai_medic(player, alive_players, distance_system)
 		"狂战士":
-			return _ai_berserker(player, alive_players, distance_system)
+			return _ai_berserker(player, enemies, distance_system)
 		"影刃":
-			return _ai_shadow_blade(player, alive_players, distance_system)
+			return _ai_shadow_blade(player, enemies, distance_system)
 		"石像鬼":
-			return _ai_gargoyle(player, alive_players, distance_system)
+			return _ai_gargoyle(player, enemies, distance_system)
 		"破败王者（怒）":
-			return _ai_blade_lord(player, alive_players, distance_system)
+			return _ai_blade_lord(player, enemies, distance_system)
 		"漩涡鸣人（仙人模式）":
-			return _ai_sage_naruto(player, alive_players, distance_system)
+			return _ai_sage_naruto(player, enemies, distance_system)
 		"司马懿（狂）":
-			return _ai_sima_yi(player, alive_players, distance_system)
+			return _ai_sima_yi(player, enemies, distance_system)
 	return {}
 
 ## 从存活列表中提取敌方目标（team_id != player.team_id）
@@ -833,6 +838,9 @@ func _has_valid_target(
 		if effect.target == SkillEffect.EffectTarget.SELF:
 			return true
 		for other in others:
+			# 防御性过滤：排除队友
+			if player.team_id != 0 and other.team_id == player.team_id:
+				continue
 			if RoundResolver.can_use_skill(player, skill, other, distance_system):
 				return true
 	return false

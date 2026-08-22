@@ -166,6 +166,49 @@ func get_small_enemy_attack_bonus(floor_num: int) -> float:
 		return 0.0
 	return get_cycle_attack_bonus(_get_cycle(floor_num))
 
+## 小怪站位优化：远程/辅助大概率放中间（离玩家更远），近战放两端
+## 环形座位中，敌人数组首尾两端紧邻玩家（距离1），中间位置距离最远
+## 70%概率执行优化站位，30%完全随机增加变化性
+func _arrange_enemy_positions(enemies: Array[CharacterData]) -> Array[CharacterData]:
+	if enemies.size() <= 1:
+		return enemies
+	# 30%概率完全随机站位
+	if _rng.randf() < 0.3:
+		enemies.shuffle()
+		return enemies
+	# 分为远程组和近战组
+	var ranged: Array[CharacterData] = []
+	var melee: Array[CharacterData] = []
+	for c in enemies:
+		if _is_ranged_character(c):
+			ranged.append(c)
+		else:
+			melee.append(c)
+	# 如果全是同类型，无需重排
+	if ranged.is_empty() or melee.is_empty():
+		return enemies
+	# 各组随机打乱
+	ranged.shuffle()
+	melee.shuffle()
+	# 近战分前后两半：前半放数组头部，后半（逆序）放数组尾部
+	var front_count: int = ceili(float(melee.size()) / 2.0)
+	var front_melee: Array[CharacterData] = melee.slice(0, front_count)
+	var back_melee: Array[CharacterData] = melee.slice(front_count, melee.size())
+	back_melee.reverse()
+	# 结果 = [近战前半] + [远程中间] + [近战后半逆序]
+	var result: Array[CharacterData] = []
+	result.append_array(front_melee)
+	result.append_array(ranged)
+	result.append_array(back_melee)
+	return result
+
+## 判断角色是否为远程/辅助型（有射程≥2的技能）
+func _is_ranged_character(c: CharacterData) -> bool:
+	for skill in c.skills:
+		if skill.max_range >= 2:
+			return true
+	return false
+
 ## 测试用：直接指定小怪索引列表生成（不做随机）
 func _generate_small_enemies_with_indices(indices: Array[int]) -> Array[CharacterData]:
 	var result: Array[CharacterData] = []
@@ -237,6 +280,10 @@ func _start_next_floor_impl() -> void:
 		return
 
 	_current_enemy_chars = enemies
+	# 小怪站位优化：远程/辅助大概率站中间（离玩家更远），近战放两端
+	if not _is_elite_floor(_current_floor) and not _is_boss_floor(_current_floor):
+		enemies = _arrange_enemy_positions(enemies)
+		_current_enemy_chars = enemies
 	_current_enemy_name = ""
 	for i in range(enemies.size()):
 		if i > 0:
