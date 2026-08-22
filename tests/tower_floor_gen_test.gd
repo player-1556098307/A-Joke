@@ -196,8 +196,18 @@ func _test_boss_floor_skip() -> void:
 		GameManager.call("_check_elimination")
 		await get_tree().process_frame
 
-	# 第16层=大Boss → 应该跳过=通关
-	_assert(victory.size() == 1, "4a: 第16层跳过触发通关（实际=%d）" % victory.size())
+	# 确保推进到第16层（可能上一个循环末尾刚触发推进但未完成）
+	if tower.is_running() and tower.get_current_floor() < 16:
+		tower.start_next_floor()
+		await get_tree().process_frame
+
+	# 第16层=大Boss → 应该有宙斯敌人，不是跳过通关
+	_assert(victory.size() == 0, "4a: 第16层不跳过通关（实际victory=%d）" % victory.size())
+	_assert(tower.is_running(), "4b: 第16层仍在运行（有Boss战）")
+	var boss_floor: int = tower.get_current_floor()
+	_assert(boss_floor == 16, "4c: 当前层=16（实际=%d）" % boss_floor)
+	var boss_name := tower.get_current_enemy_name()
+	_assert(boss_name == "宙斯（幻象）", "4d: 第16层Boss=宙斯（实际=%s）" % boss_name)
 
 	tower.queue_free()
 

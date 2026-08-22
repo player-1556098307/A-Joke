@@ -148,6 +148,18 @@ var blade_stage: int = 0
 ## 反馈怒标记数（司马懿，0-4）
 var fury_marks: int = 0
 
+## ── 宙斯Boss专属字段 ─────────────────────────────────────────
+## 当前回合剩余行动权（神权：一阶段2点/二阶段3点）
+var action_points: int = 0
+## 神怒获气标记：宙斯专属被动，无法自己聚气，其他玩家聚气或造成伤害时宙斯+1气
+var is_zeus: bool = false
+## 宙斯二阶段标记（true=当前为二阶段宙斯）
+var is_zeus_phase2: bool = false
+## 宙斯Boss标记（true=一阶段或二阶段宙斯，用于阶段切换判定）
+var is_zeus_boss: bool = false
+## 神大罚是否已使用（限定技，一局一次）
+var zeus_judgement_used: bool = false
+
 ## ── 慈悲尖塔玩家 buff 字段（层间奖励，每层注入）──────────────────
 ## 普攻固定增伤（锋刃之力：+1）
 var damage_bonus_basic: float = 0.0
@@ -357,6 +369,11 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"lifesteal_per_hit": lifesteal_per_hit,
 		"blade_stage": blade_stage,
 		"fury_marks": fury_marks,
+		"action_points": action_points,
+		"is_zeus": is_zeus,
+		"is_zeus_phase2": is_zeus_phase2,
+		"is_zeus_boss": is_zeus_boss,
+		"zeus_judgement_used": zeus_judgement_used,
 	}
 
 ## 从回溯快照恢复自身状态（全部字段）
@@ -425,6 +442,11 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	lifesteal_per_hit        = snap.get("lifesteal_per_hit", lifesteal_per_hit)
 	blade_stage              = snap.get("blade_stage", blade_stage)
 	fury_marks               = snap.get("fury_marks", fury_marks)
+	action_points            = snap.get("action_points", action_points)
+	is_zeus                  = snap.get("is_zeus", is_zeus)
+	is_zeus_phase2           = snap.get("is_zeus_phase2", is_zeus_phase2)
+	is_zeus_boss             = snap.get("is_zeus_boss", is_zeus_boss)
+	zeus_judgement_used      = snap.get("zeus_judgement_used", zeus_judgement_used)
 
 ## 重置回合临时数据（每回合开始时调用），持续状态字段不在此重置
 ## 防反（counter_stance）为持续状态：进入后持续到自己的下个回合行动开始（_start_action_input）时清除

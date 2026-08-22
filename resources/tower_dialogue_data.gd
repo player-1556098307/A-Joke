@@ -31,6 +31,17 @@ func get_floor_entry(floor_num: int) -> Dictionary:
 				{ "text": "……别心软。他不会的。" },
 			]
 		}
+		16: return {
+			"speaker": "神官 · 梅塔特隆",
+			"lines": [
+				{ "text": "到了。" },
+				{ "text": "这塔有十六层，一百零六个人死在下面。你是第一个走到这里的。" },
+				{ "text": "上面坐着的东西——它不是人，也不是神。它是塔本身长出来的意志。" },
+				{ "text": "他管自己叫宙斯。像那个丢了雷霆的旧神。不过他没有雷霆。他有的是整座塔。" },
+				{ "text": "你杀不死他。你只能让他换一身皮。" },
+				{ "text": "——去吧。他等了很久了。" },
+			]
+		}
 		_:
 			return {}
 
@@ -64,6 +75,20 @@ func get_floor_exit(floor_num: int) -> Dictionary:
 		}
 		_:
 			return {}
+
+## 宙斯一阶段→二阶段过渡对话
+func get_zeus_phase_transition_dialogue() -> Dictionary:
+	return {
+		"speaker": "",
+		"lines": [
+			{ "text": "（宙斯的身体像碎掉的镜子一样剥落——但碎片没有落地，它们在空中重新拼合）" },
+			{ "speaker": "宙斯", "text": "你以为塔只有一层皮？" },
+			{ "speaker": "宙斯", "text": "我是这座塔。你拆掉我的壳，塔还是塔。" },
+			{ "speaker": "宙斯", "text": "——再来。" },
+			{ "speaker": "神官 · 梅塔特隆", "text": "……他没在开玩笑。这不是复活，是同一座塔换了一面墙。" },
+			{ "speaker": "神官 · 梅塔特隆", "text": "别松手。他现在有三只手了。" },
+		]
+	}
 
 ## 通关对话
 func get_victory_dialogue() -> Dictionary:

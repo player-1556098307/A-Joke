@@ -31,6 +31,8 @@ var fast_mode: bool = false
 ## 战斗中剧情触发标记
 var _enemy_hp50_triggered: bool = false    ## 敌人HP首次低于50%
 var _player_eliminated_triggered: bool = false  ## 玩家队有人被淘汰
+var _zeus_phase_transition_triggered: bool = false  ## 宙斯阶段转换对话
+var _zeus_transition_prev_phase: String = "battle"  ## 转换前的phase，对话结束后恢复
 var _enemy_name: String = ""
 
 func _ready() -> void:
@@ -135,6 +137,8 @@ func _ready() -> void:
 	# 连接 GameManager 战斗中信号（剧情触发）
 	GameManager.player_eliminated.connect(_on_player_eliminated)
 	GameManager.round_resolved.connect(_on_round_resolved)
+	# 宙斯一阶段→二阶段转换对话
+	GameManager.zeus_phase_transition_required.connect(_on_zeus_phase_transition)
 
 	# 应用塔模式暗色主题
 	_ui.apply_tower_theme()
@@ -520,6 +524,8 @@ func _on_dialogue_generic_finished() -> void:
 	_fade_portrait(false)
 	if _phase == "exit_dialogue":
 		_show_reward_selection()
+	elif _phase == "zeus_transition":
+		_on_zeus_transition_dialogue_finished()
 	# 战斗中的叙事对话不改变 phase，只是弹出后消失
 
 ## 弹出层间奖励选择界面（每角色独立选祝福）
@@ -729,6 +735,28 @@ func _on_player_eliminated(_player_id: int) -> void:
 	}
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
+
+## 宙斯一阶段→二阶段转换：弹出过渡对话
+func _on_zeus_phase_transition(_zeus_id: int) -> void:
+	if fast_mode:
+		return
+	_zeus_phase_transition_triggered = true
+	var data := TowerDialogueData.new().get_zeus_phase_transition_dialogue()
+	if data.is_empty():
+		return
+	# 暂存当前 phase，对话结束后恢复
+	_zeus_transition_prev_phase = _phase
+	_phase = "zeus_transition"
+	_dialogue_box.visible = true
+	_dialogue_box.start(data)
+
+## 宙斯阶段转换对话结束 → 恢复战斗 phase + 刷新UI
+func _on_zeus_transition_dialogue_finished() -> void:
+	_dialogue_box.visible = false
+	_fade_portrait(false)
+	_phase = _zeus_transition_prev_phase
+	# 刷新UI：宙斯换了角色.tres，头像/血量/技能列表需要更新
+	_ui.setup_players(GameManager.get_alive_players())
 
 # ============================================================
 #  梅塔特隆立绘

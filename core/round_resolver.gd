@@ -536,6 +536,16 @@ static func _apply_single_effect(
 			target.counter_stance = true
 			return { "counter_stance": true }
 
+		SkillEffect.EffectType.SHIELD:
+			# 数值护盾：value>0 在已有基础上累加；value=-1 为一次性全挡（不叠加，直接覆盖）
+			if effect.value < 0:
+				target.shield = -1
+			else:
+				if target.shield < 0:
+					target.shield = 0
+				target.shield += int(effect.value)
+			return { "shield_value": int(effect.value), "total_shield": target.shield }
+
 		SkillEffect.EffectType.CHANGE_DISTANCE:
 			distance_system.modify_distance(attacker.player_id, target.player_id, effect.value)
 			var new_dist: int = distance_system.get_distance(attacker.player_id, target.player_id)

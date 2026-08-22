@@ -1,0 +1,63 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+; ── 普攻：1耗1伤范围1 ──
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1.0
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "近身一击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+; ── 地狱魔杀：5耗范围1造成7伤 ──
+[sub_resource type="Resource" id="SE_hell"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 7.0
+target = 0
+
+[sub_resource type="Resource" id="SD_hell"]
+script = ExtResource("2_skill")
+skill_name = "地狱魔杀"
+description = "对目标造成 7 点伤害。"
+energy_cost = 5
+min_range = 1
+max_range = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_hell")])
+
+; ── 壳：2耗给自己和宙斯套圣盾 ──
+; 对自己用SHIELD
+[sub_resource type="Resource" id="SE_shell_self"]
+script = ExtResource("1_effect")
+effect_type = 1
+value = 1.0
+target = 2
+
+[sub_resource type="Resource" id="SD_shell"]
+script = ExtResource("2_skill")
+skill_name = "壳"
+description = "消耗 2 气，为自己获得 1 个圣盾（宙斯护盾由系统额外处理）。"
+energy_cost = 2
+min_range = 0
+max_range = 0
+effects = Array[ExtResource("1_effect")]([SubResource("SE_shell_self")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "克罗狄亚"
+max_hp = 15
+basic_attack_cost = 1
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_hell"), SubResource("SD_shell")])
+tags = Array[String](["战士"])
+grade = "A"

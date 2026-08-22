@@ -96,6 +96,12 @@ func decide_action(
 		if result.size() > 0:
 			return result
 
+	# 宙斯Boss特殊策略
+	if _is_zeus(player):
+		return _decide_zeus_action(player, alive_players, distance_system)
+
+	# 宙斯召唤物策略（异种/克罗狄亚走标准普攻逻辑即可）
+
 	# 收集所有能量+钟足够且有合法目标的技能
 	var all_skills := player.get_all_skills()
 	var usable: Array[Dictionary] = []
@@ -599,6 +605,20 @@ func _is_tower_enemy(player: PlayerState) -> bool:
 		"破败王者（怒）", "漩涡鸣人（仙人模式）", "司马懿（狂）"
 	]
 
+## 判断角色是否为宙斯Boss
+func _is_zeus(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	var name := player.character.character_name
+	return name == "宙斯（幻象）" or name == "宙斯（幻象·二阶段）"
+
+## 判断角色是否为异种或克罗狄亚（宙斯召唤物）
+func _is_zeus_summon(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	var name := player.character.character_name
+	return name == "异种" or name == "克罗狄亚"
+
 ## 塔敌人分发器：按角色名调用对应策略
 ## alive_players 传入完整存活列表，分发器统一过滤为敌方列表后传给策略（医疗兵除外）
 func _decide_tower_enemy_action(
@@ -825,6 +845,70 @@ func _ai_sima_yi(player: PlayerState, enemies: Array[PlayerState], ds: DistanceS
 		if target >= 0:
 			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
 	return {}
+
+## ── 宙斯Boss AI策略 ───────────────────────────────────────────────
+## 宙斯拥有多个行动权，每次行动按优先级决策：
+## 1. 神大罚（限定技）：HP≤25且未用时，选最高血敌人
+## 2. 神罚：有1气时AOE伤害（优先消耗气）
+## 3. 变异军团：有行动权且召唤物未满时召唤
+## 4. 神盾：无盾时用行动权加盾
+## 5. 无可用行动时聚气（但宙斯聚气=0气，相当于跳过）
+func _decide_zeus_action(
+	player: PlayerState,
+	alive_players: Array[PlayerState],
+	distance_system: DistanceSystem
+) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	var enemies := _tower_enemies(player, alive_players)
+	var is_phase2 := player.character.character_name == "宙斯（幻象·二阶段）"
+
+	# 1. 神大罚（限定技）：HP≤25且未使用，选最高血敌人
+	if player.hp <= 25 and not player.zeus_judgement_used:
+		var judge_idx := _find_skill_index(all_skills, player, "神大罚")
+		if judge_idx >= 0:
+			# 选HP最高的敌人
+			var best_target := -1
+			var best_hp := -1.0
+			for e in enemies:
+				if e.is_alive and e.hp > best_hp:
+					best_hp = e.hp
+					best_target = e.player_id
+			if best_target >= 0:
+				return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": judge_idx, "target_id": best_target }
+
+	# 2. 神罚：有1气时AOE
+	if player.energy >= 1:
+		var punish_idx := _find_skill_index(all_skills, player, "神罚")
+		if punish_idx >= 0:
+			# 神罚是AOE，目标可为任意（GameManager用ENEMY_ALL处理）
+			var target := _pick_best_target(player, all_skills[punish_idx], enemies, distance_system)
+			if target >= 0:
+				return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": punish_idx, "target_id": target }
+
+	# 3. 变异军团：有行动权且召唤物未满时召唤
+	if player.action_points > 0:
+		# 检查已有召唤物数量
+		var existing := 0
+		for p in alive_players:
+			if p.team_id == player.team_id:
+				if is_phase2 and p.character.character_name == "克罗狄亚":
+					existing += 1
+				elif not is_phase2 and p.character.character_name == "异种":
+					existing += 1
+		var max_summons := 1 if is_phase2 else 2
+		if existing < max_summons:
+			var summon_idx := _find_skill_index(all_skills, player, "变异军团")
+			if summon_idx >= 0:
+				return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": summon_idx, "target_id": player.player_id }
+
+	# 4. 神盾：无盾时有行动权则加盾
+	if player.shield == 0 and player.action_points > 0:
+		var shield_idx := _find_skill_index(all_skills, player, "神盾")
+		if shield_idx >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": shield_idx, "target_id": player.player_id }
+
+	# 5. 无可用行动：聚气（宙斯聚气得0气但消耗行动权结束回合）
+	return { "action": PlayerState.ActionType.CHARGE, "skill_index": -1, "target_id": -1 }
 
 
 ## 检查技能是否有至少一个合法目标（包含 SELF 类型和敌对目标）

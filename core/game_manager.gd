@@ -279,6 +279,21 @@ var _prep_current_skill_index: int = -1
 ## 投影待定上下文（等待UI/网络选择目标与技能）
 var _project_pending: Dictionary = {}
 
+## ── 宙斯Boss阶段状态 ──────────────────────────────────────────
+## 召唤物自增ID（用于分配新player_id）
+var _zeus_next_player_id: int = 100
+## 宙斯二阶段转换中标记（true=一阶段宙斯死亡后正在等待外部推进二阶段）
+var _zeus_phase_transition: bool = false
+## 二阶段切换后保留的玩家HP/状态
+var _zeus_phase2_pending: bool = false
+
+## 宙斯召唤物死亡爆炸信号
+signal zeus_summon_destroyed(summon_id: int, damage_to_zeus: int, zeus_id: int)
+## 宙斯二阶段转换信号
+signal zeus_phase_transition_required(zeus_id: int)
+## 宙斯行动权变化信号
+signal zeus_action_points_changed(player_id: int, points: int)
+
 func _ready() -> void:
 	_ai_controller = AIController.new()
 	_resolve_timer = Timer.new()
@@ -346,11 +361,22 @@ func setup_game(config: Dictionary) -> void:
 	_distance_system.setup(seat_order)
 
 	_debug_force_scissors = config.get("debug_force_scissors", false)
-	# 尖塔祝福：拥有尖塔祝福技能的角色开局获得2个气
+	# 尖塔祝福：拥有尖塔祝福技能的角色开局获得2个气（宙斯=5个气由value指定）
 	for p in _players:
 		if _has_tower_blessing(p):
-			p.add_energy(2)
+			var blessing_value := _get_tower_blessing_value(p)
+			p.add_energy(blessing_value)
 			player_charged.emit(p.player_id, p.energy)
+	# ── 宙斯Boss初始化 ──
+	for p in _players:
+		if _is_zeus(p):
+			p.is_zeus = true
+			p.is_zeus_boss = true
+			# 神怒：宙斯无法自己聚气 → 设气上限0使其add_energy无效
+			# 但开局5气已经在上面给了，这里设max_energy=999以保留已给气
+			# 神怒的真正实现在于：宙斯聚气时不获得气（_apply_actions中跳过）
+			# 行动权由 _start_action_input 初始化
+			_zeus_next_player_id = max(_zeus_next_player_id, _players.size() + 100)
 	_init_match_record()
 	_enter_phase.call_deferred(GamePhase.GESTURE_INPUT)
 
@@ -877,25 +903,38 @@ func _start_action_input() -> void:
 		return
 
 	# 防反状态：触发后已在结算时取消；此处清理未触发而残留到下回合开始的防反
-	if winner.counter_stance:
-		winner.counter_stance = false
-		counter_stance_ended.emit(winner.player_id)
-	# 宇智波流招架状态：与防反一致，自己的下个回合开始时清除
-	if winner.uchiha_stance:
-		winner.uchiha_stance = false
+	# 宙斯多行动权重入ACTION_INPUT时跳过（仅在真正新回合开始时处理）
+	var _is_zeus_reentry := _is_zeus(winner) and _prev_phase == GamePhase.APPLYING
+	if not _is_zeus_reentry:
+		if winner.counter_stance:
+			winner.counter_stance = false
+			counter_stance_ended.emit(winner.player_id)
+		# 宇智波流招架状态：与防反一致，自己的下个回合开始时清除
+		if winner.uchiha_stance:
+			winner.uchiha_stance = false
 
-	# 连续回合追踪：如果本回合胜者与上回合相同则+1，否则重置为1
-	if _sole_winner_id == _prev_winner_id:
-		winner.consecutive_rounds += 1
+		# 连续回合追踪：如果本回合胜者与上回合相同则+1，否则重置为1
+		if _sole_winner_id == _prev_winner_id:
+			winner.consecutive_rounds += 1
+		else:
+			winner.consecutive_rounds = 1
+		_prev_winner_id = _sole_winner_id
+
+		# 慈悲尖塔 buff：回生 — 自己回合开始时回复 regen_per_round 点 HP
+		_process_tower_regen(winner)
+
+		# 鬼才（司马懿）：连续获得两回合时，额外获得一个回合（下回合强制判胜）
+		_process_genius(winner)
+
+	# ── 宙斯Boss：行动权初始化（仅在新回合首次进入时设置，多行动权重入时跳过）──
+	if _is_zeus(winner):
+		# 仅在从 PREPARATION 首次进入 ACTION_INPUT 时初始化行动权
+		# 多行动权返回 ACTION_INPUT 时 _prev_phase == APPLYING，跳过初始化
+		if _prev_phase != GamePhase.APPLYING:
+			winner.action_points = 3 if _is_zeus_phase2_character(winner) else 2
+			zeus_action_points_changed.emit(winner.player_id, winner.action_points)
 	else:
-		winner.consecutive_rounds = 1
-	_prev_winner_id = _sole_winner_id
-
-	# 慈悲尖塔 buff：回生 — 自己回合开始时回复 regen_per_round 点 HP
-	_process_tower_regen(winner)
-
-	# 鬼才（司马懿）：连续获得两回合时，额外获得一个回合（下回合强制判胜）
-	_process_genius(winner)
+		winner.action_points = 1
 
 	action_required.emit(_sole_winner_id)
 
@@ -929,16 +968,18 @@ func _apply_actions() -> void:
 
 	match winner.pending_action:
 		PlayerState.ActionType.CHARGE:
-			# 影分身存在时聚气加成 +2，否则 +1
-			var gain: int = 1 + winner.clone_count
-			# 仙人之力（仙人鸣人）：聚气额外+1
-			# 注意：不能用"仙人之力"技能名判断——秽土柱间也有同名被动（跺脚+气上限6），会误判给柱间加聚气
-			if _tower_has_skill(winner, "蛙组手"):
-				gain += 1
-			# ── 慈悲尖塔 buff：蓄锐每回合额外聚气 ──
-			gain += winner.charge_bonus
-			winner.add_energy(gain)
-			player_charged.emit(_sole_winner_id, winner.energy)
+			# ── 宙斯·神怒：宙斯无法聚气（聚气时获得0气）──
+			if not _is_zeus(winner):
+				# 影分身存在时聚气加成 +2，否则 +1
+				var gain: int = 1 + winner.clone_count
+				# 仙人之力（仙人鸣人）：聚气额外+1
+				# 注意：不能用"仙人之力"技能名判断——秽土柱间也有同名被动（跺脚+气上限6），会误判给柱间加聚气
+				if _tower_has_skill(winner, "蛙组手"):
+					gain += 1
+				# ── 慈悲尖塔 buff：蓄锐每回合额外聚气 ──
+				gain += winner.charge_bonus
+				winner.add_energy(gain)
+				player_charged.emit(_sole_winner_id, winner.energy)
 			var cs: PlayerMatchStats = _match_record.player_stats.get(_sole_winner_id)
 			if cs:
 				cs.charge_count += 1
@@ -946,6 +987,9 @@ func _apply_actions() -> void:
 			_process_gate_open(winner)
 			# 泉奈·荣耀解锁：聚气达到4时自动解锁（消耗4气；使用后需再次聚气4解锁）
 			_process_glory_unlock(winner)
+			# ── 宙斯·神怒：其他玩家聚气时宙斯+1气（宙斯自己不聚气）──
+			if not _is_zeus(winner):
+				_process_zeus_divine_wrath(winner.player_id, true, false)
 			# Record charge action in replay snapshot
 			if _current_snapshot:
 				var alog := ActionLog.new()
@@ -1157,6 +1201,89 @@ func _apply_actions() -> void:
 				_enter_phase(GamePhase.ELIMINATION)
 				return
 
+			# ── 宙斯Boss技能特殊处理 ──────────────────────────────
+			if _is_zeus(winner):
+				# 神罚：1气AOE，正常走apply_effects（能量由apply_effects内部扣除）
+				if skill.skill_name == "神罚":
+					var punish_logs := RoundResolver.apply_effects(winner, skill, targets, _distance_system, splash_targets)
+					for entry in punish_logs:
+						_emit_effect_signals(entry)
+					skill_applied.emit(punish_logs)
+					player_charged.emit(_sole_winner_id, winner.energy)
+					_record_action(winner, skill, punish_logs)
+					# 消耗1行动权
+					winner.action_points -= 1
+					zeus_action_points_changed.emit(winner.player_id, winner.action_points)
+					if winner.action_points > 0 and winner.is_alive:
+						_enter_phase(GamePhase.ACTION_INPUT)
+					else:
+						winner.action_points = 0
+						_enter_phase(GamePhase.ELIMINATION)
+					return
+				# 神盾：消耗1行动权获得1圣盾（0气）
+				if skill.skill_name == "神盾":
+					winner.shield += 1
+					player_shielded.emit(winner.player_id, 1.0)
+					winner.action_points -= 1
+					zeus_action_points_changed.emit(winner.player_id, winner.action_points)
+					var shield_logs: Array[Dictionary] = [{
+						"attacker_id": winner.player_id,
+						"target_id": winner.player_id,
+						"effect_type": SkillEffect.EffectType.SHIELD,
+						"value": 1.0,
+						"result": {"shield_gained": 1},
+					}]
+					skill_applied.emit(shield_logs)
+					_record_action(winner, skill, shield_logs)
+					if winner.action_points > 0 and winner.is_alive:
+						_enter_phase(GamePhase.ACTION_INPUT)
+					else:
+						winner.action_points = 0
+						_enter_phase(GamePhase.ELIMINATION)
+					return
+				# 神大罚：限定技，0气0行动权，使目标HP降至1并麻痹3回合
+				if skill.skill_name == "神大罚":
+					var judge_target: PlayerState = targets[0] if targets.size() > 0 else null
+					if judge_target == null:
+						_enter_phase(GamePhase.ELIMINATION)
+						return
+					judge_target.hp = 1.0
+					judge_target.paralyze_turns = 3
+					player_paralyzed.emit(judge_target.player_id, 3)
+					winner.zeus_judgement_used = true
+					if not skill.skill_name in winner.limited_skills_used:
+						winner.limited_skills_used.append(skill.skill_name)
+					var judge_logs: Array[Dictionary] = [{
+						"attacker_id": winner.player_id,
+						"target_id": judge_target.player_id,
+						"effect_type": SkillEffect.EffectType.ZEUS_JUDGEMENT,
+						"value": 3.0,
+						"result": {"hp_set_to": 1, "paralyzed": 3},
+					}]
+					skill_applied.emit(judge_logs)
+					_record_action(winner, skill, judge_logs)
+					# 神大罚消耗1行动权
+					winner.action_points -= 1
+					zeus_action_points_changed.emit(winner.player_id, winner.action_points)
+					if winner.action_points > 0 and winner.is_alive:
+						_enter_phase(GamePhase.ACTION_INPUT)
+					else:
+						winner.action_points = 0
+						_enter_phase(GamePhase.ELIMINATION)
+					return
+				# 变异军团：消耗1行动权召唤异种或克罗狄亚
+				if skill.skill_name == "变异军团":
+					winner.action_points -= 1
+					zeus_action_points_changed.emit(winner.player_id, winner.action_points)
+					# 执行召唤
+					_zeus_perform_summon(winner, skill)
+					if winner.action_points > 0 and winner.is_alive:
+						_enter_phase(GamePhase.ACTION_INPUT)
+					else:
+						winner.action_points = 0
+						_enter_phase(GamePhase.ELIMINATION)
+					return
+
 			# ── 飞雷神拦截检查 ──────────────────────────────────────
 			# 检查目标中是否有波风水门且可触发换位/闪避
 			var ftg_result := _check_ftg_intercept(winner, skill, targets)
@@ -1248,6 +1375,9 @@ func _apply_actions() -> void:
 						var res: Dictionary = entry.get("result", {})
 						if res.get("damage_dealt", 0) > 0:
 							winner.dealt_damage_this_round = true
+							# ── 宙斯·神怒：其他玩家造成伤害时宙斯+1气 ──
+							if not _is_zeus(winner):
+								_process_zeus_divine_wrath(winner.player_id, false, true)
 							break
 			for entry in logs:
 				_emit_effect_signals(entry)
@@ -1294,6 +1424,22 @@ func _apply_actions() -> void:
 					_process_blade_of_the_fallen(winner, hit_target, bhp)
 					_process_fury_burst(winner, hit_target)
 
+			# ── 克罗狄亚·壳：额外给同队宙斯+1圣盾 ──
+			if skill.skill_name == "壳" and _is_clodia(winner):
+				for p in _players:
+					if p.is_alive and _is_zeus(p) and p.team_id == winner.team_id:
+						p.shield += 1
+						player_shielded.emit(p.player_id, 1.0)
+						break
+
+	# ── 宙斯Boss行动权系统：行动后检查剩余行动权 ──
+	if _is_zeus(winner) and winner.is_alive and winner.action_points > 0:
+		# 还有行动权，回到行动选择阶段
+		_enter_phase(GamePhase.ACTION_INPUT)
+		return
+	# 非宙斯或行动权耗尽：正常进入淘汰检测
+	if _is_zeus(winner):
+		winner.action_points = 0
 	_enter_phase(GamePhase.ELIMINATION)
 
 ## 构建技能目标列表：ENEMY_ALL 取全部敌人，ENEMY_SINGLE 取指定目标
@@ -2064,6 +2210,21 @@ func _check_elimination() -> void:
 			# 夺舍体死亡：回退到夺舍前止水状态（不淘汰、不终止游戏）
 			if _revert_takeover_if_needed(player):
 				continue
+			# ── 宙斯Boss召唤物死亡：爆炸伤害宙斯 ──
+			if _is_mutant(player) or _is_clodia(player):
+				_process_zeus_summon_explosion(player)
+				player.is_alive = false
+				_distance_system.remove_player(player.player_id)
+				player_eliminated.emit(player.player_id)
+				var es_summon: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
+				if es_summon:
+					es_summon.elimination_round = _current_round_number
+					es_summon.elimination_reason = "召唤物死亡"
+				continue
+			# ── 宙斯一阶段死亡：触发二阶段转换（不淘汰）──
+			if _is_zeus(player) and not player.is_zeus_phase2:
+				_zeus_start_phase_transition(player)
+				continue
 			# 尝试触发止水别天神（击杀者自动夺舍）
 			var killer := get_player(player.last_hit_by_id)
 			if killer != null and killer.is_alive and _is_shisui(killer) \
@@ -2231,6 +2392,17 @@ func _end_round() -> void:
 	# 九尾伤害后检测淘汰
 	for player in _players:
 		if player.is_alive and player.hp <= 0:
+			# 宙斯召唤物死亡爆炸
+			if _is_mutant(player) or _is_clodia(player):
+				_process_zeus_summon_explosion(player)
+				player.is_alive = false
+				_distance_system.remove_player(player.player_id)
+				player_eliminated.emit(player.player_id)
+				continue
+			# 宙斯一阶段死亡：触发二阶段转换
+			if _is_zeus(player) and not player.is_zeus_phase2:
+				_zeus_start_phase_transition(player)
+				continue
 			player.is_alive = false
 			_distance_system.remove_player(player.player_id)
 			player_eliminated.emit(player.player_id)
@@ -2241,6 +2413,17 @@ func _end_round() -> void:
 	# 延迟伤害后再次检测淘汰
 	for player in _players:
 		if player.is_alive and player.hp <= 0:
+			# 宙斯召唤物死亡爆炸
+			if _is_mutant(player) or _is_clodia(player):
+				_process_zeus_summon_explosion(player)
+				player.is_alive = false
+				_distance_system.remove_player(player.player_id)
+				player_eliminated.emit(player.player_id)
+				continue
+			# 宙斯一阶段死亡：触发二阶段转换
+			if _is_zeus(player) and not player.is_zeus_phase2:
+				_zeus_start_phase_transition(player)
+				continue
 			player.is_alive = false
 			_distance_system.remove_player(player.player_id)
 			player_eliminated.emit(player.player_id)
@@ -2949,6 +3132,146 @@ func _tower_has_skill(player: PlayerState, skill_name: String) -> bool:
 ## 尖塔祝福：开局获得2个气
 func _has_tower_blessing(player: PlayerState) -> bool:
 	return _tower_has_skill(player, "尖塔祝福")
+
+## 获取尖塔祝福的气值（默认2，宙斯神赐=5）
+func _get_tower_blessing_value(player: PlayerState) -> int:
+	for skill in player.character.skills:
+		if skill.is_passive and skill.skill_name == "尖塔祝福":
+			for effect in skill.effects:
+				if effect.effect_type == SkillEffect.EffectType.TOWER_BLESSING:
+					return int(effect.value)
+	return 2
+
+## 判断玩家是否为宙斯Boss（一阶段或二阶段）
+func _is_zeus(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	var name := player.character.character_name
+	return name == "宙斯（幻象）" or name == "宙斯（幻象·二阶段）"
+
+## 判断玩家是否为宙斯一阶段
+func _is_zeus_phase1(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	return player.character.character_name == "宙斯（幻象）"
+
+## 判断玩家是否为宙斯二阶段
+func _is_zeus_phase2_character(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	return player.character.character_name == "宙斯（幻象·二阶段）"
+
+## 判断玩家是否为异种召唤物
+func _is_mutant(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	return player.character.character_name == "异种"
+
+## 判断玩家是否为克罗狄亚召唤物
+func _is_clodia(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	return player.character.character_name == "克罗狄亚"
+
+## ── 宙斯Boss召唤系统 ─────────────────────────────────────────
+## 执行 summons（异种或克罗狄亚）
+func _zeus_perform_summon(zeus: PlayerState, skill: SkillData) -> void:
+	# 检查召唤物类型
+	var is_phase2 := _is_zeus_phase2_character(zeus)
+	# 检查已有召唤物数量限制
+	var existing_count := 0
+	for p in _players:
+		if p.is_alive:
+			if is_phase2 and _is_clodia(p):
+				existing_count += 1
+			elif not is_phase2 and _is_mutant(p):
+				existing_count += 1
+	var max_summons := 1 if is_phase2 else 2
+	if existing_count >= max_summons:
+		# 已满，不召唤
+		return
+	# 加载召唤物角色资源
+	var char_path := "res://resources/characters/tower/克罗狄亚.tres" if is_phase2 else "res://resources/characters/tower/异种.tres"
+	var summon_char := load(char_path) as CharacterData
+	if summon_char == null:
+		return
+	# 分配新player_id
+	_zeus_next_player_id += 1
+	var new_id := _zeus_next_player_id
+	var summon_state := PlayerState.new(new_id, summon_char.character_name, summon_char, false)
+	summon_state.team_id = zeus.team_id  # 召唤物与宙斯同队
+	summon_state.action_points = 0
+	# 添加到玩家列表和距离系统
+	_players.append(summon_state)
+	# 距离系统：将召唤物插入宙斯旁边的座位
+	_distance_system._seat_order.insert(_distance_system._seat_order.find(zeus.player_id) + 1, new_id)
+	# 发射信号
+	skill_applied.emit([{
+		"attacker_id": zeus.player_id,
+		"target_id": new_id,
+		"effect_type": SkillEffect.EffectType.ZEUS_SUMMON_MUTANT if not is_phase2 else SkillEffect.EffectType.ZEUS_SUMMON_CLODIA,
+		"value": 0.0,
+		"result": {"summon_id": new_id, "summon_name": summon_char.character_name},
+	}])
+	# 记录行动
+	_record_action(zeus, skill, [{
+		"attacker_id": zeus.player_id,
+		"target_id": new_id,
+		"skill_name": skill.skill_name,
+		"summon": true,
+	}])
+
+## 召唤物死亡爆炸：异种-1伤/克罗狄亚-3伤对宙斯
+func _process_zeus_summon_explosion(summon: PlayerState) -> void:
+	if not _is_mutant(summon) and not _is_clodia(summon):
+		return
+	# 找到同队的宙斯
+	var zeus: PlayerState = null
+	for p in _players:
+		if p.is_alive and _is_zeus(p) and p.team_id == summon.team_id:
+			zeus = p
+			break
+	if zeus == null:
+		return
+	var damage := 1 if _is_mutant(summon) else 3
+	# 爆炸伤害走真实伤害（直接扣HP，不经过吸收链）
+	zeus.hp = max(0.0, zeus.hp - float(damage))
+	zeus_summon_destroyed.emit(summon.player_id, damage, zeus.player_id)
+	burn_damage_triggered.emit(zeus.player_id, float(damage), zeus.hp, "召唤物爆炸")
+
+## 宙斯二阶段转换：一阶段宙斯HP归零时触发
+## 不淘汰宙斯，而是切换到二阶段角色，保留玩家状态
+func _zeus_start_phase_transition(zeus: PlayerState) -> void:
+	# 加载二阶段角色
+	var phase2_char := load("res://resources/characters/tower/宙斯（幻象·二阶段）.tres") as CharacterData
+	if phase2_char == null:
+		return
+	# 切换角色
+	zeus.character = phase2_char
+	# 回复到满血
+	zeus.hp = phase2_char.max_hp
+	# 重置限定技
+	zeus.zeus_judgement_used = false
+	zeus.limited_skills_used.clear()
+	# 标记为二阶段
+	zeus.is_zeus_phase2 = true
+	# 保持气量
+	# 行动权重置在下一回合 _start_action_input 中自动处理
+	_zeus_phase_transition = false
+	# 发信号通知UI
+	zeus_phase_transition_required.emit(zeus.player_id)
+
+## 神怒获气：其他玩家聚气或造成伤害时，场上宙斯+1气
+func _process_zeus_divine_wrath(excluded_id: int, _is_charge: bool = false, _is_damage: bool = false) -> void:
+	if not _is_tower_mode:
+		return
+	for p in _players:
+		if p.is_alive and _is_zeus(p) and p.player_id != excluded_id:
+			# 神怒：宙斯不聚气但获得1气（直接加，不经过聚气逻辑）
+			# 宙斯的max_energy默认999，add_energy正常工作
+			p.energy += 1
+			p.energy = min(p.energy, p.max_energy)
+			player_charged.emit(p.player_id, p.energy)
 
 ## 破败王者之刃（锁定技）：普攻命中后按阶段触发
 ## 阶段1（第1次普攻）：附带目标现有生命值（普攻结算前）50%的伤害

@@ -96,7 +96,7 @@ func peek_next_floor_name() -> String:
 	if next_floor > MAX_FLOORS:
 		return ""
 	if _is_boss_floor(next_floor):
-		return "???"
+		return "宙斯（幻象）"
 	if _is_elite_floor(next_floor):
 		var elite_idx := _used_elite_count
 		if elite_idx < ELITE_PATHS.size():
@@ -254,15 +254,19 @@ func _start_next_floor_impl() -> void:
 		return
 	_current_floor += 1
 
-	# 大Boss层（第16层）：暂时跳过=通关
-	if _is_boss_floor(_current_floor):
-		_running = false
-		tower_victory.emit()
-		return
-
 	# 生成本层敌人
 	var enemies: Array[CharacterData] = []
-	if _is_elite_floor(_current_floor):
+
+	# 大Boss层（第16层）：宙斯（幻象）
+	if _is_boss_floor(_current_floor):
+		var boss_char := load("res://resources/characters/tower/宙斯（幻象）.tres") as CharacterData
+		if boss_char != null:
+			enemies.append(boss_char)
+		else:
+			_running = false
+			tower_victory.emit()
+			return
+	elif _is_elite_floor(_current_floor):
 		# 精英怪层：按顺序取，不重复
 		var elite_idx := _used_elite_count
 		if elite_idx < ELITE_PATHS.size():

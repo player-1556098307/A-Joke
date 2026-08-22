@@ -1894,14 +1894,7 @@ func _on_gesture_submitted(player_id: int, gesture: PlayerState.Gesture) -> void
 	_mark_decided(player_id)
 
 func _play_all_gesture_reveals() -> void:
-	# Print all deferred log messages first
-	for entry in _pending_reveals:
-		var log_pid: int = entry["player_id"]
-		var log_prefix: String = entry.get("prefix", "")
-		var log_name: String = entry.get("p_name", str(log_pid))
-		var log_gname: String = entry.get("gname", "")
-		_append_log("%s%s 出了 %s" % [log_prefix, log_name, log_gname], LT_PHASE, log_pid)
-
+	# 战斗日志不再显示猜拳过程（"XX 出了 石头"），仅由 _on_round_resolved 显示获胜方
 	var gesture_emojis: PackedStringArray = ["", "✊", "✌", "✋", "⏭"]
 	var popups: Array[Label] = []
 

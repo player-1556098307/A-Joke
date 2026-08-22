@@ -1,0 +1,96 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+; ── 无普攻：宙斯没有普攻技能 ──
+
+; ── 神罚：1耗，对所有其他玩家造成1点伤害（ENEMY_ALL）──
+[sub_resource type="Resource" id="SE_punish"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1.0
+target = 1
+
+[sub_resource type="Resource" id="SD_punish"]
+script = ExtResource("2_skill")
+skill_name = "神罚"
+description = "对所有其他玩家造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_punish")])
+
+; ── 神盾：消耗1行动权获得1圣盾（0耗，SELF）──
+[sub_resource type="Resource" id="SE_shield"]
+script = ExtResource("1_effect")
+effect_type = 1
+value = 1.0
+target = 2
+
+[sub_resource type="Resource" id="SD_shield"]
+script = ExtResource("2_skill")
+skill_name = "神盾"
+description = "消耗 1 点行动权，获得 1 个圣盾。"
+energy_cost = 0
+min_range = 0
+max_range = 0
+effects = Array[ExtResource("1_effect")]([SubResource("SE_shield")])
+
+; ── 神大罚：限定技，0耗，使一名玩家HP降至1并麻痹3回合（HP≤25可用）──
+[sub_resource type="Resource" id="SE_judgement"]
+script = ExtResource("1_effect")
+effect_type = 46
+value = 3.0
+target = 0
+
+[sub_resource type="Resource" id="SD_judgement"]
+script = ExtResource("2_skill")
+skill_name = "神大罚"
+description = "限定技（0耗，HP≤25时可用）：使一名玩家体力流失至 1，并麻痹 3 回合。"
+energy_cost = 0
+min_range = 1
+max_range = 999
+is_limited = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_judgement")])
+
+; ── 变异军团：消耗1行动权召唤1个异种（0耗，SELF标记，方向0=顺时针）──
+[sub_resource type="Resource" id="SE_summon_mutant"]
+script = ExtResource("1_effect")
+effect_type = 47
+value = 0.0
+target = 2
+
+[sub_resource type="Resource" id="SD_summon_mutant"]
+script = ExtResource("2_skill")
+skill_name = "变异军团"
+description = "消耗 1 点行动权，在顺时针或逆时针方向召唤 1 个异种（异种不超过 2 个）。"
+energy_cost = 0
+min_range = 0
+max_range = 0
+effects = Array[ExtResource("1_effect")]([SubResource("SE_summon_mutant")])
+
+; ── 神赐（被动）：开局获得5个气 ──
+[sub_resource type="Resource" id="SE_gift"]
+script = ExtResource("1_effect")
+effect_type = 37
+value = 5
+target = 2
+
+[sub_resource type="Resource" id="SD_gift"]
+script = ExtResource("2_skill")
+skill_name = "尖塔祝福"
+description = "开局获得 5 个气。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_gift")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "宙斯（幻象）"
+max_hp = 50
+basic_attack_cost = 1
+skills = Array[ExtResource("2_skill")]([SubResource("SD_punish"), SubResource("SD_shield"), SubResource("SD_judgement"), SubResource("SD_summon_mutant"), SubResource("SD_gift")])
+tags = Array[String](["神"])
+grade = "S"
