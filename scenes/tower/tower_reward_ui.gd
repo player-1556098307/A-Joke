@@ -375,6 +375,11 @@ func _build_ui() -> void:
 func get_reward_pool() -> Array:
 	return REWARD_POOL.duplicate(true)
 
+## 设置副标题文本（用于显示当前选祝福的角色名）
+func set_subtitle(text: String) -> void:
+	if _subtitle_label != null:
+		_subtitle_label.text = text
+
 ## 关闭界面（不选择）
 func close() -> void:
 	_is_active = false

@@ -20,6 +20,11 @@ var _buff_panel: Panel
 var _buff_panel_box: VBoxContainer  ## 面板内布局容器（Panel 非容器，须用 VBox 排布子控件）
 var _buff_panel_visible: bool = false
 
+## 每角色独立祝福选择：当前选祝福的角色索引（0=队长, 1=队友1, 2=队友2）
+var _reward_player_index: int = 0
+## 本层队伍中 team_id=1 的玩家数量
+var _party_size: int = 1
+
 ## 测试快速模式：跳过所有过渡动画和对话，直接启动战斗/推进层
 var fast_mode: bool = false
 
@@ -179,18 +184,34 @@ func _begin_floor_battle(_floor_num: int) -> void:
 	# 战斗阶段显示 buff 查看按钮（有祝福时才显示）
 	_update_buff_btn_visibility()
 
-## 注入慈悲尖塔层间奖励 buff 到玩家队（每层 setup_game 后调用）
+## 注入慈悲尖塔层间奖励 buff 到玩家队（每角色独立注入）
 func _inject_tower_buffs() -> void:
-	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
-	if buffs.is_empty():
-		return
+	# 兼容旧结构：若存在全局 tower_buffs 则迁移到 per_player
+	var old_buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	if not old_buffs.is_empty():
+		var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+		if per_player.is_empty():
+			# 迁移：旧 buff 全部给队长（索引0）
+			per_player = [[]]
+			per_player[0] = old_buffs.duplicate(true)
+			SceneManager.last_tower_config["tower_buffs_per_player"] = per_player
+		SceneManager.last_tower_config.erase("tower_buffs")
+	# 按队伍顺序注入各自 buff
+	var per_player_buffs: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	var team_idx: int = 0
 	for p in GameManager.get_alive_players():
 		if p.team_id != 1:
 			continue
+		var buffs: Array = []
+		if team_idx < per_player_buffs.size() and per_player_buffs[team_idx] is Array:
+			buffs = per_player_buffs[team_idx]
 		for b in buffs:
 			_apply_buff(p, b)
+		team_idx += 1
 	# 刷新 UI 显示（护盾/分身等可视化字段）
 	_ui.setup_players(GameManager.get_alive_players())
+	# 后期小怪攻击力强化（第3-4轮 +1/+2 普攻增伤）
+	_inject_enemy_attack_bonus()
 
 ## 应用单个 buff 到 PlayerState
 func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
@@ -213,6 +234,17 @@ func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 			var max_bonus: float = buff.get("value", 3.0)
 			p.max_hp_bonus += max_bonus
 			p.hp += max_bonus  # 同步补血
+
+## 后期小怪攻击力强化：第3-4轮小怪普攻增伤
+func _inject_enemy_attack_bonus() -> void:
+	var floor_num := tower_mgr.get_current_floor()
+	var atk_bonus := tower_mgr.get_small_enemy_attack_bonus(floor_num)
+	if atk_bonus <= 0:
+		return
+	for p in GameManager.get_alive_players():
+		if p.team_id != 2:
+			continue
+		p.damage_bonus_basic += atk_bonus
 
 # ============================================================
 #  Buff 查看浮窗
@@ -285,7 +317,7 @@ func _toggle_buff_panel() -> void:
 	else:
 		_buff_panel.visible = false
 
-## 刷新浮窗内容：清空并重建已获取 buff 列表
+## 刷新浮窗内容：清空并重建已获取 buff 列表（每角色独立显示）
 func _refresh_buff_panel() -> void:
 	# 清空旧内容：立即移出并释放，避免 queue_free 延迟导致新旧节点短暂共存
 	var old_children := _buff_panel_box.get_children()
@@ -293,11 +325,15 @@ func _refresh_buff_panel() -> void:
 		_buff_panel_box.remove_child(child)
 		child.queue_free()
 
-	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	var per_player_buffs: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	# 兼容旧结构
+	var old_buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	if not old_buffs.is_empty() and per_player_buffs.is_empty():
+		per_player_buffs = [old_buffs]
 
 	# 标题
 	var title := Label.new()
-	title.text = "已获祝福" if not buffs.is_empty() else "尚未获得祝福"
+	title.text = "已获祝福"
 	title.add_theme_font_size_override("font_size", 15)
 	title.add_theme_color_override("font_color", Color("#FAC775"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -311,41 +347,73 @@ func _refresh_buff_panel() -> void:
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_buff_panel_box.add_child(sep)
 
-	# 逐条显示
-	for b in buffs:
-		var reward: Dictionary = _find_reward_by_id(b.get("id", ""))
-		if reward.is_empty():
+	# 按角色分组显示
+	var has_any_buff: bool = false
+	var party: Array = SceneManager.last_tower_config.get("players", [])
+	for i in range(party.size()):
+		var entry = party[i]
+		if entry is Dictionary and not entry.has("character"):
 			continue
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 6)
-		# 图标
-		var icon := Label.new()
-		icon.text = reward.get("icon", "?")
-		icon.add_theme_font_size_override("font_size", 16)
-		icon.add_theme_color_override("font_color", reward.get("color", Color("#FAC775")))
-		icon.custom_minimum_size = Vector2(24, 0)
-		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(icon)
-		# 名称
-		var name := Label.new()
-		name.text = reward.get("name", "")
-		name.add_theme_font_size_override("font_size", 13)
-		name.add_theme_color_override("font_color", Color("#E8E2D5"))
-		name.custom_minimum_size = Vector2(70, 0)
-		name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(name)
-		# 效果
-		var desc := Label.new()
-		desc.text = reward.get("desc", "")
-		desc.add_theme_font_size_override("font_size", 12)
-		desc.add_theme_color_override("font_color", Color("#9A9182"))
-		desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(desc)
-		_buff_panel_box.add_child(row)
+		var char_data: CharacterData = entry["character"] if entry is Dictionary else null
+		if char_data == null:
+			continue
+		var buffs: Array = []
+		if i < per_player_buffs.size() and per_player_buffs[i] is Array:
+			buffs = per_player_buffs[i]
+		if buffs.is_empty():
+			continue
+		has_any_buff = true
+		# 角色名标题
+		var char_label := Label.new()
+		char_label.text = "▸ %s" % char_data.character_name
+		char_label.add_theme_font_size_override("font_size", 13)
+		char_label.add_theme_color_override("font_color", Color("#FAC775"))
+		char_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_buff_panel_box.add_child(char_label)
+		# 逐条显示该角色的 buff
+		for b in buffs:
+			var reward: Dictionary = _find_reward_by_id(b.get("id", ""))
+			if reward.is_empty():
+				continue
+			var row := HBoxContainer.new()
+			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_theme_constant_override("separation", 6)
+			row.offset_left = 12
+			# 图标
+			var icon := Label.new()
+			icon.text = reward.get("icon", "?")
+			icon.add_theme_font_size_override("font_size", 16)
+			icon.add_theme_color_override("font_color", reward.get("color", Color("#FAC775")))
+			icon.custom_minimum_size = Vector2(24, 0)
+			icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(icon)
+			# 名称
+			var name := Label.new()
+			name.text = reward.get("name", "")
+			name.add_theme_font_size_override("font_size", 13)
+			name.add_theme_color_override("font_color", Color("#E8E2D5"))
+			name.custom_minimum_size = Vector2(70, 0)
+			name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(name)
+			# 效果
+			var desc := Label.new()
+			desc.text = reward.get("desc", "")
+			desc.add_theme_font_size_override("font_size", 12)
+			desc.add_theme_color_override("font_color", Color("#9A9182"))
+			desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(desc)
+			_buff_panel_box.add_child(row)
+	if not has_any_buff:
+		var empty_label := Label.new()
+		empty_label.text = "尚未获得祝福"
+		empty_label.add_theme_font_size_override("font_size", 13)
+		empty_label.add_theme_color_override("font_color", Color("#9A9182"))
+		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_buff_panel_box.add_child(empty_label)
 
 	# 关闭提示
 	var hint := Label.new()
@@ -370,8 +438,10 @@ func _hide_buff_panel() -> void:
 
 ## 更新 buff 按钮可见性（有已获取祝福且在战斗阶段时显示）
 func _update_buff_btn_visibility() -> void:
-	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
-	_buff_btn.visible = _phase == "battle" and not buffs.is_empty()
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	var old_buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
+	var has_buffs: bool = not per_player.is_empty() or not old_buffs.is_empty()
+	_buff_btn.visible = _phase == "battle" and has_buffs
 	if not _buff_btn.visible:
 		_hide_buff_panel()
 
@@ -406,37 +476,101 @@ func _on_dialogue_generic_finished() -> void:
 		_show_reward_selection()
 	# 战斗中的叙事对话不改变 phase，只是弹出后消失
 
-## 弹出层间奖励选择界面
+## 弹出层间奖励选择界面（每角色独立选祝福）
 ## 精英层（第4/8/12层）通关后可随机到高级祝福
 func _show_reward_selection() -> void:
 	_phase = "reward"
 	_hide_buff_panel()
 	_buff_btn.visible = false
+	# 队伍人数从配置获取（不受某层角色死亡影响）
+	var party: Array = SceneManager.last_tower_config.get("players", [])
+	_party_size = party.size()
+	if _party_size == 0:
+		_party_size = 1
+	_reward_player_index = 0
+	_show_reward_for_current_player()
+
+## 为当前角色弹出祝福选择（人类手动选 / AI自动选）
+func _show_reward_for_current_player() -> void:
 	if fast_mode:
 		# fast_mode：自动选择第一个奖励（测试用）
 		var pool := TowerRewardUI.REWARD_POOL
 		var buff: Dictionary = pool[0]
 		_on_reward_selected(buff)
 		return
+	# 判断当前角色是否为AI
+	var party: Array = SceneManager.last_tower_config.get("players", [])
+	var is_ai: bool = false
+	if _reward_player_index < party.size():
+		var entry = party[_reward_player_index]
+		if entry is Dictionary:
+			is_ai = not entry.get("is_human", true)
+	if is_ai:
+		# AI队友自动选祝福：从可选池中随机选一个
+		var cleared_floor: int = tower_mgr.get_current_floor()
+		var is_elite_floor: bool = cleared_floor > 0 and cleared_floor < TowerManager.MAX_FLOORS and cleared_floor % 4 == 0
+		var obtained_ids: Array = _get_all_obtained_ids()
+		var choices: Array[Dictionary] = _reward_ui._pick_random_rewards(3, is_elite_floor, obtained_ids)
+		if choices.is_empty():
+			_on_reward_selected({})
+			return
+		choices.shuffle()
+		var ai_buff: Dictionary = choices[0]
+		# AI选择日志
+		var ai_name: String = "AI队友"
+		if _reward_player_index < party.size():
+			var e = party[_reward_player_index]
+			if e is Dictionary and e.has("character"):
+				ai_name = (e["character"] as CharacterData).character_name
+		print("[塔] %s（AI）自动选择祝福：%s" % [ai_name, ai_buff.get("name", "?")])
+		_on_reward_selected(ai_buff)
+		return
+	# 人类玩家：弹窗手动选
+	# 更新副标题显示当前选祝福的角色名
+	var char_name: String = "角色%d" % (_reward_player_index + 1)
+	if _reward_player_index < party.size():
+		var entry = party[_reward_player_index]
+		if entry is Dictionary and entry.has("character"):
+			char_name = (entry["character"] as CharacterData).character_name
+	_reward_ui.set_subtitle("%s 选择祝福（%d/%d）" % [char_name, _reward_player_index + 1, _party_size])
 	_reward_ui.visible = true
-	var cleared_floor: int = tower_mgr.get_current_floor()
-	var is_elite_floor: bool = cleared_floor > 0 and cleared_floor < TowerManager.MAX_FLOORS and cleared_floor % 4 == 0
-	# 已获取的 buff id 列表（unique 奖励已获取后不再出现在随机池）
-	var obtained_ids: Array = []
-	for b in SceneManager.last_tower_config.get("tower_buffs", []):
-		if b is Dictionary and b.has("id"):
-			obtained_ids.append(b.get("id"))
-	_reward_ui.start(is_elite_floor, obtained_ids)
+	var cleared_floor2: int = tower_mgr.get_current_floor()
+	var is_elite_floor2: bool = cleared_floor2 > 0 and cleared_floor2 < TowerManager.MAX_FLOORS and cleared_floor2 % 4 == 0
+	# 已获取的 buff id 列表（所有角色的 unique 奖励全局不重复）
+	var obtained_ids2: Array = _get_all_obtained_ids()
+	_reward_ui.start(is_elite_floor2, obtained_ids2)
 
-## 奖励选择完成 → 保存 buff 到 SceneManager → 推进下一层
+## 获取所有角色已获取的 buff id 列表（unique 奖励全局不重复）
+func _get_all_obtained_ids() -> Array:
+	var ids: Array = []
+	var per_player_buffs: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	for buffs in per_player_buffs:
+		if buffs is Array:
+			for b in buffs:
+				if b is Dictionary and b.has("id"):
+					ids.append(b.get("id"))
+	return ids
+
+## 奖励选择完成 → 保存 buff 到当前角色的列表 → 下一个角色选 / 推进下一层
 func _on_reward_selected(buff: Dictionary) -> void:
 	_reward_ui.visible = false
-	# 持久化 buff 到 SceneManager（下一层注入）
-	var buffs: Array = SceneManager.last_tower_config.get("tower_buffs", [])
-	buffs.append(buff)
-	SceneManager.last_tower_config["tower_buffs"] = buffs
-	# 下一层战斗开始时由 _update_buff_btn_visibility 重新显示按钮
-	_proceed_to_next_floor()
+	# 持久化 buff 到 SceneManager（按角色索引存储）
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	# 确保数组足够大
+	while per_player.size() <= _reward_player_index:
+		per_player.append([])
+	if per_player[_reward_player_index] is Array:
+		(per_player[_reward_player_index] as Array).append(buff)
+	else:
+		per_player[_reward_player_index] = [buff]
+	SceneManager.last_tower_config["tower_buffs_per_player"] = per_player
+	# 下一个角色选祝福
+	_reward_player_index += 1
+	if _reward_player_index < _party_size:
+		_show_reward_for_current_player()
+	else:
+		# 所有角色选完 → 推进下一层
+		_proceed_to_next_floor()
 
 ## 推进到下一层（正常模式=过渡动画，fast_mode=直接启动）
 func _proceed_to_next_floor() -> void:

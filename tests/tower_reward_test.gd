@@ -21,6 +21,7 @@ func _ready() -> void:
 	await _test_reward_ui_random_pick()
 	await _test_buff_persistence()
 	await _test_all_buff_types_inject()
+	await _test_ai_auto_select_buff()
 
 	print("=== 塔奖励测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
@@ -553,6 +554,69 @@ func _test_all_buff_types_inject() -> void:
 	_assert(player.shield == 5, "10t: protect_2注入")
 
 	tower.queue_free()
+
+## 测试11：AI队友自动选祝福（不弹窗，自动随机选择）
+func _test_ai_auto_select_buff() -> void:
+	print("--- AI自动选祝福 ---")
+	var char_data := load("res://resources/characters/漩涡鸣人（疾风传）.tres") as CharacterData
+	var char_data2 := load("res://resources/characters/宇智波佐助.tres") as CharacterData
+	# 配置：1人类 + 1AI队友
+	SceneManager.last_tower_config.erase("tower_buffs")
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
+	SceneManager.last_tower_config["players"] = [
+		{ "character": char_data, "is_human": true },
+		{ "character": char_data2, "is_human": false },
+	]
+
+	# 实例化 tower_battle（fast_mode=true 快速过场）
+	var battle = (load("res://scenes/tower/tower_battle.tscn") as PackedScene).instantiate()
+	battle.fast_mode = true
+	add_child(battle)
+	await get_tree().process_frame
+
+	# 等待第1层战斗启动
+	for i in range(900):
+		await get_tree().process_frame
+		if battle._phase == "battle":
+			break
+
+	_assert(battle._phase == "battle", "11a: 第1层战斗已启动（实际=%s）" % battle._phase)
+
+	# 直接调用 _show_reward_selection 模拟层胜利后的祝福选择
+	# 设置 _party_size 并手动触发 reward 流程
+	battle._party_size = 2
+	battle._reward_player_index = 0
+	# fast_mode 下 _show_reward_for_current_player 自动选第一个buff
+	# 角色0（人类，fast_mode自动选）→ 角色1（AI，应自动选）→ 完成
+	battle._phase = "reward"
+	battle._show_reward_for_current_player()
+	await get_tree().process_frame
+	# fast_mode 下角色0立即自动选完，应推进到角色1
+	await get_tree().process_frame
+
+	# 等待所有角色选完（reward阶段结束）
+	for i in range(100):
+		await get_tree().process_frame
+		if battle._phase != "reward":
+			break
+
+	# 验证两个角色都获得了 bless（per_player 数组有2个元素）
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	_assert(per_player.size() == 2, "11b: 2个角色各有祝福列表（实际=%d）" % per_player.size())
+	if per_player.size() >= 2:
+		_assert(per_player[0] is Array and per_player[0].size() >= 1, "11c: 角色0获得祝福")
+		_assert(per_player[1] is Array and per_player[1].size() >= 1, "11d: 角色1（AI）获得祝福")
+		# AI获得的祝福在池中
+		var ai_buff: Dictionary = per_player[1][0]
+		var ai_id: String = ai_buff.get("id", "")
+		var pool_ids: Array[String] = []
+		for r in TowerRewardUI.REWARD_POOL:
+			pool_ids.append(r.get("id", ""))
+		_assert(ai_id in pool_ids, "11e: AI祝福在池中（id=%s）" % ai_id)
+
+	# 清理
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
+	battle.queue_free()
 
 # ═════════ 辅助函数 ═══════════════════════════════════════
 

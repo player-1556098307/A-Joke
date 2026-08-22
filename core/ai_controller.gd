@@ -90,6 +90,12 @@ func decide_action(
 		if result.size() > 0:
 			return result
 
+	# 慈悲尖塔敌人差异化策略
+	if _is_tower_enemy(player):
+		var result := _decide_tower_enemy_action(player, alive_players, distance_system)
+		if result.size() > 0:
+			return result
+
 	# 收集所有能量+钟足够且有合法目标的技能
 	var all_skills := player.get_all_skills()
 	var usable: Array[Dictionary] = []
@@ -578,6 +584,243 @@ func decide_bell_action(player: PlayerState, alive_players: Array[PlayerState]) 
 	if player.bell_count >= 3:
 		return true
 	return false
+
+## ── 慈悲尖塔敌人差异化AI ───────────────────────────────────────────────
+## 判断角色是否为塔敌人（通过角色名匹配）
+func _is_tower_enemy(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	var name := player.character.character_name
+	return name in [
+		"训练兵", "铁盾兵", "爆破手", "术师", "医疗兵", "狂战士", "影刃", "石像鬼",
+		"破败王者（怒）", "漩涡鸣人（仙人模式）", "司马懿（狂）"
+	]
+
+## 塔敌人分发器：按角色名调用对应策略
+## alive_players 传入完整存活列表（含队友），策略内部自行过滤敌我
+func _decide_tower_enemy_action(
+	player: PlayerState,
+	alive_players: Array[PlayerState],
+	distance_system: DistanceSystem
+) -> Dictionary:
+	var name := player.character.character_name
+	match name:
+		"训练兵":
+			return _ai_trainee(player, alive_players, distance_system)
+		"铁盾兵":
+			return _ai_shield_guard(player, alive_players, distance_system)
+		"爆破手":
+			return _ai_bomber(player, alive_players, distance_system)
+		"术师":
+			return _ai_mage(player, alive_players, distance_system)
+		"医疗兵":
+			return _ai_medic(player, alive_players, distance_system)
+		"狂战士":
+			return _ai_berserker(player, alive_players, distance_system)
+		"影刃":
+			return _ai_shadow_blade(player, alive_players, distance_system)
+		"石像鬼":
+			return _ai_gargoyle(player, alive_players, distance_system)
+		"破败王者（怒）":
+			return _ai_blade_lord(player, alive_players, distance_system)
+		"漩涡鸣人（仙人模式）":
+			return _ai_sage_naruto(player, alive_players, distance_system)
+		"司马懿（狂）":
+			return _ai_sima_yi(player, alive_players, distance_system)
+	return {}
+
+## 从存活列表中提取敌方目标（team_id != player.team_id）
+func _tower_enemies(player: PlayerState, alive_players: Array[PlayerState]) -> Array[PlayerState]:
+	var result: Array[PlayerState] = []
+	for p in alive_players:
+		if p.player_id == player.player_id:
+			continue
+		if p.team_id == player.team_id and player.team_id != 0:
+			continue
+		result.append(p)
+	return result
+
+## 从存活列表中提取友方目标（含自己）
+func _tower_allies(player: PlayerState, alive_players: Array[PlayerState]) -> Array[PlayerState]:
+	var result: Array[PlayerState] = []
+	for p in alive_players:
+		if player.team_id != 0:
+			if p.team_id == player.team_id:
+				result.append(p)
+		else:
+			if p.player_id == player.player_id:
+				result.append(p)
+	return result
+
+## 训练兵：无技能，走默认普攻/充能逻辑
+func _ai_trainee(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	return {}
+
+## 铁盾兵：护盾为0时举盾(1气)，有盾或有气时普攻，否则充能
+func _ai_shield_guard(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	if player.shield == 0 and player.energy >= 1:
+		var idx := _find_skill_index(all_skills, player, "举盾")
+		if idx >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": idx, "target_id": player.player_id }
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 爆破手：半血以下或气≥2时优先自爆(2气3伤)，否则普攻
+func _ai_bomber(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	# 半血以下或气≥2且有目标时自爆
+	if player.hp <= player.character.max_hp * 0.5 or player.energy >= 2:
+		var bomb_idx := _find_skill_index(all_skills, player, "自爆")
+		if bomb_idx >= 0 and player.energy >= 2:
+			var target := _pick_best_target(player, all_skills[bomb_idx], enemies, ds)
+			if target >= 0:
+				return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": bomb_idx, "target_id": target }
+	# 普攻
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 术师：优先麻痹最低血目标(2气)，否则普攻
+func _ai_mage(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	var para_idx := _find_skill_index(all_skills, player, "麻痹术")
+	if para_idx >= 0 and player.energy >= 2:
+		var target := _pick_best_target(player, all_skills[para_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": para_idx, "target_id": target }
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 医疗兵：队友(含自己)有伤且气≥2时治疗最低血队友，否则普攻
+func _ai_medic(player: PlayerState, alive_players: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	var heal_idx := _find_skill_index(all_skills, player, "治疗")
+	if heal_idx >= 0 and player.energy >= 2:
+		# 找最低血友方（含自己）
+		var allies := _tower_allies(player, alive_players)
+		var wounded: Array[PlayerState] = []
+		for a in allies:
+			if a.hp < a.character.max_hp:
+				wounded.append(a)
+		if wounded.size() > 0:
+			wounded.sort_custom(func(a, b): return a.hp < b.hp)
+			var target_p := wounded[0]
+			# 治疗是ENEMY_SINGLE目标，需要目标在射程内
+			if RoundResolver.can_use_skill(player, all_skills[heal_idx], target_p, ds):
+				return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": heal_idx, "target_id": target_p.player_id }
+	# 普攻
+	var enemies := _tower_enemies(player, alive_players)
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 狂战士：气≥2时重劈(2伤)，否则普攻
+func _ai_berserker(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	var heavy_idx := _find_skill_index(all_skills, player, "重劈")
+	if heavy_idx >= 0 and player.energy >= 2:
+		var target := _pick_best_target(player, all_skills[heavy_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": heavy_idx, "target_id": target }
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 影刃：气≥2时暗杀(2穿透)，否则普攻(1穿透)
+func _ai_shadow_blade(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	var assassinate_idx := _find_skill_index(all_skills, player, "暗杀")
+	if assassinate_idx >= 0 and player.energy >= 2:
+		var target := _pick_best_target(player, all_skills[assassinate_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": assassinate_idx, "target_id": target }
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 石像鬼：护盾为0时石化皮肤(+2盾,1气)，有盾时普攻(射程2)
+func _ai_gargoyle(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	if player.shield == 0 and player.energy >= 1:
+		var stone_idx := _find_skill_index(all_skills, player, "石化皮肤")
+		if stone_idx >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": stone_idx, "target_id": player.player_id }
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 破败王者（怒）：锁定技绑定普攻，优先普攻推进阶段
+## 阶段1=普攻附带目标50%HP伤害，阶段2=普攻后回半血，阶段3=普攻后+2气
+## 策略：有气时优先普攻（每阶段收益巨大），半血时悲痛刷新阶段更有利
+func _ai_blade_lord(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 仙人鸣人：气≥2时优先超大玉螺旋丸(4伤)，气≥2且有低血目标时蛙组手(2真伤)，否则普攻
+## 仙人之力被动聚气+1，无需主动触发
+func _ai_sage_naruto(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	# 1. 超大玉螺旋丸：2气4伤，最高优先
+	var rasengan_idx := _find_skill_index(all_skills, player, "仙法·超大玉螺旋丸")
+	if rasengan_idx >= 0 and player.energy >= 2:
+		var target := _pick_best_target(player, all_skills[rasengan_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": rasengan_idx, "target_id": target }
+	# 2. 蛙组手：2气2真伤（必中），对有护盾的目标优先
+	var frog_idx := _find_skill_index(all_skills, player, "蛙组手")
+	if frog_idx >= 0 and player.energy >= 2:
+		var target := _pick_best_target(player, all_skills[frog_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": frog_idx, "target_id": target }
+	# 3. 普攻
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
+## 司马懿（狂）：普攻是核心（触发反馈怒标记真伤 + 鬼才额外回合）
+## 策略：有气就普攻，没气时反馈被动积攒怒标记
+func _ai_sima_yi(player: PlayerState, enemies: Array[PlayerState], ds: DistanceSystem) -> Dictionary:
+	var all_skills := player.get_all_skills()
+	# 普攻：0.5伤 + 触发怒标记真实伤害
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], enemies, ds)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+	return {}
+
 
 ## 检查技能是否有至少一个合法目标（包含 SELF 类型和敌对目标）
 func _has_valid_target(

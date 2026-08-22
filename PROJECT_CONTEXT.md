@@ -3,23 +3,23 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '8f66aceb-1fc6-43a6-9ed1-8374a2cd337f'
-  PropagateID: '8f66aceb-1fc6-43a6-9ed1-8374a2cd337f'
-  ReservedCode1: '7e40dc62-8d0c-4a91-bc26-378b52d796a9'
-  ReservedCode2: '7e40dc62-8d0c-4a91-bc26-378b52d796a9'
+  ProduceID: '492da144-2648-4de3-ae54-df58744f135f'
+  PropagateID: '492da144-2648-4de3-ae54-df58744f135f'
+  ReservedCode1: '0266446c-a592-45c4-8118-031d923c0ccf'
+  ReservedCode2: '0266446c-a592-45c4-8118-031d923c0ccf'
 ---
 
 # A-Joke Test 项目上下文
 
 > 本文件供 AI Agent 快速理解项目全貌，无需重复探索即可开始开发/测试/运维。
-> 最后更新：2026-08-20
+> 最后更新：2026-08-22
 
 ---
 
 ## 1. 项目概况
 
 - **项目名称**: A Joke Test — 回合制石头剪刀布 + 角色对战游戏
-- **引擎**: Godot 4.7.1 stable（Forward+ 渲染，D3D12）
+- **引擎**: Godot 4.7.1 stable（Forward+ 渲染，D3D12；实际运行 v4.7.2）
 - **项目路径**: `E:\ajoke-g\A-Joke`
 - **Godot 可执行文件**: `D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`（不在 PATH，必须全路径调用）
 - **Git 远端**: `https://github.com/player-1556098307/A-Joke.git`（main 分支）
@@ -117,13 +117,13 @@ A-Joke/
 │   ├── game_ui.tscn           # 游戏界面场景
 │   ├── game_over.gd/.tscn     # 游戏结束
 │   ├── settings.gd/.tscn      # 设置
+│   ├── tower/                 # 慈悲尖塔模式（10个脚本，详见第17章）
 │   ├── net/                   # 联机场景
 │   └── hgw/                   # HGW 场景
 │
-├── tests/                     # 测试套件（16个，905断言）
+├── tests/                     # 测试套件（35个，2044断言）
 │   ├── *.gd                   # 测试脚本（extends Node）
-│   ├── *.tscn                 # 测试场景
-│   └── backtrack_test.tscn    # 回溯测试场景（脚本待编写）
+│   └── *.tscn                 # 测试场景
 │
 ├── server/
 │   └── server_main.gd/.tscn   # 服务端入口（导出为二进制部署）
@@ -233,6 +233,7 @@ SETUP → GESTURE_INPUT → RESOLVING → [TIEBREAK_INPUT → TIEBREAK_RESOLVING
 | `glory_unlocked` / `glory_used_this_round` / `untargetable_turns` / `uchiha_stance` | - | 泉奈 | 荣耀/招架/不可选 |
 | `susanoo_spiral_unlocked` / `has_kotoamatsukami_skill` / `kotoamatsukami_used` / `takeover_active` / `koto_awaiting_confirm` / `last_hit_by_id` | - | 止水(须佐) | 须佐链/夺舍 |
 | `phantom_count` / `backtrack_snapshot` | - | 止水(天劫) | 幻影/回溯快照 |
+| `damage_bonus_basic` / `charge_bonus` / `damage_reduction` / `regen_per_round` | - | 慈悲尖塔buff | 层间奖励持久化：增伤/聚气+/减伤/每回合回血 |
 
 **关键方法**:
 - `capture_backtrack_snapshot() -> Dictionary` — 新止水回溯用全体快照（~40字段）
@@ -371,10 +372,9 @@ GameManager 通过 **40+ 信号** 驱动 UI（`ui/game_ui.gd` ~3316行），UI �
 | herta | 黑塔 | 6 | 法师 | B | 普攻·送你砖石(被动)·genjutsu(被动) — EffectType 32/33 |
 | big_herta | 大黑塔 | 8 | 法师 | A | 普攻·解读(被动)·格局打开(被动)·魔法 — EffectType 34/35/36 |
 
-**慈悲尖塔专属角色**（`resources/characters/tower/`，仅塔模式使用）:
-- 司马懿（狂）
-- 漩涡鸣人（仙人模式）
-- 破败王者（怒）
+**慈悲尖塔专属角色**（`resources/characters/tower/`，仅塔模式使用，11个敌人）:
+- 司马懿（狂）、漩涡鸣人（仙人模式）、破败王者（怒）— Boss/特殊敌人
+- 医疗兵、影刃、术师、爆破手、狂战士、石像鬼、训练兵、铁盾兵 — 8种小怪
 
 ### 角色注册（3处硬编码同步）
 
@@ -575,28 +575,28 @@ script = ExtResource("1_test")
 
 **断言计数**：每个测试文件末尾输出 `=== xxx测试结束：PASS=NN FAIL=0 ===`，退出码 0=全过，1=有失败。
 
-### 11.5 现有测试套件（30个，1257断言）
+### 11.5 现有测试套件（35个，2044断言）
 
 **核心对战测试**:
 
 | 文件 | 角色/功能 | 断言数 |
 |---|---|---|
-| `bugfix_test` | 通用bug修复（钟获取+麻痹禁技） | 23 |
-| `new_shisui_test` | 新止水（天劫）完整机制 | 88 |
-| `ui_popup_smoke_test` | UI弹窗冒烟 | 23 |
-| `naruto_fy_test` | 鸣人（疾风传） | 44 |
-| `shisui_test` | 旧止水（须佐能） | 66 |
-| `izuna_test` | 泉奈 | 61 |
-| `emiya_test` | 卫宫 | 71 |
-| `edo_hashirama_test` | 秽土柱间 | 127 |
-| `xiye_test` | 希耶尔 | 76 |
-| `ftg_intercept_test` | 飞雷神拦截 | 59 |
-| `minato_test` | 波风水门 | 62 |
-| `might_gai_fix_test` | 迈特凯修复 | 16 |
-| `might_gai_e2e_test` | 迈特凯端到端 | 25 |
-| `might_gai_test` | 迈特凯基础 | 49 |
-| `core_logic_test` | 底层逻辑专项（状态机/手势/状态字段） | 57 |
-| `crossover_scenario_test` | 多角色组合场景 | 58 |
+| `bugfix_test` | 通用bug修复（钟获取+麻痹禁技） | 22 |
+| `new_shisui_test` | 新止水（天劫）完整机制 | 87 |
+| `ui_popup_smoke_test` | UI弹窗冒烟 | 22 |
+| `naruto_fy_test` | 鸣人（疾风传） | 43 |
+| `shisui_test` | 旧止水（须佐能） | 65 |
+| `izuna_test` | 泉奈 | 62 |
+| `emiya_test` | 卫宫 | 72 |
+| `edo_hashirama_test` | 秽土柱间 | 126 |
+| `xiye_test` | 希耶尔 | 469 |
+| `ftg_intercept_test` | 飞雷神拦截 | 57 |
+| `minato_test` | 波风水门 | 61 |
+| `might_gai_fix_test` | 迈特凯修复 | 21 |
+| `might_gai_e2e_test` | 迈特凯端到端 | 59 |
+| `might_gai_test` | 迈特凯基础 | 55 |
+| `core_logic_test` | 底层逻辑专项（状态机/手势/状态字段） | 56 |
+| `crossover_scenario_test` | 多角色组合场景 | 57 |
 | `herta_test` | 黑塔完整机制 | 37 |
 | `big_herta_test` | 大黑塔完整机制 | 48 |
 
@@ -604,19 +604,25 @@ script = ExtResource("1_test")
 
 | 文件 | 功能 | 断言数 |
 |---|---|---|
-| `tower_mode_test` | 塔模式基础流程 | - |
-| `tower_select_test` | 角色选择 | - |
-| `tower_team_test` | 队伍编成 | - |
-| `tower_gate_test` | 塔门交互 | - |
-| `tower_enemy_test` | 敌人生成 | - |
-| `tower_battle_test` | 塔内战斗 | - |
-| `tower_battle_floor_test` | 楼层推进 | - |
-| `tower_mingemon_test` | 明怪机制 | - |
-| `tower_layout_check` | 布局检查 | - |
-| `mingemon_test` | 明怪独立测试 | - |
-| `shisui_bt_pve_test` | 新止水PvE回溯测试 | - |
-| `shisui_bt_pvp_test` | 新止水PvP回溯测试 | - |
-| `backtrack_test` | 回溯多场景专项（脚本待编写） | - |
+| `tower_mode_test` | 塔模式基础流程 | 15 |
+| `tower_select_test` | 角色选择 | 21 |
+| `tower_team_test` | 队伍编成 | 7 |
+| `tower_gate_test` | 塔门交互 | 16 |
+| `tower_enemy_test` | 敌人生成 | 28 |
+| `tower_battle_test` | 塔内战斗（含 buff 查看浮窗 18 断言） | 18 |
+| `tower_battle_floor_test` | 楼层推进 | 4 |
+| `tower_battle_layout_test` | 布局验证 | 18 |
+| `tower_mingemon_test` | 明怪机制 | 11 |
+| `tower_floor_gen_test` | 关卡生成 | 111 |
+| `tower_reward_test` | 层间奖励选择（8种buff） | 167 |
+| `mingemon_test` | 明怪独立测试 | 12 |
+| `shisui_bt_pve_test` | 新止水PvE回溯测试 | 69 |
+| `shisui_bt_pvp_test` | 新止水PvP回溯测试 | 64 |
+| `elimination_effect_test` | 淘汰特效 | 7 |
+| `hp50_dialogue_integration_test` | Boss半血对话 | 8 |
+| `sfx_manager_test` | 战斗音效系统 | 49 |
+
+> 断言数取自最近一次全量回归（2026-08-22，35 套件 2044 项断言 0 FAIL）。
 
 ### 11.6 常见测试问题排查
 
@@ -647,46 +653,30 @@ git push origin main
 
 **最近提交记录**:
 ```
-7da8f16 test: 新增底层逻辑专项测试(56断言)+多角色组合场景测试(57断言)
-51cbea5 fix: 砸钟伤害不计入钟获取+麻痹状态禁用幻影闪避
-87ce096 fix: 别天神回溯跳过无反应（跳过时清空快照防循环弹窗）
-5ba437e fix: 别天神回溯撤销上一回合（快照滚动至 _prev_round_pre_snapshot）
-1ac9ffd fix: 修复创建房间后 Nakama storage 未生成房间实例的问题
-49afc80 feat: 联机对战系统 — ENet+Nakama网络架构、服务器部署、房间列表修复
-3448636 feat: HGW对战系统、角色编辑器插件、UI修复
-3f4cce7 Initial commit
+7e768b2 fix: 祝福面板布局修复(VBox容器) + 位置调整避开手势区
+8fd72c0 feat: 塔战斗buff查看按钮——右下角按钮+浮窗面板展示已获祝福
+5fcee02 feat: 慈悲尖塔平衡性优化——祝福池调整+后期小怪强化
+c93f912 fix: 战斗日志过滤按钮每层累积导致溢出显示错误
+efdeb60 fix: 气标z_index降至弹窗之下，祝福/对话场景不再浮于最外层
+c350bb1 feat: 合并神速/起势奖励+修复防反触发后取消招架状态
+c1d13b9 fix(ui): 修复气标志菱形遮挡血条+数字未居中
+9740506 feat(tower): 奖励池分级+回生时机+新buff+悬停修复
+95964ee feat: 悬停角色卡片显示技能详情面板(含被动/限定技全量列表)
+3ff7b50 feat: 战斗UI气标志改为菱形蓝色方片+白色黑体数字
+16d2993 feat: 慈悲塔P2-3层间奖励选择(8种buff+红黑UI+持久化注入)
+d2c154e fix: 对话移至精英层(4/8/12)+层间过渡/退场对话加梅塔特隆立绘
+ddfa84f feat: 慈悲尖塔16层关卡重构+8种小怪+全量测试适配
+58b4f1b test: 新增Boss半血对话触发验证测试(8项全PASS)
+a12fd50 feat: 战斗音效系统 SFXManager（程序合成音效+外部音频替换+设置开关）
 ```
 
-> **注意**: commit `7da8f16` 因 GitHub 网络超时未推送成功，待网络恢复后执行 `git push origin main`。
+> **Git 状态**: 截至 2026-08-22 工作区干净（无未提交变更）。慈悲尖塔相关开发全部已 commit，均未 push（本地开发模式，按需推送）。
 
-### 12.1 当前未提交变更（2026-08-20）
+### 12.1 未提交变更
 
-以下文件已修改或新增但**尚未 commit**，新对话接手时需注意：
+> 截至 2026-08-22：**工作区干净**，无未提交变更。所有慈悲尖塔开发（层间奖励选择、buff 查看、战斗、平衡性优化等）均已 commit（本地未 push）。
 
-**已修改文件**（12个）：
-- `core/ai_controller.gd` — 黑塔/大黑塔AI策略
-- `core/game_manager.gd` — 黑塔/大黑塔技能处理 + EffectType 32~36
-- `core/player_state.gd` — 新增字段
-- `core/round_resolver.gd` — 新效果结算
-- `core/scene_manager.gd`
-- `data/characters.gd` — LIST 追加黑塔/大黑塔
-- `resources/characters/宇智波止水（天劫）.tres`
-- `resources/characters/宇智波止水（须佐能）.tres`
-- `resources/skill_effect.gd` — EffectType 枚举新增 32~36
-- `scenes/character_select.gd` — preload 追加黑塔/大黑塔
-- `scenes/main_menu.gd` / `main_menu.tscn` — 慈悲尖塔入口
-- `tests/might_gai_test.gd` / `ui/game_ui.gd`
-
-**新增文件**：
-- 角色：`resources/characters/黑塔.tres`、`大黑塔.tres`
-- 立绘：`portraits/黑塔.png`(+.import)、`大黑塔.png`(+.import)
-- 慈悲尖塔：`resources/characters/tower/`（3个敌人角色）、`scenes/tower/`（5个场景脚本）
-- 测试：`herta_test`、`big_herta_test`、`mingemon_test`、`shisui_bt_pve_test`、`shisui_bt_pvp_test`、`tower_*_test`（9个）
-- 上下文：`PROJECT_CONTEXT.md`
-
-> **建议**：下次对话首要任务 = 将以上变更分批 commit + push。
-
-**.gitignore**: `.godot/`、`.claude/`、`.temp/`、`/android/` 被忽略。
+**.gitignore**: `.godot/`、`.claude/`、`.temp/`、`/android/`、`builds/` 被忽略。
 
 ---
 
@@ -744,34 +734,53 @@ git push origin main
 6. **GameManager 适配**: 新机制需在 `game_manager.gd` 中添加处理逻辑
 7. **网络适配**: 新增 SrvOp/CliOp + Host/Client 信号映射 + 状态同步
 8. **专项测试**: 编写 `tests/xxx_test.gd + .tscn`
-9. **全量回归**: 运行全部16个套件确认 0 FAIL
+9. **全量回归**: 运行全部35个套件确认 0 FAIL
 10. **Git 提交推送**: `git add → commit → push origin main`
 
 ---
 
-## 17. 慈悲尖塔模式（Roguelike PvE）
+## 16. 慈悲尖塔模式（Roguelike PvE）
 
-独立于对战模式的 PvE 爬塔玩法，肉鸽循环：选队→爬层→战斗→死亡→重来。
+独立于对战模式的 PvE 爬塔玩法，肉鸽循环：选队→爬层→战斗→死亡→重来。暗色主题（背景 #0D0A08、边框 #8B2020、标题 #FAC775），UI 纯代码构建（StyleBoxFlat，无 .tscn 布局）。
 
 **目录结构**:
 ```
 scenes/tower/
-├── tower_manager.gd      # 塔模式主管理器（层推进/存档/重开）
-├── tower_gate.gd/.tscn   # 塔门交互（神官·梅塔特隆对话）
-├── tower_select.gd/.tscn # 角色选择
-└── tower_battle.gd/.tscn # 塔内战斗
+├── tower_manager.gd          # 塔模式主管理器（层推进/存档/重开）
+├── tower_gate.gd/.tscn       # 塔门交互（神官·梅塔特隆对话）
+├── tower_select.gd/.tscn     # 角色选择
+├── tower_battle.gd/.tscn     # 塔内战斗（buff查看按钮+浮窗）
+├── tower_reward_ui.gd        # 层间奖励选择UI（红黑风格，8种奖励池）
+├── tower_floor_transition.gd # 层间过渡动画
+├── tower_result.gd/.tscn     # 通关/失败结算
+└── dialogue_box.gd/.tscn     # 剧情对话（进场/退场/战斗中）
 
-resources/characters/tower/  # 塔模式专属敌人
-├── 司马懿（狂）.tres
-├── 漩涡鸣人（仙人模式）.tres
-└── 破败王者（怒）.tres
+resources/characters/tower/   # 塔模式专属敌人（8种小怪）
+├── 司马懿（狂）.tres / 漩涡鸣人（仙人模式）.tres / 破败王者（怒）.tres
+├── 医疗兵.tres / 影刃.tres / 术师.tres / 爆破手.tres
+├── 狂战士.tres / 石像鬼.tres / 训练兵.tres / 铁盾兵.tres
 ```
+
+**层间奖励 buff 系统**（P2-3层之间，`tower_reward_ui.gd` 的 `REWARD_POOL`）:
+- 8 种奖励池，3 选 1，红黑风格 UI（悬停特效+入场动画）
+- buff 存于 `SceneManager.last_tower_config["tower_buffs"]`，持久化到跨层
+- PlayerState 新增 4 个 buff 字段：`damage_bonus_basic` / `charge_bonus` / `damage_reduction` / `regen_per_round`
+- buff id 与效果：`blade_power`(增伤) / `charge_bonus`(聚气+) / `shield_wall`(减伤) / `regen`(回血) / `clone`(分身) / `swift`(起势) / `protect`(护盾) / `vitality`(上限+回满)
+- 祝福设定：回生/坚壁为精英层专属且获取后不再出现；蓄锐为唯一祝福；气上限祝福已删除
+
+**战斗中 buff 查看**（tower_battle.gd）:
+- 右下角"✦ 祝福"按钮（有祝福且在战斗阶段时显示）→ 点击弹出浮窗面板
+- 面板显示：已获祝福列表（图标+名称+效果）+ "再次点击关闭"提示
+- 面板位置：左侧 (204,200,250×270)，避开右侧手势选择区 (774,88)-(946,532)
+- 布局规范：**Panel 非容器，子控件必须包 VBoxContainer 才自动排布**（直接 add_child 会全叠 0,0）
+
+**关卡结构**: 16 层关卡，精英层（4/8/12）有对话+Boss；后期小怪 HP+数量双强化
 
 **文案**：神官·梅塔特隆（原创角色，神话锚点=犹太教天书记官）开场白+死亡对话已设计，见长期记忆。
 
 ---
 
-## 16. 关于本文件
+## 17. 关于本文件
 
 本文件由 AI Agent（星辰超级智能体 TeleAgent）根据项目源码自动生成和维护，用于跨会话/跨 Agent 传递项目上下文。如需更新，可直接编辑本文件。
 

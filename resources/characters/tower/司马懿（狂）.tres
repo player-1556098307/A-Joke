@@ -78,7 +78,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_ml")])
 [resource]
 script = ExtResource("3_char")
 character_name = "司马懿（狂）"
-max_hp = 12
+max_hp = 36
 basic_attack_cost = 1
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_bl"), SubResource("SD_fy"), SubResource("SD_gc"), SubResource("SD_ml")])
 tags = Array[String](["法师", "刺客"])

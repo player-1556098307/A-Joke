@@ -67,6 +67,53 @@ func _ready() -> void:
 	_assert(cfg.size() == 3, "8b: 队伍3人（玩家+2AI，实际=%d）" % cfg.size())
 	_assert(cfg[2]["is_human"] == false, "8c: 槽位3为AI（实际=%s）" % str(cfg[2]["is_human"]))
 
+	# 9. 换位功能：交换槽位0和槽位1（玩家↔AI）
+	var pre_sel_0: int = sel._selections[0]
+	var pre_sel_1: int = sel._selections[1]
+	var pre_mode_0: int = sel._slot_modes[0]
+	var pre_mode_1: int = sel._slot_modes[1]
+	sel._swap_slots(0, 1)
+	_assert(sel._selections[0] == pre_sel_1, "9a: 换位后槽位0角色=原槽位1角色（实际=%d）" % sel._selections[0])
+	_assert(sel._selections[1] == pre_sel_0, "9b: 换位后槽位1角色=原槽位0角色（实际=%d）" % sel._selections[1])
+	_assert(sel._slot_modes[0] == pre_mode_1, "9c: 换位后槽位0模式=原槽位1模式（实际=%d）" % sel._slot_modes[0])
+	_assert(sel._slot_modes[1] == pre_mode_0, "9d: 换位后槽位1模式=原槽位0模式（实际=%d）" % sel._slot_modes[1])
+	# 真人玩家换到槽位1后应能正确识别
+	var hs: int = sel._get_human_slot()
+	_assert(hs == 1, "9e: 换位后真人玩家在槽位1（实际=%d）" % hs)
+	# _build_tower_config 中玩家变成第二个成员
+	cfg = sel._build_tower_config()
+	_assert(cfg.size() == 3, "9f: 换位后队伍仍3人（实际=%d）" % cfg.size())
+	_assert(cfg[1]["is_human"] == true, "9g: 换位后玩家在队伍第2位（实际=%s）" % str(cfg[1]["is_human"]))
+	_assert(cfg[0]["is_human"] == false, "9h: 换位后AI在队伍第1位（实际=%s）" % str(cfg[0]["is_human"]))
+
+	# 10. 换回去（恢复正常顺序）
+	sel._swap_slots(0, 1)
+	hs = sel._get_human_slot()
+	_assert(hs == 0, "10a: 换回后真人玩家在槽位0（实际=%d）" % hs)
+	_assert(sel._slot_modes[0] == pre_mode_0 and sel._slot_modes[1] == pre_mode_1, "10b: 换回后模式恢复")
+	cfg = sel._build_tower_config()
+	_assert(cfg[0]["is_human"] == true, "10c: 换回后玩家在队伍第1位（实际=%s）" % str(cfg[0]["is_human"]))
+
+	# 11. 换位按钮交互流程：点击⇄进入换位模式 → 再点槽位完成交换
+	_assert(sel._swap_pending == -1, "11a: 初始无换位状态")
+	sel._on_swap_pressed(0)
+	_assert(sel._swap_pending == 0, "11b: 点击⇄进入换位模式（源=槽位0）")
+	sel._on_swap_pressed(1)
+	_assert(sel._swap_pending == -1, "11c: 再次点击目标完成交换后退出换位模式")
+	# 交换应该已执行
+	hs = sel._get_human_slot()
+	_assert(hs == 1, "11d: 交互流程换位后玩家在槽位1（实际=%d）" % hs)
+
+	# 12. 换位模式下再点源槽位取消
+	sel._swap_slots(0, 1)  # 先换回去
+	sel._on_swap_pressed(2)
+	_assert(sel._swap_pending == 2, "12a: 点击槽位2⇄进入换位模式（源=槽位2）")
+	sel._on_swap_pressed(2)
+	_assert(sel._swap_pending == -1, "12b: 再次点击同一槽位取消换位")
+
+	# 13. 清理
+	sel.queue_free()
+
 	print("=== 塔选人冒烟测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
 

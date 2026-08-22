@@ -80,7 +80,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_sg")])
 [resource]
 script = ExtResource("3_char")
 character_name = "漩涡鸣人（仙人模式）"
-max_hp = 12
+max_hp = 24
 basic_attack_cost = 1
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_bl"), SubResource("SD_rs"), SubResource("SD_fk"), SubResource("SD_sg")])
 tags = Array[String](["法师", "战士"])

@@ -1,5 +1,6 @@
 ## TowerSelect — 慈悲尖塔选人场景（房间式队伍）
-## 1号槽位=玩家（真人，固定）；2/3号槽位可填充 AI 或真人，空槽位不参战（单人/双人/三人由填充决定）
+## 1号槽位=玩家（真人，默认）；2/3号槽位可填充 AI 队友，空槽位不参战（单人/双人/三人由填充决定）
+## ⇄ 按钮可交换站位（角色+模式一起换，影响战斗中座位顺序与距离）
 ## 样式与 PvE 选人一致：角色卡 + 等级筛选 + 详情预览 + 技能卡
 extends Control
 
@@ -64,6 +65,8 @@ var _name_label: Label
 var _stats_panel: Panel
 var _skills_container: VBoxContainer
 var _start_btn: Button
+var _swap_pending: int = -1  # 换位模式：-1=未激活，>=0=源槽位索引
+var _swap_buttons: Array[Button] = []
 
 func _ready() -> void:
 	for data in Characters.LIST:
@@ -160,7 +163,7 @@ func _build_ui() -> void:
 
 	# 房间说明
 	var room_hint := Label.new()
-	room_hint.text = "1号 = 你（玩家）；2/3号可添加 AI 队友，空槽位不参战（真人联机后续开放）"
+	room_hint.text = "1号 = 你（玩家）；2/3号可添加 AI 队友，⇄可交换站位，空槽位不参战（真人联机后续开放）"
 	room_hint.add_theme_font_size_override("font_size", 11)
 	room_hint.add_theme_color_override("font_color", Color("#888780"))
 	room_hint.anchor_left = 0.0; room_hint.anchor_top = 0.0
@@ -309,6 +312,14 @@ func _build_ui() -> void:
 		mode_btn.pressed.connect(_toggle_slot_mode.bind(i))
 		slot_box.add_child(mode_btn)
 		_slot_mode_buttons.append(mode_btn)
+		var swap_btn := Button.new()
+		swap_btn.text = "⇄"
+		swap_btn.focus_mode = Control.FOCUS_NONE
+		swap_btn.custom_minimum_size = Vector2(36, 30)
+		swap_btn.add_theme_font_size_override("font_size", 12)
+		swap_btn.pressed.connect(_on_swap_pressed.bind(i))
+		slot_box.add_child(swap_btn)
+		_swap_buttons.append(swap_btn)
 
 # ── 等级筛选 ───────────────────────────────────────────────────────
 
@@ -527,13 +538,20 @@ func _make_inline_badge(text: String, bg: Color, fg: Color,
 # ── 交互 ───────────────────────────────────────────────────────────
 
 func _set_active_slot(slot: int) -> void:
+	if _swap_pending >= 0:
+		if slot != _swap_pending:
+			_swap_slots(_swap_pending, slot)
+		else:
+			_swap_pending = -1
+			_refresh_all()
+		return
 	_active_slot = slot
 	_refresh_all()
 
 ## 切换槽位模式（2/3号）：空 ↔ AI（本地单机不支持填真人；真人队友留待联机部署）
 func _toggle_slot_mode(slot: int) -> void:
-	if slot == 0:
-		return  # 玩家槽位固定真人
+	if _slot_modes[slot] == MODE_HUMAN:
+		return  # 真人槽位不可切换
 	if _slot_modes[slot] == MODE_EMPTY:
 		_slot_modes[slot] = MODE_AI
 		# 填充时若未选角色，默认给一个
@@ -542,6 +560,35 @@ func _toggle_slot_mode(slot: int) -> void:
 	else:
 		_slot_modes[slot] = MODE_EMPTY
 	_refresh_all()
+
+## 换位按钮：点击进入换位模式，再点另一个槽位完成交换
+func _on_swap_pressed(slot: int) -> void:
+	if _swap_pending == slot:
+		_swap_pending = -1  # 再次点击取消
+	elif _swap_pending >= 0:
+		_swap_slots(_swap_pending, slot)
+	else:
+		_swap_pending = slot
+	_refresh_all()
+
+## 交换两个槽位的角色和模式
+func _swap_slots(a: int, b: int) -> void:
+	var tmp_sel: int = _selections[a]
+	_selections[a] = _selections[b]
+	_selections[b] = tmp_sel
+	var tmp_mode: int = _slot_modes[a]
+	_slot_modes[a] = _slot_modes[b]
+	_slot_modes[b] = tmp_mode
+	_swap_pending = -1
+	_active_slot = a
+	_refresh_all()
+
+## 获取真人玩家所在槽位
+func _get_human_slot() -> int:
+	for i in 3:
+		if _slot_modes[i] == MODE_HUMAN:
+			return i
+	return 0  # fallback（不应发生）
 
 func _select_for_active(char_data: CharacterData) -> void:
 	var idx := _chars.find(char_data)
@@ -575,17 +622,23 @@ func _refresh_slots() -> void:
 		var btn: Button = _slot_buttons[i]
 		var lbl: Label = _slot_name_lbls[i]
 		var mode_btn: Button = _slot_mode_buttons[i]
+		var swap_btn: Button = _swap_buttons[i]
 		var is_active: bool = i == _active_slot
 		var mode: int = _slot_modes[i]
+		var is_human: bool = mode == MODE_HUMAN
 		var filled: bool = mode >= 0
-		if is_active:
+		var is_swap_src: bool = _swap_pending == i
+		var is_swap_mode: bool = _swap_pending >= 0
+		if is_swap_src:
+			btn.add_theme_stylebox_override("normal", _make_flat(Color("#FCE4E4"), Color("#E24B4A"), 3, 6))
+		elif is_active and not is_swap_mode:
 			btn.add_theme_stylebox_override("normal", _make_flat(Color("#EAF3DE"), Color("#3B6D11"), 3, 6))
 		elif filled:
 			btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFFDF5"), Color("#D3D1C7"), 2, 6))
 		else:
 			btn.add_theme_stylebox_override("normal", _make_flat(Color("#F7F5F0"), Color("#D3D1C7"), 1, 6))
 		var sel: int = _selections[i]
-		if i == 0:
+		if is_human:
 			lbl.text = "玩家 · %s%s" % [_chars[sel].character_name if sel >= 0 else "未选择", " ◈" if is_active else ""]
 			lbl.add_theme_color_override("font_color", Color("#27500A") if is_active else Color("#2C2C2A"))
 		elif mode == MODE_EMPTY:
@@ -596,12 +649,12 @@ func _refresh_slots() -> void:
 			lbl.text = "%s成员 · %s%s" % [role, _chars[sel].character_name if sel >= 0 else "未选择", " ◈" if is_active else ""]
 			lbl.add_theme_color_override("font_color", Color("#27500A") if is_active else Color("#2C2C2A"))
 		# 模式按钮
-		if i == 0:
+		if is_human:
 			mode_btn.text = "👤 玩家"
 			mode_btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFF6E0"), Color("#C9A84C"), 1, 4))
 			mode_btn.add_theme_color_override("font_color", Color("#8B6514"))
 		else:
-			# 2/3号槽位：空 ↔ AI（真人留待联机）
+			# 非真人槽位：空 ↔ AI（真人留待联机）
 			if mode == MODE_EMPTY:
 				mode_btn.text = "＋ 空"
 				mode_btn.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#B4B2A9"), 1, 4))
@@ -610,6 +663,19 @@ func _refresh_slots() -> void:
 				mode_btn.text = "🤖 AI"
 				mode_btn.add_theme_stylebox_override("normal", _make_flat(Color("#EEF4FB"), Color("#2A6AB0"), 1, 4))
 				mode_btn.add_theme_color_override("font_color", Color("#2A6AB0"))
+		# 换位按钮
+		if is_swap_src:
+			swap_btn.text = "取消"
+			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#E24B4A"), Color("#2C2C2A"), 1, 4))
+			swap_btn.add_theme_color_override("font_color", Color("#FFFDF5"))
+		elif is_swap_mode:
+			swap_btn.text = "⇄"
+			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFF6E0"), Color("#C9A84C"), 1, 4))
+			swap_btn.add_theme_color_override("font_color", Color("#8B6514"))
+		else:
+			swap_btn.text = "⇄"
+			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#B4B2A9"), 1, 4))
+			swap_btn.add_theme_color_override("font_color", Color("#5F5E5A"))
 
 func _refresh_detail() -> void:
 	var sel: int = _selections[_active_slot]
@@ -802,7 +868,8 @@ func _update_start_label() -> void:
 	var lbl := _start_btn.get_child(0) as Label
 	if lbl == null:
 		return
-	if _selections[0] < 0:
+	var hs: int = _get_human_slot()
+	if _selections[hs] < 0:
 		lbl.text = "请先选择玩家角色"
 		return
 	var count := 0
@@ -828,8 +895,9 @@ func _build_tower_config() -> Array:
 	return party
 
 func _on_start() -> void:
-	# 玩家槽位必须已选角色
-	if _selections[0] < 0 or _selections[0] >= _chars.size():
+	# 真人玩家必须已选角色
+	var hs: int = _get_human_slot()
+	if _selections[hs] < 0 or _selections[hs] >= _chars.size():
 		return
 	var party := _build_tower_config()
 	if party.is_empty():

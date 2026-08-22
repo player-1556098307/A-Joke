@@ -48,15 +48,15 @@ func _ready() -> void:
 
 	# --- buff 查看按钮测试 ---
 	# 无祝福时按钮应隐藏
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
 	SceneManager.last_tower_config.erase("tower_buffs")
 	battle._update_buff_btn_visibility()
 	_assert(not battle._buff_btn.visible, "10: 无祝福时buff按钮隐藏")
 	_assert(not battle._buff_panel.visible, "11: 无祝福时buff面板隐藏")
 
-	# 模拟获得一个 buff
-	SceneManager.last_tower_config["tower_buffs"] = [
-		{ "id": "blade_power", "value": 1.0 },
-		{ "id": "shield_wall", "value": 0.5 },
+	# 模拟获得 buff（每角色独立结构：角色0获得2个buff）
+	SceneManager.last_tower_config["tower_buffs_per_player"] = [
+		[{ "id": "blade_power", "value": 1.0 }, { "id": "shield_wall", "value": 0.5 }],
 	]
 	battle._update_buff_btn_visibility()
 	_assert(battle._buff_btn.visible, "12: 有祝福+战斗阶段时buff按钮显示")
@@ -69,9 +69,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
-	# 面板内容：标题+分隔线+2行buff+关闭提示 = 5 个子节点（VBox 容器内）
+	# 面板内容：标题+分隔线+角色名+2行buff+关闭提示 = 6 个子节点（VBox 容器内）
 	var child_count: int = battle._buff_panel_box.get_child_count()
-	_assert(child_count == 5, "14: 面板有5个子节点（标题+分隔+2行+提示）（实际=%d）" % child_count)
+	_assert(child_count == 6, "14: 面板有6个子节点（标题+分隔+角色名+2行+提示）（实际=%d）" % child_count)
 
 	# 布局验证：VBox 内子节点纵向排列且不重叠（位置递增）
 	var prev_bottom: float = -1.0

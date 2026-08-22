@@ -160,6 +160,7 @@ func _ready() -> void:
 	GameManager.backtrack_performed.connect(_on_backtrack_performed)
 	GameManager.hiroari_targets_required.connect(_on_hiroari_targets_required)
 	GameManager.hiroari_used.connect(_on_hiroari_used)
+	GameManager.hiano_interrupt_required.connect(_on_hiano_interrupt_required)
 
 func _style_panels() -> void:
 	# LogPanelBg — white background, dark border (matching SVG)
@@ -3689,6 +3690,83 @@ func _submit_hiroari() -> void:
 		net_client.submit_hiroari_targets(player_id, targets)
 	else:
 		GameManager.submit_hiroari_targets(player_id, targets)
+
+
+## ── 旧止水·日晕舞中断点决策弹窗（人类玩家） ──
+var _hiano_dialog: PanelContainer = null
+
+func _on_hiano_interrupt_required(player_id: int, target_id: int, _max_interrupt: int) -> void:
+	# 只有人类玩家需要弹窗（AI 在 GameManager 内自动决策）
+	if player_id != _human_player_id:
+		return
+	_show_hiano_dialog(player_id, target_id)
+
+func _show_hiano_dialog(player_id: int, target_id: int) -> void:
+	if _hiano_dialog != null:
+		_hiano_dialog.queue_free()
+	_hiano_dialog = PanelContainer.new()
+	_hiano_dialog.position = Vector2(260, 170)
+	_hiano_dialog.size = Vector2(440, 240)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#993C1D")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_hiano_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_hiano_dialog.add_child(vbox)
+
+	var target := GameManager.get_player(target_id)
+	var title := Label.new()
+	title.text = "🌀 宇智波流·日晕舞 — 选择中断点"
+	title.add_theme_font_size_override("font_size", 15)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("#993C1D"))
+	vbox.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "目标：%s（HP %.0f）\n共3段伤害（每段1伤），中断后可衔接【须佐能乎·九十九】" % [
+		target.player_name if target else str(target_id),
+		target.hp if target else 0.0]
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", Color("#5F5E5A"))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(hint)
+
+	# 三个选项：不中断 / 1段后中断 / 2段后中断
+	var options := [
+		["打满3段（不中断）", 0],
+		["1段后中断 → 接九十九", 1],
+		["2段后中断 → 接九十九", 2],
+	]
+	for opt in options:
+		var btn := Button.new()
+		btn.text = opt[0]
+		btn.custom_minimum_size = Vector2(0, 32)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#FCEBEB"), Color("#993C1D"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#F7C1C1"), Color("#791F1F"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#F0A8A8"), Color("#791F1F"), 1, 4))
+		var interrupt_at: int = opt[1]
+		btn.pressed.connect(func():
+			_submit_hiano_interrupt(player_id, interrupt_at)
+		)
+		vbox.add_child(btn)
+
+	add_child(_hiano_dialog)
+
+func _submit_hiano_interrupt(player_id: int, interrupt_at: int) -> void:
+	if _hiano_dialog:
+		_hiano_dialog.queue_free()
+		_hiano_dialog = null
+	# 与日影舞提交方式一致：本地直接回调 GameManager，网络走 net_client
+	if net_client:
+		net_client.submit_hiano_interrupt(player_id, interrupt_at)
+	else:
+		GameManager.submit_hiano_interrupt(player_id, interrupt_at)
 
 
 # ============================================================

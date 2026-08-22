@@ -7,6 +7,7 @@ var _pass_count: int = 0
 var _fail_count: int = 0
 var _ui: Control = null
 var _applied_targets: Array = []
+var _applied_hiano: Array = []
 
 func _ready() -> void:
 	print("=== UI弹窗冒烟测试（新止水） ===")
@@ -111,6 +112,47 @@ func _ready() -> void:
 	var applied: Array = _applied_targets
 	_assert(applied.size() == 4 and applied[3] == 2, "U5e: 提交目标=[1,1,-1,2]（实际=%s）" % str(applied))
 	_assert(_ui._hiroari_dialog == null, "U5f: 4段选择完毕弹窗已关闭")
+
+	# ══ 测试4：旧止水日晕舞中断点弹窗（bug修复验证） ══
+	# 加载旧止水（须佐能）角色
+	var old_shisui_char := load("res://resources/characters/宇智波止水（须佐能）.tres") as CharacterData
+	if old_shisui_char == null:
+		print("FATAL: 旧止水角色资源加载失败")
+		get_tree().quit(1)
+		return
+	# 重新初始化 GameManager（旧止水为人类玩家）
+	gm.setup_game({
+		"players": [
+			{"name": "止水", "character": old_shisui_char, "is_human": true},
+			{"name": "鸣人", "character": naruto_char, "is_human": false},
+			{"name": "佐助", "character": sasuke_char, "is_human": false},
+		]
+	})
+	await get_tree().process_frame
+	_ui._human_player_id = 0
+	var shisui: PlayerState = gm.get_player(0)
+	_assert(shisui != null, "U6: 旧止水初始化")
+	# 触发日晕舞中断点请求信号
+	gm.hiano_interrupt_required.emit(0, 1, 2)
+	await get_tree().process_frame
+	_assert(_ui._hiano_dialog != null, "U6a: 日晕舞中断点弹窗已创建")
+	if _ui._hiano_dialog:
+		var btn_texts4: Array[String] = []
+		_for_each_button(_ui._hiano_dialog, func(b: Button): btn_texts4.append(b.text))
+		_assert(btn_texts4.any(func(t: String): return t.contains("不中断")), "U6b: 不中断按钮存在（%s）" % str(btn_texts4))
+		_assert(btn_texts4.any(func(t: String): return t.contains("1段后中断")), "U6c: 1段后中断按钮存在（%s）" % str(btn_texts4))
+		_assert(btn_texts4.any(func(t: String): return t.contains("2段后中断")), "U6d: 2段后中断按钮存在（%s）" % str(btn_texts4))
+	# 点击"1段后中断" → 应调用 GameManager.submit_hiano_interrupt(0, 1)
+	_applied_hiano = []
+	var on_hiano := func(pid: int, at: int): _applied_hiano = [pid, at]
+	gm.hiano_interrupt_made.connect(on_hiano)
+	var clicked_h := _click_button(_ui._hiano_dialog, "1段后中断")
+	_assert(clicked_h, "U6e: 点击1段后中断按钮")
+	await get_tree().process_frame
+	gm.hiano_interrupt_made.disconnect(on_hiano)
+	var hiano_made: Array = _applied_hiano
+	_assert(hiano_made.size() == 2 and hiano_made[0] == 0 and hiano_made[1] == 1, "U6f: 提交中断点=[0,1]（实际=%s）" % str(hiano_made))
+	_assert(_ui._hiano_dialog == null, "U6g: 弹窗已关闭")
 
 	print("=== UI弹窗冒烟测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)

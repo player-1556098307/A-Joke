@@ -146,6 +146,19 @@ func get_small_enemy_hp_bonus(floor_num: int) -> int:
 func get_cycle_hp_bonus(cycle: int) -> int:
 	return (cycle - 1) * 2
 
+## 按轮次获取攻击力加成（第1-2轮+0，第3轮+1，第4轮+2）
+## 仅对小怪层生效，精英/Boss层不加
+func get_cycle_attack_bonus(cycle: int) -> float:
+	if cycle <= 2:
+		return 0.0
+	return float(cycle - 2)  # 第3轮+1, 第4轮+2
+
+## 获取指定层小怪的攻击力加成（正数=小怪层后期，0=前期/精英层）
+func get_small_enemy_attack_bonus(floor_num: int) -> float:
+	if floor_num <= 0 or _is_elite_floor(floor_num) or _is_boss_floor(floor_num):
+		return 0.0
+	return get_cycle_attack_bonus(_get_cycle(floor_num))
+
 ## 测试用：直接指定小怪索引列表生成（不做随机）
 func _generate_small_enemies_with_indices(indices: Array[int]) -> Array[CharacterData]:
 	var result: Array[CharacterData] = []

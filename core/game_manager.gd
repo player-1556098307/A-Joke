@@ -1993,6 +1993,11 @@ func _on_hiroari_targets_made(player_id: int, targets: Array[int]) -> void:
 func submit_hiroari_targets(player_id: int, targets: Array[int]) -> void:
 	hiroari_targets_made.emit(player_id, targets)
 
+## 人类玩家日晕舞中断点提交入口（由UI/网络主机调用）
+## interrupt_at: 0=不中断 1=1段后中断 2=2段后中断
+func submit_hiano_interrupt(player_id: int, interrupt_at: int) -> void:
+	hiano_interrupt_made.emit(player_id, interrupt_at)
+
 ## 逆时针取下一个存活玩家（从指定ID开始，用于日影舞死亡顺延）
 func _next_alive_counterclockwise(from_id: int, skip_id: int = -1) -> PlayerState:
 	var alive := get_alive_players()
