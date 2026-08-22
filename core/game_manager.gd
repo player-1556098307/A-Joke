@@ -6,11 +6,13 @@ extends Node
 ## 游戏阶段枚举：驱动整个游戏主循环的状态机
 enum GamePhase {
 	SETUP,               ## 初始化
+	ODD_EVEN_INPUT,      ## 黑白配（手心手背）— 玩家选择
+	ODD_EVEN_RESOLVING,  ## 黑白配结算
 	GESTURE_INPUT,       ## 等待玩家出拳
 	RESOLVING,           ## 结算手势胜负
 	TIEBREAK_INPUT,      ## 加赛出拳
 	TIEBREAK_RESOLVING,  ## 加赛结算
-	PREPARATION,         ## 准备阶段（猜拳赢家回合开始，所有有准备技能的玩家按逆时针轮询释放）
+	PREPARATION,         ## 准备阶段（猜拳赢家回合开始）
 	ACTION_INPUT,        ## 等待胜者选择行动
 	APPLYING,            ## 执行行动效果
 	ELIMINATION,         ## 淘汰检测
@@ -39,6 +41,12 @@ signal game_over(winner_id: int, record: MatchRecord)
 signal tiebreak_started(candidate_ids: Array[int])
 ## 加赛结束后发射，传递胜出者ID
 signal tiebreak_resolved(winner_id: int)
+## 黑白配（手心手背）阶段开始：传递所有参配玩家ID
+signal odd_even_started(participant_ids: Array[int])
+## 黑白配一轮结算：choices={pid:bool}, winners=Array[int], is_tie=bool
+signal odd_even_resolved(choices: Dictionary, winners: Array[int], is_tie: bool)
+## 黑白配结束，幸存者进入石头剪刀布：传递RPS参与方ID
+signal odd_even_finished(rps_participants: Array[int])
 ## 玩家获得护盾时发射
 signal player_shielded(player_id: int, shield_value: float)
 ## 玩家被麻痹时发射
@@ -222,6 +230,20 @@ var _current_snapshot: RoundSnapshot
 ## 调试开关：AI强制出剪刀
 var _debug_force_scissors: bool = false
 
+## ── 黑白配（手心手背）状态 ──────────────────────────────────
+## 当前黑白配参与方ID列表（≥5人存活时启动）
+var _odd_even_participants: Array[int] = []
+## 黑白配每轮选择：pid → true(手心/正) / false(手背/反)
+var _odd_even_choices: Dictionary = {}
+## 黑白配是否已经启动（避免回合内重复进入）
+var _odd_even_active: bool = false
+## 本回合黑白配已完成（防止RPS平局重入时再次触发黑白配）
+var _odd_even_done_this_round: bool = false
+## 自动出拳模式（塔模式可用）：true时人类玩家手势由AI随机代理
+var auto_rps_enabled: bool = false
+## 当前回合参与石头剪刀布的玩家ID（黑白配筛选后仅胜者参与；无黑白配时为全部存活玩家）
+var _rps_participants: Array[int] = []
+
 ## 联机模式标志（服务器设置为 true，关闭单机"人类死亡即结束"逻辑）
 var _is_network_game: bool = false
 ## 慈悲尖塔模式标志（PvE组队：人类死亡不结束，队友可继续；敌人全灭=层胜利由外部管理器处理）
@@ -326,6 +348,8 @@ func _on_resolve_timer_timeout() -> void:
 		_resolve_round()
 	elif _current_phase == GamePhase.TIEBREAK_RESOLVING:
 		_resolve_tiebreak()
+	elif _current_phase == GamePhase.ODD_EVEN_RESOLVING:
+		_resolve_odd_even()
 
 ## 初始化游戏：创建玩家状态、距离系统、对局记录，进入首次出拳阶段
 func setup_game(config: Dictionary) -> void:
@@ -339,6 +363,12 @@ func setup_game(config: Dictionary) -> void:
 	_last_round_pre_snapshot = {}
 	_prev_round_pre_snapshot = {}
 	_is_tower_mode = config.get("tower_mode", false)
+	_odd_even_active = false
+	_odd_even_done_this_round = false
+	_odd_even_participants.clear()
+	_odd_even_choices.clear()
+	_rps_participants.clear()
+	auto_rps_enabled = config.get("auto_rps", false)
 
 	var player_configs: Array = config["players"]
 	for i in range(player_configs.size()):
@@ -385,24 +415,30 @@ func setup_game(config: Dictionary) -> void:
 func _enter_phase(phase: GamePhase) -> void:
 	_prev_phase = _current_phase
 	_current_phase = phase
-	if phase == GamePhase.GESTURE_INPUT:
-		if _prev_phase != GamePhase.RESOLVING and _prev_phase != GamePhase.TIEBREAK_RESOLVING:
+	# 回合计数：ODD_EVEN_INPUT 或 GESTURE_INPUT 从非结算阶段进入时递增
+	if phase == GamePhase.ODD_EVEN_INPUT:
+		if _prev_phase != GamePhase.ODD_EVEN_RESOLVING:
+			_current_round_number += 1
+	elif phase == GamePhase.GESTURE_INPUT:
+		if _prev_phase != GamePhase.RESOLVING and _prev_phase != GamePhase.TIEBREAK_RESOLVING and _prev_phase != GamePhase.ODD_EVEN_RESOLVING:
 			_current_round_number += 1
 		_apply_paralyze()
 	phase_changed.emit(phase)
 
 	match phase:
-		GamePhase.GESTURE_INPUT:      _process_ai_gestures()
-		GamePhase.RESOLVING:          _resolve_timer.start()
-		GamePhase.TIEBREAK_INPUT:     _start_tiebreak_input()
-		GamePhase.TIEBREAK_RESOLVING: _resolve_timer.start()
-		GamePhase.PREPARATION:        _start_preparation_phase()
-		GamePhase.ACTION_INPUT:       _start_action_input()
-		GamePhase.APPLYING:           _apply_actions()
-		GamePhase.ELIMINATION:        _check_elimination()
-		GamePhase.END_PHASE:         _process_end_phase()
-		GamePhase.ROUND_END:          _end_round()
-		GamePhase.GAME_OVER:          _finish_game()
+		GamePhase.ODD_EVEN_INPUT:      _start_odd_even()
+		GamePhase.ODD_EVEN_RESOLVING:  _resolve_timer.start()
+		GamePhase.GESTURE_INPUT:       _start_gesture_input()
+		GamePhase.RESOLVING:           _resolve_timer.start()
+		GamePhase.TIEBREAK_INPUT:      _start_tiebreak_input()
+		GamePhase.TIEBREAK_RESOLVING:  _resolve_timer.start()
+		GamePhase.PREPARATION:         _start_preparation_phase()
+		GamePhase.ACTION_INPUT:        _start_action_input()
+		GamePhase.APPLYING:            _apply_actions()
+		GamePhase.ELIMINATION:         _check_elimination()
+		GamePhase.END_PHASE:          _process_end_phase()
+		GamePhase.ROUND_END:           _end_round()
+		GamePhase.GAME_OVER:           _finish_game()
 
 ## 应用麻痹：被麻痹的玩家自动出 SKIP，发射 player_skipped 信号
 func _apply_paralyze() -> void:
@@ -411,17 +447,201 @@ func _apply_paralyze() -> void:
 			player.current_gesture = PlayerState.Gesture.SKIP
 			player_skipped.emit(player.player_id)
 
-## 处理AI出拳：每个AI延时后提交手势（延时由SettingsManager决定）
-func _process_ai_gestures() -> void:
+## ── 黑白配（手心手背）─────────────────────────────────────────
+## 常量：≥5人存活时启动黑白配，≤4人时直接进入石头剪刀布
+const ODD_EVEN_THRESHOLD := 5
+const ODD_EVEN_MAX_SURVIVORS := 4
+
+## 判断本回合是否需要黑白配：存活玩家≥5 且 本回合未走过黑白配
+func _should_start_odd_even() -> bool:
+	if _odd_even_done_this_round:
+		return false
+	var alive_count := 0
+	for p in _players:
+		if p.is_alive:
+			alive_count += 1
+	return alive_count >= ODD_EVEN_THRESHOLD
+
+## 启动黑白配阶段：收集参与方，AI自动选择，等待人类选择
+func _start_odd_even() -> void:
+	_odd_even_participants.clear()
+	_odd_even_choices.clear()
+	_odd_even_active = true
+	# 麻痹玩家不参与黑白配（自动出SKIP）
+	for p in _players:
+		if p.is_alive:
+			if p.paralyze_turns > 0:
+				p.current_gesture = PlayerState.Gesture.SKIP
+				player_skipped.emit(p.player_id)
+			else:
+				_odd_even_participants.append(p.player_id)
+	# 如果参与人数 <5（麻痹导致），直接走RPS
+	if _odd_even_participants.size() < ODD_EVEN_THRESHOLD:
+		_odd_even_active = false
+		_odd_even_done_this_round = true
+		_rps_participants.clear()
+		for p in _players:
+			if p.is_alive and p.current_gesture != PlayerState.Gesture.SKIP:
+				_rps_participants.append(p.player_id)
+		for p in _players:
+			if p.is_alive and not _rps_participants.has(p.player_id):
+				p.current_gesture = PlayerState.Gesture.SKIP
+		_enter_phase(GamePhase.GESTURE_INPUT)
+		return
+	odd_even_started.emit(_odd_even_participants.duplicate())
+	# AI自动选择手心/手背
 	var delay := SettingsManager.get_ai_delay()
-	var _has_human_alive := false
+	for pid in _odd_even_participants:
+		var p := get_player(pid)
+		if p != null and not p.is_human:
+			var choice := randf() < 0.5  # true=手心(正), false=手背(反)
+			get_tree().create_timer(delay).timeout.connect(
+				_delayed_submit_odd_even.bind(pid, choice), CONNECT_ONE_SHOT)
+	# 如果没有人类玩家或人类死亡，直接全部AI
+	if _all_odd_even_submitted():
+		_enter_phase(GamePhase.ODD_EVEN_RESOLVING)
+
+## 人类玩家提交黑白配选择（由UI调用）
+func submit_odd_even(player_id: int, choice: bool) -> void:
+	if _current_phase != GamePhase.ODD_EVEN_INPUT:
+		return
+	if not _odd_even_participants.has(player_id):
+		return
+	_odd_even_choices[player_id] = choice
+	if _all_odd_even_submitted():
+		_enter_phase(GamePhase.ODD_EVEN_RESOLVING)
+	elif get_player(player_id) != null and get_player(player_id).is_human:
+		_flush_pending_ai_odd_even()
+
+## 刷新未提交的AI黑白配选择
+func _flush_pending_ai_odd_even() -> void:
+	if _current_phase != GamePhase.ODD_EVEN_INPUT:
+		return
+	for pid in _odd_even_participants:
+		var p := get_player(pid)
+		if p != null and not p.is_human and not _odd_even_choices.has(pid):
+			_odd_even_choices[pid] = randf() < 0.5
+	if _all_odd_even_submitted():
+		_enter_phase(GamePhase.ODD_EVEN_RESOLVING)
+
+func _delayed_submit_odd_even(pid: int, choice: bool) -> void:
+	if _current_phase == GamePhase.ODD_EVEN_INPUT:
+		submit_odd_even(pid, choice)
+
+func _all_odd_even_submitted() -> bool:
+	for pid in _odd_even_participants:
+		if not _odd_even_choices.has(pid):
+			return false
+	return true
+
+## 结算黑白配一轮：手心手背分组，少方胜出，平局则重来
+func _resolve_odd_even() -> void:
+	var palm_count := 0   # 手心数
+	var back_count := 0   # 手背数
+	var palm_ids: Array[int] = []
+	var back_ids: Array[int] = []
+	for pid in _odd_even_participants:
+		if _odd_even_choices.get(pid, true):
+			palm_count += 1
+			palm_ids.append(pid)
+		else:
+			back_count += 1
+			back_ids.append(pid)
+
+	# 全部相同 → 平局，重新配
+	if palm_count == 0 or back_count == 0:
+		odd_even_resolved.emit(_odd_even_choices.duplicate(), [], true)
+		# 平局：清空选择，重新进入黑白配
+		_odd_even_choices.clear()
+		_enter_phase(GamePhase.ODD_EVEN_INPUT)
+		return
+
+	# 少方胜出
+	var winners: Array[int] = []
+	if palm_count <= back_count:
+		winners = palm_ids
+	else:
+		winners = back_ids
+	odd_even_resolved.emit(_odd_even_choices.duplicate(), winners.duplicate(), false)
+
+	# 胜出人数 ≤4 → 进入石头剪刀布
+	if winners.size() <= ODD_EVEN_MAX_SURVIVORS:
+		_odd_even_active = false
+		_odd_even_done_this_round = true
+		_rps_participants = winners.duplicate()
+		# 重置这些玩家的手势
+		for pid in winners:
+			var p := get_player(pid)
+			if p != null:
+				p.current_gesture = PlayerState.Gesture.NONE
+		# 清理非胜者的手势（设为SKIP标记，不参与RPS）
+		for p in _players:
+			if p.is_alive and not winners.has(p.player_id):
+				p.current_gesture = PlayerState.Gesture.SKIP
+		odd_even_finished.emit(winners.duplicate())
+		_enter_phase(GamePhase.GESTURE_INPUT)
+	else:
+		# 胜出人数仍 >4 → 继续黑白配
+		_odd_even_participants = winners.duplicate()
+		_odd_even_choices.clear()
+		_enter_phase(GamePhase.ODD_EVEN_INPUT)
+
+## ── 石头剪刀布阶段入口 ────────────────────────────────────────
+## 进入GESTURE_INPUT时，先检查是否需要先走黑白配；否则正常处理AI出拳
+func _start_gesture_input() -> void:
+	# 如果存活人数≥5 且 本回合还没走过黑白配 → 先黑白配
+	if _should_start_odd_even() and not _odd_even_active:
+		_enter_phase(GamePhase.ODD_EVEN_INPUT)
+		return
+	# 确定RPS参与方：
+	# - 从ODD_EVEN_RESOLVING进入 → _rps_participants已由 _resolve_odd_even 设置
+	# - 从ROUND_END/SETUP进入 → 全部非麻痹存活玩家参与
+	# - 从RESOLVING/TIEBREAK_RESOLVING进入（平局重入） → 保持原有 _rps_participants
+	if _prev_phase == GamePhase.ROUND_END or _prev_phase == GamePhase.SETUP:
+		_rps_participants.clear()
+		for p in _players:
+			if p.is_alive and p.paralyze_turns <= 0:
+				_rps_participants.append(p.player_id)
+	# 确保非参与方为 SKIP（麻痹或黑白配淘汰的玩家）
+	for p in _players:
+		if p.is_alive and not _rps_participants.has(p.player_id):
+			p.current_gesture = PlayerState.Gesture.SKIP
+	_odd_even_active = false
+	_process_ai_gestures()
+	# 自动出拳模式：人类玩家由AI代理
+	if auto_rps_enabled and _human_player_alive():
+		_auto_submit_human_gesture()
+
+## 判断人类玩家是否存活
+func _human_player_alive() -> bool:
 	for p in _players:
 		if p.is_alive and p.is_human:
-			_has_human_alive = true
+			return true
+	return false
+
+## 自动为人类玩家提交随机手势（auto_rps_enabled时调用）
+func _auto_submit_human_gesture() -> void:
+	for p in _players:
+		if p.is_alive and p.is_human and p.current_gesture == PlayerState.Gesture.NONE:
+			var pid := p.player_id
+			var g := _ai_controller.decide_gesture(p)
+			# 延迟一小段时间后提交，让UI有时间展示
+			var t := get_tree().create_timer(0.3)
+			t.timeout.connect(func():
+				if _current_phase == GamePhase.GESTURE_INPUT:
+					submit_gesture(pid, g), CONNECT_ONE_SHOT)
 			break
+
+## 处理AI出拳：每个AI延时后提交手势（延时由SettingsManager决定）
+## 仅处理当前RPS参与方中的AI玩家
+func _process_ai_gestures() -> void:
+	var delay := SettingsManager.get_ai_delay()
 	for player in _players:
 		if player.is_alive and not player.is_human and player.current_gesture == PlayerState.Gesture.NONE:
-			var gesture := PlayerState.Gesture.SCISSORS if _debug_force_scissors and _has_human_alive else _ai_controller.decide_gesture(player)
+			# 非RPS参与方跳过（已设为SKIP）
+			if not _rps_participants.has(player.player_id):
+				continue
+			var gesture := _ai_controller.decide_gesture(player)
 			get_tree().create_timer(delay).timeout.connect(
 				_delayed_submit_gesture.bind(player.player_id, gesture), CONNECT_ONE_SHOT)
 	if _current_phase == GamePhase.GESTURE_INPUT and _all_gestures_submitted():
@@ -432,8 +652,10 @@ func _delayed_submit_gesture(pid: int, gesture: PlayerState.Gesture) -> void:
 		submit_gesture(pid, gesture)
 
 func _all_gestures_submitted() -> bool:
-	for player in _players:
-		if player.is_alive and player.current_gesture == PlayerState.Gesture.NONE:
+	# 只检查RPS参与方是否都已提交手势
+	for pid in _rps_participants:
+		var player := get_player(pid)
+		if player != null and player.is_alive and player.current_gesture == PlayerState.Gesture.NONE:
 			return false
 	return true
 
@@ -492,9 +714,11 @@ func _resolve_round() -> void:
 				player.reset_round_data()
 			_enter_phase(GamePhase.GESTURE_INPUT)
 		else:
-			for player in _players:
-				if player.is_alive:
-					player.current_gesture = PlayerState.Gesture.NONE
+			# 只重置RPS参与方的手势，非参与方保持SKIP
+			for pid in _rps_participants:
+				var p := get_player(pid)
+				if p != null and p.is_alive:
+					p.current_gesture = PlayerState.Gesture.NONE
 			_enter_phase(GamePhase.GESTURE_INPUT)
 	elif (result["winners"] as Array).size() == 1:
 		_sole_winner_id = int((result["winners"] as Array)[0])
@@ -507,8 +731,11 @@ func _resolve_round() -> void:
 		_tiebreak_candidates.clear()
 		for id in (result["winners"] as Array):
 			_tiebreak_candidates.append(int(id))
-		for player in _players:
-			player.current_gesture = PlayerState.Gesture.NONE
+		# 只重置RPS参与方的手势，非参与方保持SKIP
+		for pid in _rps_participants:
+			var p := get_player(pid)
+			if p != null:
+				p.current_gesture = PlayerState.Gesture.NONE
 		tiebreak_started.emit(_tiebreak_candidates)
 		_enter_phase(GamePhase.TIEBREAK_INPUT)
 
@@ -2479,6 +2706,9 @@ func _end_round() -> void:
 				player.binding_field_skills.clear()
 				binding_field_ended.emit(player.player_id)
 		player.reset_round_data()
+	_odd_even_active = false
+	_odd_even_done_this_round = false
+	_rps_participants.clear()
 	_enter_phase(GamePhase.GESTURE_INPUT)
 
 ## 处理延迟伤害队列：每回合结束时 tick 倒计时，触发的伤害执行吸收链
@@ -2794,6 +3024,9 @@ func _flush_pending_ai_gestures() -> void:
 		return
 	for p in _players:
 		if p.is_alive and not p.is_human and p.current_gesture == PlayerState.Gesture.NONE:
+			# 非RPS参与方跳过
+			if not _rps_participants.has(p.player_id):
+				continue
 			var g := _ai_controller.decide_gesture(p)
 			p.current_gesture = g
 			gesture_submitted.emit(p.player_id, g)

@@ -107,6 +107,10 @@ func _ready() -> void:
 	GameManager.game_over.connect(_on_game_over)
 	GameManager.tiebreak_started.connect(_on_tiebreak_started)
 	GameManager.tiebreak_resolved.connect(_on_tiebreak_resolved)
+	# ── 黑白配（手心手背）信号 ──
+	GameManager.odd_even_started.connect(_on_odd_even_started)
+	GameManager.odd_even_resolved.connect(_on_odd_even_resolved)
+	GameManager.odd_even_finished.connect(_on_odd_even_finished)
 	GameManager.player_shielded.connect(_on_player_shielded)
 	GameManager.player_paralyzed.connect(_on_player_paralyzed)
 	GameManager.player_knocked_down.connect(_on_player_knocked_down)
@@ -218,6 +222,93 @@ func _setup_menu_button() -> void:
 	menu_btn.add_theme_color_override("font_pressed_color", Color("#FAC775"))
 	menu_btn.pressed.connect(_on_menu_pressed)
 	add_child(menu_btn)
+	_setup_auto_rps_button()
+	_setup_odd_even_panel()
+
+## 自动出拳开关按钮（右上角，菜单按钮右侧）
+var _auto_rps_btn: Button
+func _setup_auto_rps_button() -> void:
+	_auto_rps_btn = Button.new()
+	_auto_rps_btn.text = "⚡自动出拳"
+	_auto_rps_btn.add_theme_font_size_override("font_size", 10)
+	_auto_rps_btn.focus_mode = Control.FOCUS_NONE
+	_auto_rps_btn.custom_minimum_size = Vector2(80, 22)
+	_auto_rps_btn.position = Vector2(828, 8)
+	_auto_rps_btn.size = Vector2(80, 22)
+	_update_auto_rps_btn_style()
+	_auto_rps_btn.pressed.connect(_on_auto_rps_toggled)
+	add_child(_auto_rps_btn)
+
+func _update_auto_rps_btn_style() -> void:
+	if GameManager.auto_rps_enabled:
+		_auto_rps_btn.add_theme_stylebox_override("normal",   _make_flat(Color("#27500A"), Color("#3B6D11"), 1, 3))
+		_auto_rps_btn.add_theme_stylebox_override("hover",    _make_flat(Color("#3B6D11"), Color("#4A8A16"), 1, 3))
+		_auto_rps_btn.add_theme_stylebox_override("pressed",  _make_flat(Color("#1E4727"), Color("#97C459"), 1, 3))
+		_auto_rps_btn.add_theme_color_override("font_color",         Color("#EAF3DE"))
+		_auto_rps_btn.add_theme_color_override("font_hover_color",   Color("#FFFDF5"))
+		_auto_rps_btn.add_theme_color_override("font_pressed_color", Color("#97C459"))
+	else:
+		_auto_rps_btn.add_theme_stylebox_override("normal",   _make_flat(Color("#3A3A38"), Color("#5A5A57"), 1, 3))
+		_auto_rps_btn.add_theme_stylebox_override("hover",    _make_flat(Color("#4A4A47"), Color("#888780"), 1, 3))
+		_auto_rps_btn.add_theme_stylebox_override("pressed",  _make_flat(Color("#2C2C2A"), Color("#FAC775"), 1, 3))
+		_auto_rps_btn.add_theme_color_override("font_color",         Color("#D3D1C7"))
+		_auto_rps_btn.add_theme_color_override("font_hover_color",   Color("#FFFDF5"))
+		_auto_rps_btn.add_theme_color_override("font_pressed_color", Color("#FAC775"))
+
+func _on_auto_rps_toggled() -> void:
+	GameManager.auto_rps_enabled = not GameManager.auto_rps_enabled
+	_update_auto_rps_btn_style()
+	if GameManager.auto_rps_enabled:
+		_append_log("── 自动出拳已开启 ──", LT_STATUS)
+
+## 黑白配（手心手背）选择面板
+var _odd_even_panel: VBoxContainer
+var _btn_palm: Button   # 手心
+var _btn_back: Button   # 手背
+func _setup_odd_even_panel() -> void:
+	_odd_even_panel = VBoxContainer.new()
+	_odd_even_panel.position = Vector2(774, 88)
+	_odd_even_panel.size = Vector2(172, 0)
+	_odd_even_panel.add_theme_constant_override("separation", 8)
+	_odd_even_panel.visible = false
+	add_child(_odd_even_panel)
+
+	var title := Label.new()
+	title.text = "手心手背"
+	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_color_override("font_color", Color("#FFFDF5"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_odd_even_panel.add_child(title)
+
+	_btn_palm = Button.new()
+	_btn_palm.text = "🖐  手心"
+	_btn_palm.add_theme_font_size_override("font_size", 15)
+	_btn_palm.custom_minimum_size = Vector2(172, 52)
+	_btn_palm.add_theme_stylebox_override("normal",  _make_flat(Color("#FFFDF5"), Color("#D3D1C7"), 2, 6))
+	_btn_palm.add_theme_stylebox_override("hover",   _make_flat(Color("#EAF3DE"), Color("#3B6D11"), 2, 6))
+	_btn_palm.add_theme_stylebox_override("pressed", _make_flat(Color("#D8ECC5"), Color("#27500A"), 3, 6))
+	_btn_palm.add_theme_color_override("font_color",         Color("#2C2C2A"))
+	_btn_palm.add_theme_color_override("font_hover_color",   Color("#27500A"))
+	_btn_palm.add_theme_color_override("font_pressed_color", Color("#27500A"))
+	_btn_palm.pressed.connect(_on_odd_even_pressed.bind(true))
+	_odd_even_panel.add_child(_btn_palm)
+
+	_btn_back = Button.new()
+	_btn_back.text = "✊  手背"
+	_btn_back.add_theme_font_size_override("font_size", 15)
+	_btn_back.custom_minimum_size = Vector2(172, 52)
+	_btn_back.add_theme_stylebox_override("normal",  _make_flat(Color("#FFFDF5"), Color("#D3D1C7"), 2, 6))
+	_btn_back.add_theme_stylebox_override("hover",   _make_flat(Color("#FCEBEB"), Color("#E24B4A"), 2, 6))
+	_btn_back.add_theme_stylebox_override("pressed", _make_flat(Color("#FADDDD"), Color("#791F1F"), 3, 6))
+	_btn_back.add_theme_color_override("font_color",         Color("#2C2C2A"))
+	_btn_back.add_theme_color_override("font_hover_color",   Color("#E24B4A"))
+	_btn_back.add_theme_color_override("font_pressed_color", Color("#791F1F"))
+	_btn_back.pressed.connect(_on_odd_even_pressed.bind(false))
+	_odd_even_panel.add_child(_btn_back)
+
+func _on_odd_even_pressed(choice: bool) -> void:
+	_odd_even_panel.hide()
+	GameManager.submit_odd_even(_human_player_id, choice)
 
 func _on_menu_pressed() -> void:
 	# Backdrop
@@ -1745,7 +1836,12 @@ func _on_turn_timer_tick() -> void:
 		if _human_player_id >= 0 and not is_spectating:
 			var human := GameManager.get_player(_human_player_id)
 			if human != null and human.is_alive:
-				if net_client:
+				# 黑白配超时 → 随机选手心/手背
+				if _current_phase_for_timer == GameManager.GamePhase.ODD_EVEN_INPUT:
+					var rng_oe := RandomNumberGenerator.new()
+					rng_oe.randomize()
+					GameManager.submit_odd_even(_human_player_id, rng_oe.randf() < 0.5)
+				elif net_client:
 					if _current_phase_for_timer == GameManager.GamePhase.ACTION_INPUT and _human_player_id == _current_action_player_id:
 						net_client.submit_action(PlayerState.ActionType.CHARGE, -1, -1)
 					else:
@@ -1773,9 +1869,33 @@ func _on_turn_timer_tick() -> void:
 func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> void:
 	_current_phase_for_timer = phase
 	match phase:
+		GameManager.GamePhase.ODD_EVEN_INPUT:
+			_stop_turn_timer()
+			_hide_all_thinking()
+			gesture_panel.hide()
+			action_panel.hide()
+			target_panel.hide()
+			phase_label.text = "手心手背 — 请选择"
+			phase_label.add_theme_color_override("font_color", Color("#FAC775"))
+			right_header_label.text = "黑白配"
+			var oe_human := GameManager.get_player(_human_player_id)
+			var oe_human_can_play := oe_human != null and oe_human.is_alive and oe_human.paralyze_turns <= 0 and not is_spectating
+			_odd_even_panel.visible = oe_human_can_play
+			_append_log("── 手心手背（黑白配）──" , LT_PHASE)
+			_start_turn_timer()
+			_show_all_thinking()
+
+		GameManager.GamePhase.ODD_EVEN_RESOLVING:
+			_stop_turn_timer()
+			_hide_all_thinking()
+			_odd_even_panel.hide()
+			phase_label.text = "黑白配结算中..."
+			_play_odd_even_reveals()
+
 		GameManager.GamePhase.GESTURE_INPUT:
 			_stop_turn_timer()
 			_in_tiebreak = false
+			_odd_even_panel.hide()
 			if not _is_draw_reentry:
 				_current_round += 1
 			_is_draw_reentry = false
@@ -1802,6 +1922,7 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			_stop_turn_timer()
 			_hide_all_thinking()
 			gesture_panel.hide()
+			_odd_even_panel.hide()
 			phase_label.text = "结算中..."
 			_play_all_gesture_reveals()
 
@@ -1885,6 +2006,8 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 # ── Signal handlers ───────────────────────────────────────────────────────────
 
 var _pending_reveals: Array[Dictionary] = []
+var _pending_odd_even_reveals: Array[Dictionary] = []
+var _odd_even_reveal_results: Dictionary = {}  # pid → {is_winner: bool, choice: bool}
 
 func _on_gesture_submitted(player_id: int, gesture: PlayerState.Gesture) -> void:
 	if player_id == _human_player_id:
@@ -2291,6 +2414,107 @@ func _on_tiebreak_resolved(winner_id: int) -> void:
 	phase_label.add_theme_color_override("font_color", Color("#FFFDF5"))
 	var p := GameManager.get_player(winner_id)
 	_append_log("── 加赛胜出：%s ──" % (p.player_name if p else str(winner_id)), LT_WIN)
+
+# ── 黑白配（手心手背）UI 回调 ──────────────────────────────────
+func _on_odd_even_started(participant_ids: Array[int]) -> void:
+	_pending_odd_even_reveals.clear()
+	_odd_even_reveal_results.clear()
+	var names: Array[String] = []
+	for id in participant_ids:
+		var p := GameManager.get_player(id)
+		names.append(p.player_name if p else str(id))
+	_append_log("── 黑白配开始（%d人）──" % participant_ids.size(), LT_STATUS)
+
+func _on_odd_even_resolved(choices: Dictionary, winners: Array[int], is_tie: bool) -> void:
+	# 记录每个玩家的选择和是否胜出，供动画使用
+	for pid in choices:
+		_odd_even_reveal_results[int(pid)] = {
+			"choice": choices[pid],
+			"is_winner": winners.has(int(pid))
+		}
+
+func _on_odd_even_finished(rps_participants: Array[int]) -> void:
+	var names: Array[String] = []
+	for id in rps_participants:
+		var p := GameManager.get_player(id)
+		names.append(p.player_name if p else str(id))
+	_append_log("── 黑白配结束，%d人进入石头剪刀布：%s ──" % [rps_participants.size(), ", ".join(PackedStringArray(names))], LT_WIN)
+
+## 黑白配揭示动画：在每张玩家卡上显示手心🖐或手背✊，胜出者高亮
+func _play_odd_even_reveals() -> void:
+	var popups: Array = []
+	for pid in _odd_even_reveal_results:
+		var info: Dictionary = _odd_even_reveal_results[pid]
+		var choice: bool = info["choice"]
+		var is_winner: bool = info["is_winner"]
+		var emoji: String = "🖐" if choice else "✊"
+		var card: Control = _player_cards.get(pid)
+		if card == null:
+			continue
+
+		var popup := Label.new()
+		popup.text = emoji
+		popup.add_theme_font_size_override("font_size", 36)
+		popup.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		popup.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		popup.self_modulate = Color(1, 1, 1, 0)
+		popup.scale = Vector2(0.3, 0.3)
+		popup.pivot_offset = Vector2(52, 38)
+		popup.position = Vector2(0, -12)
+		popup.size = Vector2(104, 56)
+		if is_winner:
+			popup.add_theme_color_override("font_color", Color("#3B6D11"))
+		else:
+			popup.add_theme_color_override("font_color", Color("#E24B4A"))
+		card.add_child(popup)
+		popups.append(popup)
+
+	if popups.is_empty():
+		return
+
+	# Phase 1: pop in (0→0.3s)
+	for popup in popups:
+		var t := create_tween().bind_node(popup)
+		t.set_parallel(true)
+		t.tween_property(popup, "self_modulate", Color(1, 1, 1, 1), 0.3)
+		t.tween_property(popup, "scale", Vector2(1.3, 1.3), 0.3)
+
+	# Phase 2: settle (0.3→0.8s)
+	for popup in popups:
+		var t := create_tween().bind_node(popup)
+		t.tween_property(popup, "scale", Vector2(1.0, 1.0), 0.5).set_delay(0.3)
+
+	# Phase 3: fade out (1.3→1.8s)
+	for popup in popups:
+		var t := create_tween().bind_node(popup)
+		t.tween_property(popup, "self_modulate", Color(1, 1, 1, 0), 0.5).set_delay(1.3)
+		t.tween_callback(func():
+			if is_instance_valid(popup):
+				popup.queue_free()
+		).set_delay(1.9)
+
+	# 日志记录结果
+	var palm_names: Array[String] = []
+	var back_names: Array[String] = []
+	for pid in _odd_even_reveal_results:
+		var p := GameManager.get_player(pid)
+		var pname: String = p.player_name if p else str(pid)
+		if _odd_even_reveal_results[pid]["choice"]:
+			palm_names.append(pname)
+		else:
+			back_names.append(pname)
+	var total_tie := _odd_even_reveal_results.size() > 0
+	for pid in _odd_even_reveal_results:
+		if _odd_even_reveal_results[pid]["is_winner"]:
+			total_tie = false
+			break
+	if total_tie:
+		_append_log("── 全部相同，重新配 ──", LT_STATUS)
+	else:
+		_append_log("手心(%d)：%s | 手背(%d)：%s" % [palm_names.size(), ", ".join(PackedStringArray(palm_names)), back_names.size(), ", ".join(PackedStringArray(back_names))], LT_PHASE)
+
+	_odd_even_reveal_results.clear()
 
 func _on_player_shielded(player_id: int, shield_value: float) -> void:
 	var player := GameManager.get_player(player_id)
