@@ -225,16 +225,16 @@ func _setup_menu_button() -> void:
 	_setup_auto_rps_button()
 	_setup_odd_even_panel()
 
-## 自动出拳开关按钮（右上角，菜单按钮右侧）
+## 自动出拳开关按钮（战场区域左下角拐角）
 var _auto_rps_btn: Button
 func _setup_auto_rps_button() -> void:
 	_auto_rps_btn = Button.new()
-	_auto_rps_btn.text = "⚡自动出拳"
-	_auto_rps_btn.add_theme_font_size_override("font_size", 10)
+	_auto_rps_btn.text = "⚡自动"
+	_auto_rps_btn.add_theme_font_size_override("font_size", 9)
 	_auto_rps_btn.focus_mode = Control.FOCUS_NONE
-	_auto_rps_btn.custom_minimum_size = Vector2(80, 22)
-	_auto_rps_btn.position = Vector2(828, 8)
-	_auto_rps_btn.size = Vector2(80, 22)
+	_auto_rps_btn.custom_minimum_size = Vector2(52, 18)
+	_auto_rps_btn.position = Vector2(210, 514)
+	_auto_rps_btn.size = Vector2(52, 18)
 	_update_auto_rps_btn_style()
 	_auto_rps_btn.pressed.connect(_on_auto_rps_toggled)
 	add_child(_auto_rps_btn)

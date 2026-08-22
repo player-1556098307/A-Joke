@@ -754,6 +754,20 @@ func _start_tiebreak_input() -> void:
 			var gesture := PlayerState.Gesture.SCISSORS if _debug_force_scissors and _has_human_in_tiebreak else _ai_controller.decide_gesture(player)
 			get_tree().create_timer(delay).timeout.connect(
 				_delayed_submit_tiebreak_gesture.bind(id, gesture), CONNECT_ONE_SHOT)
+	# 自动出拳模式：人类玩家由AI代理加赛手势
+	if auto_rps_enabled and _has_human_in_tiebreak:
+		var human_pid := -1
+		for tid in _tiebreak_candidates:
+			var tp := get_player(tid)
+			if tp != null and tp.is_human and tp.is_alive:
+				human_pid = tid
+				break
+		if human_pid >= 0:
+			var hg := _ai_controller.decide_gesture(get_player(human_pid))
+			var t := get_tree().create_timer(0.3)
+			t.timeout.connect(func():
+				if _current_phase == GamePhase.TIEBREAK_INPUT:
+					submit_tiebreak_gesture(human_pid, hg), CONNECT_ONE_SHOT)
 
 func _delayed_submit_tiebreak_gesture(pid: int, gesture: PlayerState.Gesture) -> void:
 	if _current_phase == GamePhase.TIEBREAK_INPUT:
