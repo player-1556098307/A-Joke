@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://cqb6rv6c8epp1" path="res://resources/portraits/zeus_phase1.png" id="4_p1"]
 
 ; ── 无普攻：宙斯没有普攻技能 ──
 
@@ -90,6 +91,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_gift")])
 script = ExtResource("3_char")
 character_name = "宙斯（幻象）"
 max_hp = 50
+portrait = ExtResource("4_p1")
 basic_attack_cost = 1
 skills = Array[ExtResource("2_skill")]([SubResource("SD_punish"), SubResource("SD_shield"), SubResource("SD_judgement"), SubResource("SD_summon_mutant"), SubResource("SD_gift")])
 tags = Array[String](["神"])

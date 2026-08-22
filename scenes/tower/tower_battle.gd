@@ -34,6 +34,8 @@ var _player_eliminated_triggered: bool = false  ## 玩家队有人被淘汰
 var _zeus_phase_transition_triggered: bool = false  ## 宙斯阶段转换对话
 var _zeus_transition_prev_phase: String = "battle"  ## 转换前的phase，对话结束后恢复
 var _enemy_name: String = ""
+## 二阶段BGM播放器
+var _bgm_player: AudioStreamPlayer
 
 func _ready() -> void:
 	# 根节点全屏锚定（Control 继承，子 Control 才能正确布局）
@@ -139,6 +141,14 @@ func _ready() -> void:
 	GameManager.round_resolved.connect(_on_round_resolved)
 	# 宙斯一阶段→二阶段转换对话
 	GameManager.zeus_phase_transition_required.connect(_on_zeus_phase_transition)
+
+	# 二阶段BGM播放器（默认静音，仅在阶段转换时播放）
+	_bgm_player = AudioStreamPlayer.new()
+	var bgm_audio: AudioStream = load("res://assets/audio/bgm/zeus_phase2_bgm.mp3")
+	if bgm_audio:
+		_bgm_player.stream = bgm_audio
+	_bgm_player.volume_db = -6.0
+	add_child(_bgm_player)
 
 	# 应用塔模式暗色主题
 	_ui.apply_tower_theme()
@@ -644,6 +654,7 @@ func _proceed_to_next_floor() -> void:
 
 func _on_tower_victory() -> void:
 	_phase = "result"
+	_stop_bgm()
 	if fast_mode:
 		_go_to_victory_result()
 		return
@@ -667,6 +678,7 @@ func _go_to_victory_result() -> void:
 	SceneManager.go_to("res://scenes/tower/tower_result.tscn")
 
 func _on_tower_defeat() -> void:
+	_stop_bgm()
 	SceneManager.tower_death_count += 1
 	SceneManager.last_tower_config["failed_floor"] = tower_mgr.get_current_floor()
 	SceneManager.pending_game_result = {
@@ -736,11 +748,12 @@ func _on_player_eliminated(_player_id: int) -> void:
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
 
-## 宙斯一阶段→二阶段转换：弹出过渡对话
+## 宙斯一阶段→二阶段转换：弹出过渡对话 + 播放二阶段BGM
 func _on_zeus_phase_transition(_zeus_id: int) -> void:
 	if fast_mode:
 		return
 	_zeus_phase_transition_triggered = true
+	_play_bgm()
 	var data := TowerDialogueData.new().get_zeus_phase_transition_dialogue()
 	if data.is_empty():
 		return
@@ -749,6 +762,18 @@ func _on_zeus_phase_transition(_zeus_id: int) -> void:
 	_phase = "zeus_transition"
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
+
+## 播放二阶段BGM（幂等：已在播放则跳过）
+func _play_bgm() -> void:
+	if _bgm_player == null or _bgm_player.stream == null:
+		return
+	if not _bgm_player.playing:
+		_bgm_player.play()
+
+## 停止二阶段BGM
+func _stop_bgm() -> void:
+	if _bgm_player != null and _bgm_player.playing:
+		_bgm_player.stop()
 
 ## 宙斯阶段转换对话结束 → 恢复战斗 phase + 刷新UI
 func _on_zeus_transition_dialogue_finished() -> void:

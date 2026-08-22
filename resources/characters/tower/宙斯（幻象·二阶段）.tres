@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://btswsnvtkgqm1" path="res://resources/portraits/zeus_phase2.png" id="4_p2"]
 
 ; ── 神罚：1耗，对所有其他玩家造成1点伤害（ENEMY_ALL）──
 [sub_resource type="Resource" id="SE_punish"]
@@ -88,6 +89,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_gift")])
 script = ExtResource("3_char")
 character_name = "宙斯（幻象·二阶段）"
 max_hp = 50
+portrait = ExtResource("4_p2")
 basic_attack_cost = 1
 skills = Array[ExtResource("2_skill")]([SubResource("SD_punish"), SubResource("SD_shield"), SubResource("SD_judgement"), SubResource("SD_summon_clodia"), SubResource("SD_gift")])
 tags = Array[String](["神"])

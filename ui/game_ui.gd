@@ -528,6 +528,10 @@ func setup_players(players: Array[PlayerState]) -> void:
 		var cy     := ARENA_CENTER.y + ARENA_RADIUS * sin(angle)
 		var card   := _build_player_card(player)
 		card.position = Vector2(cx - 52.0, cy - 55.0)
+		# 宙斯Boss卡片放大（更有Boss压迫感）：绕卡片中心缩放，位置不变
+		if player.is_zeus_boss:
+			card.pivot_offset = Vector2(52.0, 64.0)
+			card.scale = Vector2(1.6, 1.6)
 		players_container.add_child(card)
 		_player_cards[player.player_id] = card
 
