@@ -234,6 +234,14 @@ func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 			var max_bonus: float = buff.get("value", 3.0)
 			p.max_hp_bonus += max_bonus
 			p.hp += max_bonus  # 同步补血
+		"lifesteal":
+			p.lifesteal_per_hit += buff.get("value", 1.0)
+		"soul_slash":
+			# 一次性技能祝福：将斩魂技能副本加入 unlocked_skills（防重复）
+			_add_limited_skill_buff(p, "斩魂", "res://resources/characters/skills/斩魂.tres")
+		"spring":
+			# 一次性技能祝福：将回春技能副本加入 unlocked_skills（防重复）
+			_add_limited_skill_buff(p, "回春", "res://resources/characters/skills/回春.tres")
 
 ## 后期小怪攻击力强化：第3-4轮小怪普攻增伤
 func _inject_enemy_attack_bonus() -> void:
@@ -245,6 +253,37 @@ func _inject_enemy_attack_bonus() -> void:
 		if p.team_id != 2:
 			continue
 		p.damage_bonus_basic += atk_bonus
+
+## 一次性技能祝福：将限定技加入玩家 unlocked_skills（防重复，每层注入幂等）
+func _add_limited_skill_buff(p: PlayerState, skill_name: String, skill_path: String) -> void:
+	# 检查是否已存在同名技能（避免每层重复注入）
+	for existing in p.unlocked_skills:
+		if existing != null and existing.skill_name == skill_name:
+			return
+	var skill_res := load(skill_path) as SkillData
+	if skill_res == null:
+		push_warning("[塔] 一次性技能祝福资源加载失败：%s" % skill_path)
+		return
+	# 创建副本（避免修改原始资源）
+	var copy := SkillData.new()
+	copy.skill_name = skill_res.skill_name
+	copy.description = skill_res.description
+	copy.energy_cost = skill_res.energy_cost
+	copy.min_range = skill_res.min_range
+	copy.max_range = skill_res.max_range
+	copy.is_limited = skill_res.is_limited
+	# 复制效果列表
+	var effects_copy: Array[SkillEffect] = []
+	for e in skill_res.effects:
+		var ec := SkillEffect.new()
+		ec.effect_type = e.effect_type
+		ec.value = e.value
+		ec.target = e.target
+		ec.duration = e.duration
+		ec.bonus_if_paralyzed = e.bonus_if_paralyzed
+		effects_copy.append(ec)
+	copy.effects = effects_copy
+	p.unlocked_skills.append(copy)
 
 # ============================================================
 #  Buff 查看浮窗
@@ -300,12 +339,19 @@ func _build_buff_panel() -> Panel:
 	panel.z_index = 5
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.visible = false
-	# 内部 VBox 容器：负责标题/分隔线/buff条目/提示的垂直布局
+	# 内部 ScrollContainer：祝福条目过多时可滚动
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	panel.add_child(scroll)
+	# VBox 容器：负责标题/分隔线/buff条目/提示的垂直布局（放在 ScrollContainer 内）
 	_buff_panel_box = VBoxContainer.new()
-	_buff_panel_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_buff_panel_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buff_panel_box.add_theme_constant_override("separation", 6)
 	_buff_panel_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(_buff_panel_box)
+	scroll.add_child(_buff_panel_box)
 	return panel
 
 ## 切换 buff 浮窗显示/隐藏

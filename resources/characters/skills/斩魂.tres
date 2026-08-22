@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_soul_slash"]
+script = ExtResource("1_effect")
+effect_type = 42
+value = 0.5
+target = 0
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "斩魂"
+description = "对一名敌人造成其当前生命值50%的伤害（一次性道具，不耗气）。"
+energy_cost = 0
+min_range = 1
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_soul_slash")])
+is_limited = true

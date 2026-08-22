@@ -142,16 +142,23 @@ func get_small_enemy_hp_bonus(floor_num: int) -> int:
 		return 0
 	return get_cycle_hp_bonus(_get_cycle(floor_num))
 
-## 按轮次获取 HP 加成（第1轮+0，第2轮+2，第3轮+4，第4轮+6）
+## 按轮次获取 HP 加成（第1轮+0，第2轮+3，第3轮+6，第4轮+10）
 func get_cycle_hp_bonus(cycle: int) -> int:
-	return (cycle - 1) * 2
+	match cycle:
+		1: return 0
+		2: return 3
+		3: return 6
+		4: return 10
+		_: return 10
 
-## 按轮次获取攻击力加成（第1-2轮+0，第3轮+1，第4轮+2）
+## 按轮次获取攻击力加成（第1-2轮+0，第3轮+2，第4轮+3）
 ## 仅对小怪层生效，精英/Boss层不加
 func get_cycle_attack_bonus(cycle: int) -> float:
-	if cycle <= 2:
-		return 0.0
-	return float(cycle - 2)  # 第3轮+1, 第4轮+2
+	match cycle:
+		1, 2: return 0.0
+		3: return 2.0
+		4: return 3.0
+		_: return 3.0
 
 ## 获取指定层小怪的攻击力加成（正数=小怪层后期，0=前期/精英层）
 func get_small_enemy_attack_bonus(floor_num: int) -> float:

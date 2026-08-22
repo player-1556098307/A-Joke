@@ -56,9 +56,9 @@ func _test_floor_structure() -> void:
 
 	# 小怪 HP 加成（按轮次递增）
 	_assert(tower.get_cycle_hp_bonus(1) == 0, "1p: 第1轮HP加成0（实际=%d）" % tower.get_cycle_hp_bonus(1))
-	_assert(tower.get_cycle_hp_bonus(2) == 2, "1q: 第2轮HP加成2（实际=%d）" % tower.get_cycle_hp_bonus(2))
-	_assert(tower.get_cycle_hp_bonus(3) == 4, "1r: 第3轮HP加成4（实际=%d）" % tower.get_cycle_hp_bonus(3))
-	_assert(tower.get_cycle_hp_bonus(4) == 6, "1s: 第4轮HP加成6（实际=%d）" % tower.get_cycle_hp_bonus(4))
+	_assert(tower.get_cycle_hp_bonus(2) == 3, "1q: 第2轮HP加成3（实际=%d）" % tower.get_cycle_hp_bonus(2))
+	_assert(tower.get_cycle_hp_bonus(3) == 6, "1r: 第3轮HP加成6（实际=%d）" % tower.get_cycle_hp_bonus(3))
+	_assert(tower.get_cycle_hp_bonus(4) == 10, "1s: 第4轮HP加成10（实际=%d）" % tower.get_cycle_hp_bonus(4))
 
 	tower.queue_free()
 

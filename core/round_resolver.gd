@@ -327,6 +327,8 @@ static func _apply_single_effect(
 			# 伤害致目标濒死（HP归零）→ 置位可暴击
 			if target.hp <= 0 and dmg > 0:
 				attacker.can_crit_next = true
+			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
+			_apply_lifesteal(attacker, dmg)
 			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.TRUE_DAMAGE:
@@ -365,6 +367,8 @@ static func _apply_single_effect(
 			if tdmg > 0:
 				target.took_damage_this_round = true
 				target.last_hit_by_id = attacker.player_id
+			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
+			_apply_lifesteal(attacker, tdmg)
 			return { "damage_dealt": tdmg, "shield_absorbed": 0, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": 0, "counter_damage": 1 if counter_stance_triggered else 0, "true_damage": true, "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.PIERCE_DAMAGE:
@@ -382,7 +386,48 @@ static func _apply_single_effect(
 				target.last_hit_by_id = attacker.player_id
 			if target.hp <= 0:
 				attacker.can_crit_next = true
+			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
+			_apply_lifesteal(attacker, pdmg)
 			return { "damage_dealt": pdmg, "shield_absorbed": 0, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "pierce_damage": true, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"] }
+
+		SkillEffect.EffectType.PERCENT_DAMAGE:
+			# 百分比伤害（慈悲尖塔一次性技能祝福：斩魂）：按目标当前生命值百分比结算
+			# 与 DAMAGE 同等的减免链（无敌/护盾/分身/防反/坚壁），仅基础值计算不同
+			if target.invincible_turns > 0 or target.nine_tails_invincible:
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "percent_damage": true, "invincible": true }
+			var pct_raw: float = target.hp * effect.value
+			var pct_absorbed: float = 0.0
+			var pct_clone_broken: bool = false
+			var pct_counter_triggered: bool = false
+			if target.counter_stance and not is_controlled(target):
+				pct_raw = ceilf(pct_raw / 2.0)
+				pct_counter_triggered = true
+				target.add_energy(1)
+				attacker.hp = max(0.0, attacker.hp - 1.0)
+				target.counter_stance = false
+			if target.clone_count > 0:
+				target.clone_count -= 1
+				pct_absorbed = pct_raw
+				pct_raw = 0.0
+				pct_clone_broken = true
+			elif target.shield == -1:
+				pct_absorbed = pct_raw
+				pct_raw = 0.0
+				target.shield = 0
+			elif target.shield > 0:
+				pct_absorbed = min(pct_raw, target.shield)
+				pct_raw = max(0.0, pct_raw - target.shield)
+				target.shield = max(0.0, target.shield - pct_raw)
+			pct_raw = max(0.0, pct_raw - target.damage_reduction)
+			target.hp = max(0.0, target.hp - pct_raw)
+			if pct_raw > 0:
+				target.took_damage_this_round = true
+				target.last_hit_by_id = attacker.player_id
+			if target.hp <= 0 and pct_raw > 0:
+				attacker.can_crit_next = true
+			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
+			_apply_lifesteal(attacker, pct_raw)
+			return { "damage_dealt": pct_raw, "shield_absorbed": pct_absorbed, "remaining_hp": target.hp, "clone_destroyed": pct_clone_broken, "counter_stance_triggered": pct_counter_triggered, "paralyze_bonus": 0, "counter_damage": 1 if pct_counter_triggered else 0, "percent_damage": true }
 
 		SkillEffect.EffectType.DEATH_SENTENCE:
 			# 断罪死：与目标进行7次猜拳
@@ -468,7 +513,8 @@ static func _apply_single_effect(
 			return { "delta": effect.value, "new_distance": new_dist }
 
 		SkillEffect.EffectType.HEAL:
-			var heal: float = min(effect.value, target.character.max_hp - target.hp)
+			# 回血上限使用有效最大生命值（含慈悲尖塔 buff 加成），避免治疗后血量溢出
+			var heal: float = min(effect.value, target.get_max_hp() - target.hp)
 			target.hp += heal
 			return { "heal_amount": heal, "remaining_hp": target.hp }
 
@@ -623,3 +669,17 @@ static func apply_multi_hit_damage(
 		if break_after > 0 and i + 1 >= break_after:
 			break
 	return logs
+
+## 慈悲尖塔 buff：吸血（嗜血祝福 — 造成伤害时恢复生命值）
+## 在伤害结算后调用，按 attacker.lifesteal_per_hit 恢复（不超过最大生命值）
+static func _apply_lifesteal(attacker: PlayerState, damage_dealt: float) -> void:
+	if attacker == null or not attacker.is_alive:
+		return
+	if damage_dealt <= 0.0:
+		return
+	var ls: float = attacker.lifesteal_per_hit
+	if ls <= 0.0:
+		return
+	var heal: float = min(ls, attacker.get_max_hp() - attacker.hp)
+	if heal > 0.0:
+		attacker.hp += heal

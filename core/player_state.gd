@@ -159,6 +159,8 @@ var regen_per_round: float = 0.0
 var max_hp_bonus: float = 0.0
 ## 开局额外气量（起势/疾风：+N，注入时加到 energy）
 var start_energy_bonus: int = 0
+## 吸血（嗜血祝福：造成伤害时恢复 N 点生命值，不超过上限）
+var lifesteal_per_hit: float = 0.0
 
 ## 有效最大生命值 = 角色基础 + 慈悲尖塔 buff 加成（不污染共享 CharacterData 资源）
 func get_max_hp() -> float:
@@ -195,6 +197,7 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	regen_per_round     = 0.0
 	max_hp_bonus        = 0.0
 	start_energy_bonus  = 0
+	lifesteal_per_hit   = 0.0
 	pending_skill_index = -1
 	# 秽土柱间·仙人之力：气上限6
 	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
@@ -342,6 +345,15 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"phantom_count": phantom_count,
 		"delayed_damages": delayed_damages.duplicate(),
 		"jiedu_by": jiedu_by.duplicate(),
+		"damage_bonus_basic": damage_bonus_basic,
+		"charge_bonus": charge_bonus,
+		"damage_reduction": damage_reduction,
+		"regen_per_round": regen_per_round,
+		"max_hp_bonus": max_hp_bonus,
+		"start_energy_bonus": start_energy_bonus,
+		"lifesteal_per_hit": lifesteal_per_hit,
+		"blade_stage": blade_stage,
+		"fury_marks": fury_marks,
 	}
 
 ## 从回溯快照恢复自身状态（全部字段）
@@ -400,6 +412,15 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	phantom_count            = snap.get("phantom_count", phantom_count)
 	delayed_damages          = (snap.get("delayed_damages", []) as Array).duplicate(true)
 	jiedu_by                 = (snap.get("jiedu_by", []) as Array).duplicate()
+	damage_bonus_basic       = snap.get("damage_bonus_basic", damage_bonus_basic)
+	charge_bonus             = snap.get("charge_bonus", charge_bonus)
+	damage_reduction         = snap.get("damage_reduction", damage_reduction)
+	regen_per_round          = snap.get("regen_per_round", regen_per_round)
+	max_hp_bonus             = snap.get("max_hp_bonus", max_hp_bonus)
+	start_energy_bonus       = snap.get("start_energy_bonus", start_energy_bonus)
+	lifesteal_per_hit        = snap.get("lifesteal_per_hit", lifesteal_per_hit)
+	blade_stage              = snap.get("blade_stage", blade_stage)
+	fury_marks               = snap.get("fury_marks", fury_marks)
 
 ## 重置回合临时数据（每回合开始时调用），持续状态字段不在此重置
 ## 防反（counter_stance）为持续状态：进入后持续到自己的下个回合行动开始（_start_action_input）时清除

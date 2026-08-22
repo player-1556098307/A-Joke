@@ -200,7 +200,7 @@ func _test_inject_tower_buffs() -> void:
 		{ "id": "clone", "value": 1 },
 		{ "id": "swift", "value": 2 },
 		{ "id": "protect", "value": 2 },
-		{ "id": "vitality", "value": 3 },
+		{ "id": "vitality", "value": 1 },
 	]
 
 	tower.start_tower([{ "character": char_data, "is_human": true }])
@@ -241,8 +241,8 @@ func _test_inject_tower_buffs() -> void:
 	_assert(player.clone_count == 1, "6f: clone_count=1（实际=%d）" % player.clone_count)
 	_assert(player.energy == 2, "6g: swift开局+2气（实际=%d）" % player.energy)
 	_assert(player.shield == 2, "6h: shield=2（实际=%d）" % player.shield)
-	_assert(player.max_hp_bonus == 3.0, "6i: max_hp_bonus=3（实际=%.1f）" % player.max_hp_bonus)
-	_assert(player.get_max_hp() == player.character.max_hp + 3.0, "6j: get_max_hp=原始上限+3（实际=%.1f）" % player.get_max_hp())
+	_assert(player.max_hp_bonus == 1.0, "6i: max_hp_bonus=1（实际=%.1f）" % player.max_hp_bonus)
+	_assert(player.get_max_hp() == player.character.max_hp + 1.0, "6j: get_max_hp=原始上限+1（实际=%.1f）" % player.get_max_hp())
 
 	# 清理
 	SceneManager.last_tower_config.erase("tower_buffs")
@@ -255,7 +255,7 @@ func _test_reward_ui_pool() -> void:
 	add_child(ui)
 
 	var pool := ui.get_reward_pool()
-	_assert(pool.size() == 13, "7a: 奖励池13种（实际=%d）" % pool.size())
+	_assert(pool.size() == 16, "7a: 奖励池16种（实际=%d）" % pool.size())
 
 	# 每个奖励都有 tier 字段，且只允许 normal/elite 两种值
 	for i in range(pool.size()):
@@ -276,7 +276,7 @@ func _test_reward_ui_pool() -> void:
 		ids_seen.append(rid)
 
 	# 检查 13 种 id 都存在
-	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2"]
+	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2", "lifesteal", "soul_slash", "spring"]
 	for eid in expected_ids:
 		_assert(eid in ids_seen, "7h: 奖励id=%s 存在" % eid)
 
@@ -284,7 +284,7 @@ func _test_reward_ui_pool() -> void:
 	_assert(not "energy_cap" in ids_seen, "7h1: energy_cap 已删除")
 	_assert(not "energy_cap_2" in ids_seen, "7h2: energy_cap_2 已删除")
 
-	# normal 池 6 种，elite 池 7 种
+	# normal 池 9 种，elite 池 7 种
 	var normal_count := 0
 	var elite_count := 0
 	for r in pool:
@@ -292,10 +292,10 @@ func _test_reward_ui_pool() -> void:
 			elite_count += 1
 		else:
 			normal_count += 1
-	_assert(normal_count == 6, "7i: normal池6种（实际=%d）" % normal_count)
+	_assert(normal_count == 9, "7i: normal池9种（实际=%d）" % normal_count)
 	_assert(elite_count == 7, "7j: elite池7种（实际=%d）" % elite_count)
 
-	# unique 字段校验：蓄锐/坚壁/回生 必须为 unique
+	# unique 字段校验：蓄锐/坚壁/回生/影分身/嗜血/斩魂/回春 必须为 unique
 	var unique_map := {}
 	for r in pool:
 		if r.get("unique", false):
@@ -303,7 +303,11 @@ func _test_reward_ui_pool() -> void:
 	_assert(unique_map.has("charge_bonus"), "7k: charge_bonus 为唯一祝福")
 	_assert(unique_map.has("shield_wall"), "7l: shield_wall 为唯一祝福")
 	_assert(unique_map.has("regen"), "7m: regen 为唯一祝福")
-	_assert(unique_map.size() == 3, "7n: 唯一祝福共3个（实际=%d）" % unique_map.size())
+	_assert(unique_map.has("clone"), "7m2: clone 为唯一祝福")
+	_assert(unique_map.has("lifesteal"), "7m3: lifesteal 为唯一祝福")
+	_assert(unique_map.has("soul_slash"), "7m4: soul_slash 为唯一祝福")
+	_assert(unique_map.has("spring"), "7m5: spring 为唯一祝福")
+	_assert(unique_map.size() == 7, "7n: 唯一祝福共7个（实际=%d）" % unique_map.size())
 
 	ui.queue_free()
 
@@ -519,19 +523,19 @@ func _test_all_buff_types_inject() -> void:
 	_apply_single_buff(player, { "id": "protect", "value": 2 })
 	_assert(player.shield == 2, "10i: protect注入")
 
-	# vitality（生机）：生命上限+3，并同步补血
+	# vitality（生机）：生命上限+1，并同步补血
 	var base_max := player.get_max_hp()
 	var hp_before_v := player.hp
 	player.max_hp_bonus = 0.0
-	_apply_single_buff(player, { "id": "vitality", "value": 3 })
-	_assert(player.max_hp_bonus == 3.0, "10j: vitality提升max_hp_bonus=3")
-	_assert(player.get_max_hp() == player.character.max_hp + 3.0, "10k: vitality后get_max_hp正确")
-	_assert(player.hp == hp_before_v + 3.0, "10l: vitality同步补血+3")
+	_apply_single_buff(player, { "id": "vitality", "value": 1 })
+	_assert(player.max_hp_bonus == 1.0, "10j: vitality提升max_hp_bonus=1")
+	_assert(player.get_max_hp() == player.character.max_hp + 1.0, "10k: vitality后get_max_hp正确")
+	_assert(player.hp == hp_before_v + 1.0, "10l: vitality同步补血+1")
 
-	# vitality_2（龙血）：生命上限+5
+	# vitality_2（龙血）：生命上限+3
 	player.max_hp_bonus = 0.0
-	_apply_single_buff(player, { "id": "vitality_2", "value": 5 })
-	_assert(player.max_hp_bonus == 5.0, "10m: vitality_2提升max_hp_bonus=5")
+	_apply_single_buff(player, { "id": "vitality_2", "value": 3 })
+	_assert(player.max_hp_bonus == 3.0, "10m: vitality_2提升max_hp_bonus=3")
 
 	# blade_power_2（锋芒/精英）：普攻+2
 	player.damage_bonus_basic = 0.0

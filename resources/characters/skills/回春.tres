@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SkillData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+
+[sub_resource type="Resource" id="SE_spring"]
+script = ExtResource("1_effect")
+effect_type = 4
+value = 5.0
+target = 2
+
+[resource]
+script = ExtResource("2_skill")
+skill_name = "回春"
+description = "恢复自身5点生命值（一次性道具，不耗气）。"
+energy_cost = 0
+min_range = 0
+max_range = 0
+effects = Array[ExtResource("1_effect")]([SubResource("SE_spring")])
+is_limited = true
