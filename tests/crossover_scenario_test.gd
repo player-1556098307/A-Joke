@@ -415,9 +415,9 @@ func _ready() -> void:
 	_assert(gm.get("_sole_winner_id") == 1, "S13b: 樱胜（鸣人麻痹SKIP）")
 	p1.energy = 2
 	gm.submit_action(1, PlayerState.ActionType.CHARGE, -1, -1)
-	# 麻痹递减（SKIP后-1），击飞未消耗不递减
+	# 麻痹递减（SKIP后-1），击飞也每回合统一递减
 	_assert(p0.paralyze_turns == 0, "S13c: 麻痹递减到0")
-	_assert(p0.knockdown_turns == 1, "S13d: 击飞未消耗不递减（仍=1）")
+	_assert(p0.knockdown_turns == 0, "S13d: 击飞每回合统一递减（仍=0）")
 
 	# ════════════════════════════════════════════════════════════════
 	# 场景14：能量不足时技能被拒绝

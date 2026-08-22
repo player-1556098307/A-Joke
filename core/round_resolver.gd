@@ -114,10 +114,38 @@ static func apply_effects(
 				logs.append({
 					"attacker_id": attacker.player_id,
 					"target_id":   attacker.player_id,
+					"skill_name":  skill.skill_name,
 					"effect_type": effect.effect_type,
 					"value":       effect.value,
 					"result":      res
 				})
+
+			SkillEffect.EffectTarget.ENEMY_SINGLE, SkillEffect.EffectTarget.ENEMY_ALL:
+				for tgt in targets:
+					var dist := distance_system.get_distance(attacker.player_id, tgt.player_id)
+					if dist >= skill.min_range and dist <= skill.max_range:
+						var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage)
+						logs.append({
+							"attacker_id": attacker.player_id,
+							"target_id":   tgt.player_id,
+							"skill_name":  skill.skill_name,
+							"effect_type": effect.effect_type,
+							"value":       effect.value,
+							"result":      res
+						})
+
+			SkillEffect.EffectTarget.ENEMY_SPLASH:
+				# 溵射目标由 game_manager 按 splash_range 预计算，此处直接应用
+				for tgt in splash_targets:
+					var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage)
+					logs.append({
+						"attacker_id": attacker.player_id,
+						"target_id":   tgt.player_id,
+						"skill_name":  skill.skill_name,
+						"effect_type": effect.effect_type,
+						"value":       effect.value,
+						"result":      res
+					})
 
 			SkillEffect.EffectTarget.ENEMY_SINGLE, SkillEffect.EffectTarget.ENEMY_ALL:
 				for tgt in targets:
@@ -206,7 +234,7 @@ static func phase_sword_pre_apply(attacker: PlayerState, dmg_before: float) -> D
 	if not is_xiye(attacker):
 		return result
 	# 满血 -> 伤害x2
-	if attacker.hp >= attacker.character.max_hp:
+	if attacker.hp >= attacker.get_max_hp():
 		result["multiplier"] = 2.0
 	# 没气 -> 获得1气
 	if attacker.energy <= 0:
@@ -450,7 +478,7 @@ static func _apply_single_effect(
 					total_dmg += rdmg
 					rounds.append({ "win": true, "dmg": rdmg, "heal": 0.0, "crit": rcrit["crit"] })
 				else:
-					var heal: float = min(1.0, attacker.character.max_hp - attacker.hp)
+					var heal: float = min(1.0, attacker.get_max_hp() - attacker.hp)
 					attacker.hp += heal
 					total_heal += heal
 					rounds.append({ "win": false, "dmg": 0.0, "heal": heal, "crit": false })
@@ -501,6 +529,7 @@ static func _apply_single_effect(
 			if target.counter_stance and has_damage:
 				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true }
 			target.knockdown_turns += int(effect.value)
+			target.knockdown_applied_this_round = true
 			return { "knockdown_turns": target.knockdown_turns }
 
 		SkillEffect.EffectType.COUNTER_STANCE:
@@ -647,7 +676,8 @@ static func apply_multi_hit_damage(
 	damage_per_hit: float,
 	hit_count: int,
 	distance_system: DistanceSystem,
-	break_after: int = 0
+	break_after: int = 0,
+	skill_name: String = ""
 ) -> Array[Dictionary]:
 	var logs: Array[Dictionary] = []
 	for i in range(hit_count):
@@ -661,6 +691,7 @@ static func apply_multi_hit_damage(
 		logs.append({
 			"attacker_id": attacker.player_id,
 			"target_id":   target.player_id,
+			"skill_name":  skill_name,
 			"effect_type": SkillEffect.EffectType.DAMAGE,
 			"value":       damage_per_hit,
 			"result":      res,

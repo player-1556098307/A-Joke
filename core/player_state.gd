@@ -19,6 +19,8 @@ var paralyze_turns: int = 0           ## 剩余麻痹回合数（自动跳过出
 var knockdown_turns: int = 0
 ## 本回合击飞是否已生效（强制聚气），用于_end_round判断是否递减
 var knockdown_consumed_this_round: bool = false
+## 本回合是否新施加了击飞（施加回合不递减，下回合结束才递减）
+var knockdown_applied_this_round: bool = false
 var is_alive: bool                    ## 是否存活
 var is_human: bool                    ## 是否人类玩家
 
@@ -301,6 +303,7 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"paralyze_turns": paralyze_turns,
 		"knockdown_turns": knockdown_turns,
 		"knockdown_consumed_this_round": knockdown_consumed_this_round,
+		"knockdown_applied_this_round": knockdown_applied_this_round,
 		"is_alive": is_alive,
 		"clone_count": clone_count,
 		"unlocked_skills": unlocked_skills.duplicate(),
@@ -368,6 +371,7 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	paralyze_turns           = snap.get("paralyze_turns", paralyze_turns)
 	knockdown_turns          = snap.get("knockdown_turns", knockdown_turns)
 	knockdown_consumed_this_round = snap.get("knockdown_consumed_this_round", knockdown_consumed_this_round)
+	knockdown_applied_this_round = snap.get("knockdown_applied_this_round", knockdown_applied_this_round)
 	is_alive                 = snap.get("is_alive", is_alive)
 	clone_count              = snap.get("clone_count", clone_count)
 	unlocked_skills          = snap.get("unlocked_skills", []).duplicate()
@@ -439,6 +443,7 @@ func reset_round_data() -> void:
 	glory_used_this_round = false
 	# 击飞递减标记每回合重置
 	knockdown_consumed_this_round = false
+	knockdown_applied_this_round = false
 	# 无法选择回合递减（与麻痹/无敌等状态一致，回合结束时递减）
 	if untargetable_turns > 0:
 		untargetable_turns -= 1

@@ -5,14 +5,14 @@
 
 [sub_resource type="Resource" id="SE_soul_slash"]
 script = ExtResource("1_effect")
-effect_type = 42
-value = 0.5
+effect_type = 0
+value = 5.0
 target = 0
 
 [resource]
 script = ExtResource("2_skill")
 skill_name = "斩魂"
-description = "对一名敌人造成其当前生命值50%的伤害（一次性道具，不耗气）。"
+description = "对一名敌人造成5点固定伤害（一次性道具，不耗气）。"
 energy_cost = 0
 min_range = 1
 max_range = 999

@@ -274,7 +274,7 @@ func _ready() -> void:
 	var energy_before := p0.energy
 	gm.submit_action(0, PlayerState.ActionType.USE_SKILL, _find_skill_index(p0, "普攻"), 1)
 	_assert(p0.energy == energy_before + 1, "F2: 击飞强制聚气+1（实际=%d）" % p0.energy)
-	# F3: 击飞回合结束后递减到0（knockdown_consumed已被reset，但knockdown_turns递减可见）
+	# F3: 击飞回合结束后递减到0（每回合统一递减，无需赢回合）
 	_assert(p0.knockdown_turns == 0, "F3: 击飞递减到0（实际=%d）" % p0.knockdown_turns)
 
 	# ════════════════════════════════════════════════════════════════

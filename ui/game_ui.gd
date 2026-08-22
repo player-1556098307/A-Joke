@@ -1397,7 +1397,7 @@ func _add_log_row(text: String, log_type: int, details: Array) -> PanelContainer
 
 	var title_lbl := Label.new()
 	title_lbl.text = text
-	title_lbl.add_theme_font_size_override("font_size", 10)
+	title_lbl.add_theme_font_size_override("font_size", 8)
 	title_lbl.add_theme_color_override("font_color", colors[2])
 	title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1407,7 +1407,7 @@ func _add_log_row(text: String, log_type: int, details: Array) -> PanelContainer
 	for det in details:
 		var d_lbl := Label.new()
 		d_lbl.text = "  " + str(det)
-		d_lbl.add_theme_font_size_override("font_size", 10)
+		d_lbl.add_theme_font_size_override("font_size", 8)
 		d_lbl.add_theme_color_override("font_color", colors[3])
 		d_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1446,7 +1446,7 @@ func _append_log_detail(text: String) -> void:
 			var colors: Array = LOG_COLORS[_log_entries[-1]["type"]]
 			var d_lbl := Label.new()
 			d_lbl.text = "  " + text
-			d_lbl.add_theme_font_size_override("font_size", 10)
+			d_lbl.add_theme_font_size_override("font_size", 8)
 			d_lbl.add_theme_color_override("font_color", colors[3])
 			d_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			d_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2095,6 +2095,10 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 	for entry in logs:
 		var target := GameManager.get_player(entry["target_id"])
 		var t_name := target.player_name if target else str(entry["target_id"])
+		var attacker := GameManager.get_player(entry.get("attacker_id", -1))
+		var a_name := attacker.player_name if attacker else "?"
+		var s_name: String = entry.get("skill_name", "")
+		var skill_tag := "【%s】" % s_name if s_name != "" else ""
 		var effect_type: int = entry.get("effect_type", -1)
 		var res: Dictionary  = entry.get("result", {})
 		match effect_type:
@@ -2102,66 +2106,64 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				var dealt: float    = res.get("damage_dealt", 0.0)
 				var absorbed: float = res.get("shield_absorbed", 0.0)
 				var remain: float   = res.get("remaining_hp", 0.0)
-				var msg := "%s 护盾吸收%.1f，受%.1f伤，剩余HP %.1f" % [t_name, absorbed, dealt, remain] \
+				var msg := "%s%s 攻击 %s：护盾吸收%.1f，造成%.1f伤，剩余HP %.1f" % [a_name, skill_tag, t_name, absorbed, dealt, remain] \
 							if absorbed > 0 \
-							else "%s 受到 %.1f 伤害，剩余HP %.1f" % [t_name, dealt, remain]
+							else "%s%s 攻击 %s：造成 %.1f 伤害，剩余HP %.1f" % [a_name, skill_tag, t_name, dealt, remain]
 				_append_log(msg, LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_attack_effect(entry["target_id"])
 				_show_damage_popup(entry["target_id"], dealt, "normal")
 			SkillEffect.EffectType.SHIELD:
 				var sv: float = res.get("shield_value", 0.0)
-				_append_log("%s 获得%s" % [t_name, "全挡护盾" if sv == -1 else ("护盾 %.1f" % sv)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s%s 给 %s 施加%s" % [a_name, skill_tag, t_name, "全挡护盾" if sv == -1 else ("护盾 %.1f" % sv)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.CLONE_SHIELD:
-				_append_log("%s 召唤影分身（下次受击全挡，聚气+1）" % t_name, LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s%s 召唤影分身保护 %s（下次受击全挡，聚气+1）" % [a_name, skill_tag, t_name], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.PARALYZE:
-				_append_log("%s 被麻痹 %d 回合" % [t_name, res.get("turns", 0)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s%s 麻痹 %s %d 回合" % [a_name, skill_tag, t_name, res.get("turns", 0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.CHANGE_DISTANCE:
-				var attacker := GameManager.get_player(entry.get("attacker_id", -1))
-				var a_name   := attacker.player_name if attacker else "?"
-				var dir      := "拉近" if res.get("delta", 0) < 0 else "拉远"
-				_append_log("%s 与 %s 距离%s，当前: %d" % [a_name, t_name, dir, res.get("new_distance", 0)], LT_STATUS, entry.get("attacker_id", -1))
+				var dir := "拉近" if res.get("delta", 0) < 0 else "拉远"
+				_append_log("%s%s 与 %s 距离%s，当前: %d" % [a_name, skill_tag, t_name, dir, res.get("new_distance", 0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_all_distances()
 			SkillEffect.EffectType.HEAL:
-				_append_log("%s 回复 %.1f HP，剩余HP %.1f" % [t_name, res.get("heal_amount", 0.0), res.get("remaining_hp", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s%s 治疗 %s：回复 %.1f HP，剩余HP %.1f" % [a_name, skill_tag, t_name, res.get("heal_amount", 0.0), res.get("remaining_hp", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 				_show_damage_popup(entry["target_id"], res.get("heal_amount", 0.0), "heal")
 			SkillEffect.EffectType.DELAYED_DAMAGE:
-				_append_log("%s 挂载延迟伤害（%d回合后受 %.1f 伤）" % [t_name, res.get("delay", 1), res.get("damage", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("%s%s 对 %s 挂载延迟伤害（%d回合后受 %.1f 伤）" % [a_name, skill_tag, t_name, res.get("delay", 1), res.get("damage", 0.0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.UNLOCK_SKILL:
 				var sname: String = res.get("skill_name", "")
 				if sname != "":
-					_append_log("%s 解锁新技能【%s】" % [t_name, sname], LT_WIN, entry.get("attacker_id", -1))
+					_append_log("%s%s 解锁 %s 的新技能【%s】" % [a_name, skill_tag, t_name, sname], LT_WIN, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 			SkillEffect.EffectType.FTG_MARK:
 				var dealt: float = res.get("damage_dealt", 0.0)
-				_append_log("🌀 %s 被飞雷神标记！受 %.1f 伤，剩余HP %.1f" % [t_name, dealt, res.get("remaining_hp", 0.0)], LT_DAMAGE, entry.get("attacker_id", -1))
+				_append_log("🌀 %s%s 飞雷神标记 %s！受 %.1f 伤，剩余HP %.1f" % [a_name, skill_tag, t_name, dealt, res.get("remaining_hp", 0.0)], LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_skill_effect(entry["target_id"], effect_type)
 				_show_damage_popup(entry["target_id"], dealt, "normal")
 			SkillEffect.EffectType.FTG_CHARGE:
-				_append_log("🌀 %s 聚飞雷神标记（共%d个）" % [t_name, res.get("ftg_marks", 0)], LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("🌀 %s%s 为 %s 聚飞雷神标记（共%d个）" % [a_name, skill_tag, t_name, res.get("ftg_marks", 0)], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 			SkillEffect.EffectType.FTG_REMOVE:
-				_append_log("🌀 %s 拔除了飞雷神标记" % t_name, LT_STATUS, entry.get("attacker_id", -1))
+				_append_log("🌀 %s%s 拔除 %s 的飞雷神标记" % [a_name, skill_tag, t_name], LT_STATUS, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 			SkillEffect.EffectType.NINE_TAILS:
-				_append_log("🦊 %s 释放漂泊九尾！" % t_name, LT_WIN, entry.get("attacker_id", -1))
+				_append_log("🦊 %s%s 对 %s 释放漂泊九尾！" % [a_name, skill_tag, t_name], LT_WIN, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 			SkillEffect.EffectType.TRUE_DAMAGE:
 				var tdealt: float = res.get("damage_dealt", 0.0)
 				var tremain: float = res.get("remaining_hp", 0.0)
-				_append_log("💫 %s 受到 %.1f 真实伤害，剩余HP %.1f" % [t_name, tdealt, tremain], LT_DAMAGE, entry.get("attacker_id", -1))
+				_append_log("💫 %s%s 对 %s 造成 %.1f 真实伤害，剩余HP %.1f" % [a_name, skill_tag, t_name, tdealt, tremain], LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_attack_effect(entry["target_id"])
 				_show_damage_popup(entry["target_id"], tdealt, "true")
@@ -2169,7 +2171,7 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				var pdealt: float = res.get("damage_dealt", 0.0)
 				var premain: float = res.get("remaining_hp", 0.0)
 				var pcrit: bool   = res.get("crit", false)
-				var pmsg := "⚔️ %s 被断头台穿透！%s受 %.1f 伤，剩余HP %.1f" % [t_name, "暴击!" if pcrit else "", pdealt, premain]
+				var pmsg := "⚔️ %s%s 断头台穿透 %s！%s造成 %.1f 伤，剩余HP %.1f" % [a_name, skill_tag, t_name, "暴击!" if pcrit else "", pdealt, premain]
 				_append_log(pmsg, LT_DAMAGE, entry.get("attacker_id", -1))
 				_refresh_player_card(entry["target_id"])
 				_play_attack_effect(entry["target_id"])
@@ -2181,10 +2183,8 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 				var dmg: float = res.get("damage_dealt", 0.0)
 				var heal: float = res.get("total_heal", 0.0)
 				var rem: float = res.get("remaining_hp", 0.0)
-				var atk: PlayerState = GameManager.get_player(entry.get("attacker_id", -1))
-				var a_name := atk.player_name if atk else "?"
 				# 7次猜拳结果：逐条清晰展示（每次猜拳独立成行，延迟滚动显示）
-				_append_log("⚖️ %s 发动断罪死！7次猜拳开始——" % a_name, LT_PHASE, entry.get("attacker_id", -1))
+				_append_log("⚖️ %s%s 对 %s 发动断罪死！7次猜拳开始——" % [a_name, skill_tag, t_name], LT_PHASE, entry.get("attacker_id", -1))
 				for i in range(rounds.size()):
 					var r: Dictionary = rounds[i]
 					var rwin: bool = r.get("win", false)
@@ -2193,12 +2193,12 @@ func _on_skill_applied(logs: Array[Dictionary]) -> void:
 					if rwin:
 						line = "  第%d次 ✊ 赢！%s%s" % [i + 1, "暴击×2 " if rcrit else "", "对 %s 造成 %.1f 伤" % [t_name, r.get("dmg", 0.0)]]
 					else:
-						line = "  第%d次 ✋ 输 — 自身回复 %.1f HP" % [i + 1, r.get("heal", 0.0)]
+						line = "  第%d次 ✋ 输 — %s 回复 %.1f HP" % [i + 1, a_name, r.get("heal", 0.0)]
 					_append_log(line, LT_STATUS if rwin else LT_DAMAGE, entry.get("attacker_id", -1))
 					await get_tree().create_timer(0.18).timeout
 				var summary := "⚖️ 断罪死结算：赢%d次" % wc
 				if ik:
-					summary += "，目标被即死淘汰！"
+					summary += "，%s 被即死淘汰！" % t_name
 				else:
 					summary += "，%s 受 %.1f 伤，剩余HP %.1f" % [t_name, dmg, rem]
 				if heal > 0:

@@ -458,6 +458,11 @@ func _resolve_round() -> void:
 			for player in _players:
 				if player.is_alive and player.paralyze_turns > 0:
 					player.paralyze_turns -= 1
+				# 击飞也每回合统一递减（与 _end_round 逻辑一致），但本回合新施加的不递减
+				if player.is_alive and player.knockdown_turns > 0 and not player.knockdown_applied_this_round:
+					player.knockdown_turns -= 1
+					if player.knockdown_turns == 0:
+						player_knocked_down.emit(player.player_id, 0)
 				player.reset_round_data()
 			_enter_phase(GamePhase.GESTURE_INPUT)
 		else:
@@ -1455,8 +1460,8 @@ func _process_gate_open(player: PlayerState) -> void:
 	if player.gate_count >= 8:
 		# 第八门全开特效
 		eighth_gate_opened.emit(player.player_id)
-		# 回复10点生命
-		player.hp = min(player.character.max_hp, player.hp + 10.0)
+		# 回复10点生命（上限含塔buff：get_max_hp = 基础 + max_hp_bonus）
+		player.hp = min(player.get_max_hp(), player.hp + 10.0)
 		# 获得燃烧和狂战士状态
 		player.burning = true
 		player_burning.emit(player.player_id)
@@ -1635,7 +1640,7 @@ func _on_hiano_interrupt_made(player_id: int, interrupt_at: int) -> void:
 		return
 
 	# 执行多段伤害（每段独立结算，目标死亡自动停止），break_after=预选中断点
-	var logs := RoundResolver.apply_multi_hit_damage(player, target, 1.0, 3, _distance_system, interrupt_at)
+	var logs := RoundResolver.apply_multi_hit_damage(player, target, 1.0, 3, _distance_system, interrupt_at, "日晕舞")
 	# 记录伤害来源（last_hit_by_id）已由 apply_multi_hit_damage 内部 DAMAGE 分支记录
 	for entry in logs:
 		_emit_effect_signals(entry)
@@ -1708,7 +1713,7 @@ func _process_susanoo_spiral(winner: PlayerState, target: PlayerState) -> void:
 			winner.unlocked_skills.append(ninety_nine)
 			skill_unlocked.emit(winner.player_id, "须佐能乎·九十九")
 	# 3段1伤害（每段独立走吸收链，目标死亡自动停止）
-	var logs := RoundResolver.apply_multi_hit_damage(winner, target, 1.0, 3, _distance_system, 0)
+	var logs := RoundResolver.apply_multi_hit_damage(winner, target, 1.0, 3, _distance_system, 0, "须佐能乎·螺旋")
 	_finalize_shisui_use(winner, _load_shisui_skill("须佐能乎·螺旋"), logs)
 	susanoo_spiral_used.emit(winner.player_id, target.player_id, logs.size())
 
@@ -1720,7 +1725,7 @@ func _process_susanoo_ninety_nine(winner: PlayerState, target: PlayerState) -> v
 	winner.invincible_turns = 1
 	player_invincible.emit(winner.player_id, 1)
 	# 4段1伤害
-	var logs := RoundResolver.apply_multi_hit_damage(winner, target, 1.0, 4, _distance_system, 0)
+	var logs := RoundResolver.apply_multi_hit_damage(winner, target, 1.0, 4, _distance_system, 0, "须佐能乎·九十九")
 	_finalize_shisui_use(winner, _load_shisui_skill("须佐能乎·九十九"), logs)
 	susanoo_ninety_nine_used.emit(winner.player_id, target.player_id, logs.size())
 
@@ -1758,7 +1763,7 @@ func _apply_kotoamatsukami_takeover(killer: PlayerState, victim: PlayerState) ->
 	# 完全变成被杀者角色（技能替换）
 	killer.character = victim.character
 	# 血量 = 被杀者最大血量的一半（下限1，向上取整）
-	var half_hp: float = max(1.0, ceilf(victim.character.max_hp * 0.5))
+	var half_hp: float = max(1.0, ceilf(victim.get_max_hp() * 0.5))
 	killer.hp = half_hp
 	# 继承其阵亡时的气
 	killer.energy = victim.energy
@@ -1901,6 +1906,11 @@ func submit_backtrack_decision(player_id: int, use_backtrack: bool) -> void:
 
 ## ── 辅助：封装多段伤害日志的最终处理（标记伤害/信号/记录） ───────────────
 func _finalize_shisui_use(winner: PlayerState, skill: SkillData, logs: Array[Dictionary]) -> void:
+	# 补全 skill_name（多段伤害路径可能在构造 logs 时遗漏）
+	var sn: String = skill.skill_name if skill else ""
+	for entry in logs:
+		if not entry.has("skill_name") and sn != "":
+			entry["skill_name"] = sn
 	for entry in logs:
 		if entry.get("effect_type", -1) == SkillEffect.EffectType.DAMAGE \
 		or entry.get("effect_type", -1) == SkillEffect.EffectType.TRUE_DAMAGE \
@@ -2267,8 +2277,8 @@ func _end_round() -> void:
 			player.skill_disabled_turns -= 1
 			if player.skill_disabled_turns == 0:
 				skill_disabled.emit(player.player_id, 0)
-		# 减少击飞回合数（仅在击飞本回合实际生效——强制聚气——后才递减）
-		if player.knockdown_turns > 0 and player.knockdown_consumed_this_round:
+		# 减少击飞回合数（每回合结束所有被击飞角色统一递减，但本回合新施加的不递减）
+		if player.knockdown_turns > 0 and not player.knockdown_applied_this_round:
 			player.knockdown_turns -= 1
 			if player.knockdown_turns == 0:
 				player_knocked_down.emit(player.player_id, 0)
@@ -2853,7 +2863,7 @@ func _process_herta_passives(winner: PlayerState, logs: Array[Dictionary], hp_be
 			distance_changed.emit(winner.player_id, target_id, _distance_system.get_distance(winner.player_id, target_id))
 		# 送你砖石：血量跨过50%阈值（伤前≥50% 且 伤后<50%）
 		var before: float = hp_before.get(target_id, target.hp)
-		var half: float = target.character.max_hp * 0.5
+		var half: float = target.get_max_hp() * 0.5
 		if before >= half and target.hp < half and not triggered_ids.has(target_id):
 			triggered_ids.append(target_id)
 			new_triggers.append(target_id)
@@ -2951,7 +2961,7 @@ func _process_blade_of_the_fallen(attacker: PlayerState, target: PlayerState, hp
 	if not _tower_has_skill(attacker, "破败王者之刃"):
 		return
 	# 悲痛：血量低于一半时刷新阶段
-	if attacker.hp < attacker.character.max_hp * 0.5:
+	if attacker.hp < attacker.get_max_hp() * 0.5:
 		attacker.blade_stage = 0
 	if attacker.blade_stage >= 3:
 		return  # 三次用完，等待悲痛刷新
@@ -3203,7 +3213,7 @@ func _check_phantom_dodge_intercept(attacker: PlayerState, skill: SkillData, tar
 ## AI幻影闪避决策：残血时闪避，否则不闪避
 func _ai_decide_phantom_dodge(target: PlayerState, attacker: PlayerState) -> bool:
 	# 血量低于一半或即将死亡时闪避
-	if target.hp <= target.character.max_hp * 0.5:
+	if target.hp <= target.get_max_hp() * 0.5:
 		return true
 	# 对手是高威胁角色时闪避
 	return false

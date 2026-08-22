@@ -39,7 +39,7 @@ const REWARD_POOL := [
 	{ "id": "vitality_2",   "name": "龙血",     "icon": "✚", "desc": "生命上限 +3", "value": 3, "color": Color("#40C060"), "tier": "elite" },
 	# ── 趣味性祝福（一次性道具/被动吸血，不可叠加获取）──
 	{ "id": "lifesteal",    "name": "嗜血",     "icon": "☘", "desc": "造成伤害时恢复 1 点生命值（唯一）", "value": 1.0, "color": Color("#C04060"), "tier": "normal", "unique": true },
-	{ "id": "soul_slash",   "name": "斩魂",     "icon": "☠", "desc": "获得一次性技能：对敌人造成其50%当前生命值的伤害（唯一）", "value": 0.5, "color": Color("#8040C0"), "tier": "normal", "unique": true },
+	{ "id": "soul_slash",   "name": "斩魂",     "icon": "☠", "desc": "获得一次性技能：对敌人造成5点固定伤害（唯一）", "value": 5.0, "color": Color("#8040C0"), "tier": "normal", "unique": true },
 	{ "id": "spring",       "name": "回春",     "icon": "❀", "desc": "获得一次性技能：恢复自身 5 点生命值（唯一）", "value": 5.0, "color": Color("#40C080"), "tier": "normal", "unique": true },
 	{ "id": "protect_2",    "name": "铁壁",     "icon": "❂", "desc": "开局获得 5 点护盾", "value": 5, "color": Color("#90B0C0"), "tier": "elite" },
 ]

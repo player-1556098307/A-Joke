@@ -130,7 +130,7 @@ func _ready() -> void:
 	gm.call("_resolve_round")
 	_assert(gm.get("_sole_winner_id") == 1, "4g: 被击飞的佐助仍可猜拳并赢得回合（winner=%d）" % gm.get("_sole_winner_id"))
 	_assert(sasuke.energy == sas_energy_before + 1, "4h: 击飞玩家被强制聚气（气 %d→%d，预期+1）" % [sas_energy_before, sasuke.energy])
-	_assert(sasuke.knockdown_turns == 0, "4i: 击飞生效后本回合结束递减（knockdown_turns=%d）" % sasuke.knockdown_turns)
+	_assert(sasuke.knockdown_turns == 0, "4i: 击飞每回合统一递减到0（knockdown_turns=%d）" % sasuke.knockdown_turns)
 
 	# ═════════ 测试5：影分身（挡伤害+聚气加成） ════════════════
 	gm.setup_game({
