@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://b8o8t7s11qg0" path="res://resources/portraits/naruto_sage.png" id="4_portrait"]
 
 [sub_resource type="Resource" id="SE_ba"]
 script = ExtResource("1_effect")
@@ -81,6 +82,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_sg")])
 script = ExtResource("3_char")
 character_name = "漩涡鸣人（仙人模式）"
 max_hp = 24
+portrait = ExtResource("4_portrait")
 basic_attack_cost = 1
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_bl"), SubResource("SD_rs"), SubResource("SD_fk"), SubResource("SD_sg")])
 tags = Array[String](["法师", "战士"])

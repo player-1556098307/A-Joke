@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://d15m63ekh1p2g" path="res://resources/portraits/ruined_king.png" id="4_portrait"]
 
 [sub_resource type="Resource" id="SE_ba"]
 script = ExtResource("1_effect")
@@ -65,6 +66,7 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_hb")])
 script = ExtResource("3_char")
 character_name = "破败王者（怒）"
 max_hp = 12
+portrait = ExtResource("4_portrait")
 basic_attack_cost = 1
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_bl"), SubResource("SD_bf"), SubResource("SD_hb")])
 tags = Array[String](["战士"])
