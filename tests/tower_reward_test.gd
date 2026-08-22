@@ -22,6 +22,7 @@ func _ready() -> void:
 	await _test_buff_persistence()
 	await _test_all_buff_types_inject()
 	await _test_ai_auto_select_buff()
+	await _test_consumed_limited_buff()
 
 	print("=== 塔奖励测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
@@ -621,6 +622,161 @@ func _test_ai_auto_select_buff() -> void:
 	# 清理
 	SceneManager.last_tower_config.erase("tower_buffs_per_player")
 	battle.queue_free()
+
+# ═════════ 辅助函数 ═══════════════════════════════════════
+
+## 测试12：一次性技能祝福（斩魂/回春）消耗品逻辑
+## 用完一次永久失效（跨层不可再用），用完后从持有列表移除→祝福池可再次随机到
+func _test_consumed_limited_buff() -> void:
+	print("--- 一次性技能祝福消耗品逻辑 ---")
+	var gm := GameManager
+	var char_data := load("res://resources/characters/漩涡鸣人（疾风传）.tres") as CharacterData
+
+	# 清理
+	SceneManager.last_tower_config.erase("tower_buffs")
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
+	SceneManager.last_tower_config["players"] = [
+		{ "character": char_data, "is_human": true },
+	]
+
+	# 初始化：玩家持有斩魂祝福
+	SceneManager.last_tower_config["tower_buffs_per_player"] = [
+		[{ "id": "soul_slash", "value": 5.0 }]
+	]
+
+	# 用 tower_battle（fast_mode）管理整个流程，确保 _inject_tower_buffs 被调用
+	var battle = (load("res://scenes/tower/tower_battle.tscn") as PackedScene).instantiate()
+	battle.fast_mode = true
+	add_child(battle)
+	await get_tree().process_frame
+
+	# 等待第1层战斗启动
+	for i in range(900):
+		await get_tree().process_frame
+		if battle._phase == "battle":
+			break
+
+	var player := _get_player(gm)
+	_assert(player != null, "12a: 玩家存在")
+	if player == null:
+		battle.queue_free()
+		return
+
+	# 验证斩魂技能已注入 unlocked_skills（_inject_tower_buffs 在 _begin_floor_battle 中调用）
+	var has_skill := false
+	for s in player.get_all_skills():
+		if s.skill_name == "斩魂":
+			has_skill = true
+			break
+	_assert(has_skill, "12b: 斩魂技能已注入可用")
+
+	# 模拟使用斩魂：手动将技能名加入 limited_skills_used
+	player.limited_skills_used.append("斩魂")
+
+	# 验证用完后 get_all_skills 不再返回斩魂
+	var still_has := false
+	for s in player.get_all_skills():
+		if s.skill_name == "斩魂":
+			still_has = true
+			break
+	_assert(not still_has, "12c: 斩魂用完后从技能列表消失")
+
+	# 调用清理函数（模拟换层前清理）
+	battle._cleanup_consumed_limited_buffs()
+	await get_tree().process_frame
+
+	# 验证斩魂已从持久化列表移除
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	_assert(per_player.size() == 1, "12d: 持久化列表仍有1个角色")
+	if per_player.size() >= 1 and per_player[0] is Array:
+		var soul_slash_remaining := false
+		for b in per_player[0]:
+			if b is Dictionary and b.get("id", "") == "soul_slash":
+				soul_slash_remaining = true
+				break
+		_assert(not soul_slash_remaining, "12e: 斩魂已从持久化列表移除（用完即弃）")
+	else:
+		_assert(false, "12e: 持久化列表结构异常")
+
+	# 验证斩魂重新回到祝福池（不在 obtained_ids 中 → 可随机到）
+	var obtained_ids: Array = []
+	for buffs in per_player:
+		if buffs is Array:
+			for b in buffs:
+				if b is Dictionary and b.has("id"):
+					obtained_ids.append(b.get("id"))
+	_assert(not "soul_slash" in obtained_ids, "12f: 斩魂不在obtained_ids中→祝福池可再随机到")
+
+	# 验证祝福池包含斩魂（通过 _pick_random_rewards 验证可抽到）
+	var ui := TowerRewardUI.new()
+	add_child(ui)
+	var can_pick_soul_slash := false
+	for _i in range(50):
+		var choices = ui._pick_random_rewards(3, false, obtained_ids)
+		for c in choices:
+			if c.get("id", "") == "soul_slash":
+				can_pick_soul_slash = true
+				break
+		if can_pick_soul_slash:
+			break
+	_assert(can_pick_soul_slash, "12g: 斩魂用完后可在祝福池中再次随机到")
+
+	# 对照组：未使用的斩魂保持在列表中（不清理）
+	# 重置：给玩家一个未使用的斩魂，且 limited_skills_used 为空
+	SceneManager.last_tower_config["tower_buffs_per_player"] = [
+		[{ "id": "soul_slash", "value": 5.0 }]
+	]
+	player.limited_skills_used.clear()
+	battle._cleanup_consumed_limited_buffs()
+	var per_player2: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	var soul_slash_kept := false
+	if per_player2.size() >= 1 and per_player2[0] is Array:
+		for b in per_player2[0]:
+			if b is Dictionary and b.get("id", "") == "soul_slash":
+				soul_slash_kept = true
+				break
+	_assert(soul_slash_kept, "12h: 未使用的斩魂保持在列表中（不被清理）")
+
+	# 回春同理：用完后从列表移除
+	SceneManager.last_tower_config["tower_buffs_per_player"] = [
+		[{ "id": "spring", "value": 5.0 }]
+	]
+	player.limited_skills_used.clear()
+	player.limited_skills_used.append("回春")
+	battle._cleanup_consumed_limited_buffs()
+	var per_player3: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	var spring_removed := true
+	if per_player3.size() >= 1 and per_player3[0] is Array:
+		for b in per_player3[0]:
+			if b is Dictionary and b.get("id", "") == "spring":
+				spring_removed = false
+				break
+	_assert(spring_removed, "12i: 回春用完后从持久化列表移除")
+
+	# 非限定技祝福不受影响（blade_power 不在清理范围）
+	SceneManager.last_tower_config["tower_buffs_per_player"] = [
+		[{ "id": "blade_power", "value": 1.0 }, { "id": "soul_slash", "value": 5.0 }]
+	]
+	player.limited_skills_used.clear()
+	player.limited_skills_used.append("斩魂")
+	battle._cleanup_consumed_limited_buffs()
+	var per_player4: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	var blade_kept := false
+	var soul_removed2 := true
+	if per_player4.size() >= 1 and per_player4[0] is Array:
+		for b in per_player4[0]:
+			if b is Dictionary:
+				if b.get("id", "") == "blade_power":
+					blade_kept = true
+				if b.get("id", "") == "soul_slash":
+					soul_removed2 = false
+	_assert(blade_kept, "12j: 非限定技祝福(blade_power)不受清理影响")
+	_assert(soul_removed2, "12k: 斩魂被清理，blade_power保留")
+
+	ui.queue_free()
+	battle.queue_free()
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
+	SceneManager.last_tower_config.erase("players")
 
 # ═════════ 辅助函数 ═══════════════════════════════════════
 

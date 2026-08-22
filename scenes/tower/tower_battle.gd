@@ -190,6 +190,8 @@ func _begin_floor_battle(_floor_num: int) -> void:
 		var party: Array = SceneManager.last_tower_config.get("players", [])
 		tower_mgr.start_tower(party)
 	else:
+		# 换层前：清理已消耗的一次性技能祝福（斩魂/回春用完即弃，回到祝福池可再抽）
+		_cleanup_consumed_limited_buffs()
 		tower_mgr.start_next_floor()
 	_inject_tower_buffs()
 	_ui.setup_players(GameManager.get_alive_players())
@@ -267,6 +269,44 @@ func _inject_enemy_attack_bonus() -> void:
 		if p.team_id != 2:
 			continue
 		p.damage_bonus_basic += atk_bonus
+
+## 换层前清理已消耗的一次性技能祝福
+## 斩魂/回春是消耗品：用完一次永久失效，从持久化 buff 列表移除 → 祝福池可再次随机到
+func _cleanup_consumed_limited_buffs() -> void:
+	var consumed_buff_ids := { "soul_slash": true, "spring": true }
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	if per_player.is_empty():
+		return
+	var alive_players := GameManager.get_alive_players()
+	for p in alive_players:
+		if p.team_id != 1:
+			continue
+		# 找到该玩家对应的 buff 列表索引（按 team_id=1 的队伍顺序）
+		var team_idx := 0
+		for ap in alive_players:
+			if ap.team_id != 1:
+				continue
+			if ap == p:
+				break
+			team_idx += 1
+		if team_idx >= per_player.size() or not (per_player[team_idx] is Array):
+			continue
+		var buffs: Array = per_player[team_idx]
+		# 检查该玩家是否有已使用的限定技祝福
+		var to_remove := []
+		for b in buffs:
+			if not (b is Dictionary):
+				continue
+			var bid: String = b.get("id", "")
+			if not consumed_buff_ids.has(bid):
+				continue
+			# 查对应技能名是否在 limited_skills_used 中
+			var skill_name: String = "斩魂" if bid == "soul_slash" else "回春"
+			if skill_name in p.limited_skills_used:
+				to_remove.append(b)
+		for b in to_remove:
+			buffs.erase(b)
+	SceneManager.last_tower_config["tower_buffs_per_player"] = per_player
 
 ## 一次性技能祝福：将限定技加入玩家 unlocked_skills（防重复，每层注入幂等）
 func _add_limited_skill_buff(p: PlayerState, skill_name: String, skill_path: String) -> void:
