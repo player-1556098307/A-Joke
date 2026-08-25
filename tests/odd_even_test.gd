@@ -18,6 +18,9 @@ func _ready() -> void:
 	print("=== 黑白配（手心手背）机制测试 ===")
 	await get_tree().process_frame
 
+	# 测试需手动控制分组 → 关闭自动模式（机制本身默认自动）
+	GameManager.odd_even_auto = false
+
 	var naruto_char := load("res://resources/characters/漩涡鸣人.tres") as CharacterData
 	var sasuke_char := load("res://resources/characters/宇智波佐助.tres") as CharacterData
 	var sakura_char := load("res://resources/characters/春野樱.tres") as CharacterData
@@ -44,6 +47,7 @@ func _ready() -> void:
 	gm.setup_game({"players": players_a})
 	await get_tree().process_frame
 
+	# A0: 新增断言：odd_even_auto 默认值由 GameManager 定义（此处测试已置 false）
 	# A1: 初始阶段应为 ODD_EVEN_INPUT（5人≥5）
 	_assert(gm.get("_current_phase") == GameManager.GamePhase.ODD_EVEN_INPUT,
 		"A1: 5人初始阶段=ODD_EVEN_INPUT（实际=%d）" % gm.get("_current_phase"))
@@ -139,6 +143,16 @@ func _ready() -> void:
 	_assert(gm.auto_rps_enabled == false, "D3: 运行时关闭auto_rps")
 	gm.auto_rps_enabled = true
 	_assert(gm.auto_rps_enabled == true, "D4: 运行时开启auto_rps")
+
+	# D5: 塔模式跨 setup_game 保留 auto_rps_enabled
+	gm.setup_game({"players": players_c, "tower_mode": true})
+	await get_tree().process_frame
+	_assert(gm.auto_rps_enabled == true, "D5: 塔模式跨setup_game保留auto_rps")
+
+	# D6: 非塔模式跨 setup_game 重置 auto_rps_enabled
+	gm.setup_game({"players": players_c})
+	await get_tree().process_frame
+	_assert(gm.auto_rps_enabled == false, "D6: 非塔模式跨setup_game重置auto_rps")
 
 	# ════════════════════════════════════════════════════════════════
 	# 测试组E：6人黑白配 → 胜出仍>4 → 继续黑白配
@@ -305,6 +319,38 @@ func _ready() -> void:
 	_assert(gm.get("_sole_winner_id") == 0, "K1: 1人RPS胜者=0（实际=%d）" % gm.get("_sole_winner_id"))
 	_assert(gm.get("_current_phase") == GameManager.GamePhase.PREPARATION or gm.get("_current_phase") == GameManager.GamePhase.ACTION_INPUT,
 		"K2: 1人RPS后进入PREPARATION/ACTION_INPUT（实际=%d）" % gm.get("_current_phase"))
+
+	# ════════════════════════════════════════════════════════════════
+	# 测试组M：odd_even_auto 自动模式（含人类玩家也自动选择）
+	# ════════════════════════════════════════════════════════════════
+	print("--- M组：odd_even_auto 自动模式 ---")
+
+	# 先恢复自动模式（前面已手动关闭）
+	GameManager.odd_even_auto = true
+
+	gm.setup_game({"players": players_a})
+	await get_tree().process_frame
+
+	# M1: 5人初始仍为 ODD_EVEN_INPUT（自动模式保留阶段与动画）
+	_assert(gm.get("_current_phase") == GameManager.GamePhase.ODD_EVEN_INPUT,
+		"M1: 自动模式5人初始=ODD_EVEN_INPUT（实际=%d）" % gm.get("_current_phase"))
+
+	# M2: 不手动提交任何选择，等延时（AI延时+结算timer）后系统自动完成黑白配
+	await get_tree().create_timer(1.5).timeout
+
+	# M3: 应已进入 GESTURE_INPUT（系统自动分组完成）
+	_assert(gm.get("_current_phase") == GameManager.GamePhase.GESTURE_INPUT,
+		"M3: 自动模式自动完成→GESTURE_INPUT（实际=%d）" % gm.get("_current_phase"))
+
+	# M4: RPS参与方应≤4人
+	var rps_m: Array = gm.get("_rps_participants")
+	_assert(rps_m.size() > 0 and rps_m.size() <= 4, "M4: 自动分组胜者≤4人（实际=%d）" % rps_m.size())
+
+	# M5: 自动模式为全局默认开启
+	_assert(GameManager.odd_even_auto == true, "M5: odd_even_auto 默认开启")
+
+	# 清理：恢复手动模式，避免影响后续（如有）
+	GameManager.odd_even_auto = false
 
 	print("=== 黑白配机制测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)

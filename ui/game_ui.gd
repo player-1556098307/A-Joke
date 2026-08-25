@@ -1868,6 +1868,8 @@ func _on_turn_timer_tick() -> void:
 
 func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> void:
 	_current_phase_for_timer = phase
+	# 每次阶段变化同步自动出拳按钮样式（跨层 setup_game 重置状态后自动纠正显示）
+	_update_auto_rps_btn_style()
 	match phase:
 		GameManager.GamePhase.ODD_EVEN_INPUT:
 			_stop_turn_timer()
@@ -1875,12 +1877,14 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			gesture_panel.hide()
 			action_panel.hide()
 			target_panel.hide()
-			phase_label.text = "手心手背 — 请选择"
+			_odd_even_panel.hide()
+			phase_label.text = "手心手背 — 自动进行中" if GameManager.odd_even_auto else "手心手背 — 请选择"
 			phase_label.add_theme_color_override("font_color", Color("#FAC775"))
 			right_header_label.text = "黑白配"
 			var oe_human := GameManager.get_player(_human_player_id)
 			var oe_human_can_play := oe_human != null and oe_human.is_alive and oe_human.paralyze_turns <= 0 and not is_spectating
-			_odd_even_panel.visible = oe_human_can_play
+			# 自动模式下无需手动点击；手动模式才显示选择面板
+			_odd_even_panel.visible = oe_human_can_play and not GameManager.odd_even_auto
 			_append_log("── 手心手背（黑白配）──" , LT_PHASE)
 			_start_turn_timer()
 			_show_all_thinking()

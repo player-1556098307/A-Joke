@@ -243,6 +243,9 @@ var _odd_even_active: bool = false
 var _odd_even_done_this_round: bool = false
 ## 自动出拳模式（塔模式可用）：true时人类玩家手势由AI随机代理
 var auto_rps_enabled: bool = false
+## 黑白配（手心手背）自动模式：true时系统自动为所有参与者（含人类）随机选择，不要求手动点击
+## 保留阶段动画与延时，仅跳过手动输入；测试中可设为 false 以手动控制分组
+var odd_even_auto: bool = true
 ## 当前回合参与石头剪刀布的玩家ID（黑白配筛选后仅胜者参与；无黑白配时为全部存活玩家）
 var _rps_participants: Array[int] = []
 
@@ -370,7 +373,8 @@ func setup_game(config: Dictionary) -> void:
 	_odd_even_participants.clear()
 	_odd_even_choices.clear()
 	_rps_participants.clear()
-	auto_rps_enabled = config.get("auto_rps", false)
+	# 塔模式跨层/跨对局保留用户开启的自动出拳状态；非塔模式每次对局重置
+	auto_rps_enabled = config.get("auto_rps", _is_tower_mode and auto_rps_enabled)
 
 	var player_configs: Array = config["players"]
 	for i in range(player_configs.size()):
@@ -491,15 +495,17 @@ func _start_odd_even() -> void:
 		_enter_phase(GamePhase.GESTURE_INPUT)
 		return
 	odd_even_started.emit(_odd_even_participants.duplicate())
-	# AI自动选择手心/手背
+	# AI 与自动模式（odd_even_auto）下的人类玩家均系统自动随机选择，延时提交以保留过程可见
 	var delay := SettingsManager.get_ai_delay()
 	for pid in _odd_even_participants:
 		var p := get_player(pid)
-		if p != null and not p.is_human:
+		if p == null:
+			continue
+		var auto_choose: bool = not p.is_human or odd_even_auto
+		if auto_choose:
 			var choice := randf() < 0.5  # true=手心(正), false=手背(反)
 			get_tree().create_timer(delay).timeout.connect(
 				_delayed_submit_odd_even.bind(pid, choice), CONNECT_ONE_SHOT)
-	# 如果没有人类玩家或人类死亡，直接全部AI
 	if _all_odd_even_submitted():
 		_enter_phase(GamePhase.ODD_EVEN_RESOLVING)
 
