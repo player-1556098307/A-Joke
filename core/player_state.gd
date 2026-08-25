@@ -142,6 +142,15 @@ var backtrack_snapshot: Dictionary = {}
 ## 同一玩家可被多个大黑塔分别标记，各自独立生效、互不通用；永久存在（无自然消失机制）
 var jiedu_by: Array[int] = []
 
+## ── 奥伯龙专属字段 ───────────────────────────────────────────────
+## 夜幕降临状态：持续到主动用梦之终结取消；效果=每次准备阶段+1气 + 本回合无法造成伤害
+var night_curtain_active: bool = false
+## 下次伤害x2标记（梦之终结施加）：选择任意玩家（含自己），其下次造成的伤害x2
+## 所有伤害类型均生效（普攻/技能/燃烧/狂战士/延迟伤害等），触发后清除标记
+var damage_double_next: bool = false
+## 免疫下次攻击标记（终极技能赋予）：下次受到攻击时免疫该次伤害，触发后清除标记
+var immune_next_attack: bool = false
+
 ## ── 慈悲尖塔敌人专属字段 ─────────────────────────────────────────
 ## 破败王者之刃阶段计数（0=第1次普攻，1=第2次，2=第3次；3+=技能耗尽等待悲痛刷新）
 var blade_stage: int = 0
@@ -225,6 +234,10 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	bati_active         = false
 	niepan_active       = false
 	pending_skill_index = -1
+	# 奥伯龙专属字段默认值
+	night_curtain_active  = false
+	damage_double_next    = false
+	immune_next_attack    = false
 	# 秽土柱间·仙人之力：气上限6
 	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
 	for skill in char_data.skills:
@@ -270,6 +283,9 @@ func save_pre_takeover_snapshot() -> void:
 		"glory_unlocked": glory_unlocked,
 		"susanoo_spiral_unlocked": susanoo_spiral_unlocked,
 		"has_kotoamatsukami_skill": has_kotoamatsukami_skill,
+		"night_curtain_active": night_curtain_active,
+		"damage_double_next": damage_double_next,
+		"immune_next_attack": immune_next_attack,
 	}
 
 ## 从快照恢复（夺舍体死亡后回退到夺舍前止水状态）
@@ -311,6 +327,9 @@ func restore_pre_takeover_snapshot() -> void:
 	glory_unlocked        = pre_takeover_snapshot.get("glory_unlocked", glory_unlocked)
 	susanoo_spiral_unlocked = pre_takeover_snapshot.get("susanoo_spiral_unlocked", susanoo_spiral_unlocked)
 	has_kotoamatsukami_skill = pre_takeover_snapshot.get("has_kotoamatsukami_skill", has_kotoamatsukami_skill)
+	night_curtain_active   = pre_takeover_snapshot.get("night_curtain_active", night_curtain_active)
+	damage_double_next     = pre_takeover_snapshot.get("damage_double_next", damage_double_next)
+	immune_next_attack     = pre_takeover_snapshot.get("immune_next_attack", immune_next_attack)
 	# 夺舍回退后清除夺舍状态
 	takeover_active = false
 	koto_awaiting_confirm = false
@@ -390,6 +409,9 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"is_zeus_phase2": is_zeus_phase2,
 		"is_zeus_boss": is_zeus_boss,
 		"zeus_judgement_used": zeus_judgement_used,
+		"night_curtain_active": night_curtain_active,
+		"damage_double_next": damage_double_next,
+		"immune_next_attack": immune_next_attack,
 	}
 
 ## 从回溯快照恢复自身状态（全部字段）
@@ -467,6 +489,9 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	is_zeus_phase2           = snap.get("is_zeus_phase2", is_zeus_phase2)
 	is_zeus_boss             = snap.get("is_zeus_boss", is_zeus_boss)
 	zeus_judgement_used      = snap.get("zeus_judgement_used", zeus_judgement_used)
+	night_curtain_active     = snap.get("night_curtain_active", night_curtain_active)
+	damage_double_next       = snap.get("damage_double_next", damage_double_next)
+	immune_next_attack       = snap.get("immune_next_attack", immune_next_attack)
 
 ## 重置回合临时数据（每回合开始时调用），持续状态字段不在此重置
 ## 防反（counter_stance）为持续状态：进入后持续到自己的下个回合行动开始（_start_action_input）时清除
@@ -544,10 +569,12 @@ func _has_skill(skills: Array[SkillData], skill_name: String) -> bool:
 			return true
 	return false
 
-## 判断技能是否只在END_PHASE阶段生效（当前仅招架：含COUNTER_STANCE效果）
+## 判断技能是否只在END_PHASE阶段生效（招架含COUNTER_STANCE效果 / 奥伯龙梦之终结含DREAM_END效果）
 func _is_end_phase_only_skill(skill: SkillData) -> bool:
 	for effect in skill.effects:
 		if effect.effect_type == SkillEffect.EffectType.COUNTER_STANCE:
+			return true
+		if effect.effect_type == SkillEffect.EffectType.DREAM_END:
 			return true
 	return false
 

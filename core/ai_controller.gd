@@ -90,6 +90,12 @@ func decide_action(
 		if result.size() > 0:
 			return result
 
+	# 奥伯龙特殊策略
+	if _is_oberon(player):
+		var result := _decide_oberon_action(player, others, distance_system)
+		if result.size() > 0:
+			return result
+
 	# 慈悲尖塔敌人差异化策略
 	if _is_tower_enemy(player):
 		var result := _decide_tower_enemy_action(player, alive_players, distance_system)
@@ -201,6 +207,74 @@ func _is_big_herta(player: PlayerState) -> bool:
 		if skill.skill_name == "解读":
 			return true
 	return false
+
+## 判断角色是否为奥伯龙（通过技能名"夜之帷幕"判断）
+func _is_oberon(player: PlayerState) -> bool:
+	for skill in player.character.skills:
+		if skill.skill_name == "夜之帷幕":
+			return true
+	return false
+
+## 奥伯龙专用决策策略
+## 优先级：终极技能（5气限定技，3伤+麻痹）> 仲夏夜之梦（夜幕中1气获得3盾）> 普攻 > 充能
+## 夜之帷幕在准备阶段自动触发，梦之终结在结束阶段自动处理，AI只需决定操作阶段行动
+func _decide_oberon_action(
+	player: PlayerState,
+	others: Array[PlayerState],
+	distance_system: DistanceSystem
+) -> Dictionary:
+	var all_skills := player.get_all_skills()
+
+	# 1. 终极技能（5气限定技）：3伤+麻痹+免疫下次攻击
+	var fairy_idx := _find_skill_index(all_skills, player, "于彼方点缀的梦之童话")
+	if fairy_idx >= 0 and player.energy >= 5:
+		var target := _pick_best_target(player, all_skills[fairy_idx], others, distance_system)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": fairy_idx, "target_id": target }
+
+	# 2. 仲夏夜之梦（夜幕中可用，1气获得3盾）：低血或受威胁时使用
+	var midsummer_idx := _find_skill_index(all_skills, player, "仲夏夜之梦")
+	if midsummer_idx >= 0 and player.energy >= 1 and player.night_curtain_active:
+		# 低血（<=3）或无护盾时防御性使用
+		if player.hp <= 3 or player.shield <= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": midsummer_idx, "target_id": player.player_id }
+
+	# 3. 普攻：夜幕状态下伤害归零（但可用于触发其他效果），非夜幕时正常攻击
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1 and not player.night_curtain_active:
+		var target := _pick_best_target(player, all_skills[basic_idx], others, distance_system)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+
+	# 4. 夜幕状态下无好选择则充能（积累气等终极技能）
+	# 返回空让调用方走默认充能逻辑
+	return {}
+
+## 奥伯龙·梦之终结目标选择（AI自动决策）
+## 优先标记自己（下次高伤技能x2），或标记最低血队友/敌人
+func decide_dream_end_target(
+	caster: PlayerState,
+	alive_players: Array[PlayerState]
+) -> PlayerState:
+	# 简单策略：优先标记自己（下次普攻/终极技能x2）
+	# 如果自己气>=4（即将放大招），优先标记自己
+	if caster.energy >= 4:
+		return caster
+	# 否则标记血量最低的敌人
+	var best: PlayerState = null
+	var best_hp: float = 999.0
+	for p in alive_players:
+		if p.player_id == caster.player_id:
+			continue
+		if caster.team_id != 0 and p.team_id == caster.team_id:
+			continue
+		if p.hp < best_hp:
+			best_hp = p.hp
+			best = p
+	if best != null:
+		return best
+	# fallback：标记自己
+	return caster
 
 ## 大黑塔专用决策策略
 ## 优先级：魔法（3气，主目标优先【解】玩家/低血）> 普攻 > 充能

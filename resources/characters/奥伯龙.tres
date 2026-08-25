@@ -1,0 +1,98 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "远程魔法攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 2
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_nc"]
+script = ExtResource("1_effect")
+effect_type = 49
+value = 0
+target = 2
+
+[sub_resource type="Resource" id="SD_nc"]
+script = ExtResource("2_skill")
+skill_name = "夜之帷幕"
+description = "准备阶段发动：获得夜幕降临状态，持续到主动用梦之终结取消。夜幕期间每次准备阶段获得1气，但本回合无法造成伤害（伤害归零，不取消夜幕）。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_nc")])
+
+[sub_resource type="Resource" id="SE_de"]
+script = ExtResource("1_effect")
+effect_type = 50
+value = 0
+target = 2
+
+[sub_resource type="Resource" id="SD_de"]
+script = ExtResource("2_skill")
+skill_name = "梦之终结"
+description = "结束阶段发动：结束夜幕降临状态，选择任意一名玩家（含自己），使其下一次造成的伤害x2。所有伤害类型均生效（普攻/技能/燃烧/狂战士/延迟伤害等）。"
+energy_cost = 0
+effects = Array[ExtResource("1_effect")]([SubResource("SE_de")])
+
+[sub_resource type="Resource" id="SE_md"]
+script = ExtResource("1_effect")
+effect_type = 51
+value = 3
+target = 2
+
+[sub_resource type="Resource" id="SD_md"]
+script = ExtResource("2_skill")
+skill_name = "仲夏夜之梦"
+description = "操作阶段发动（需处于夜幕降临状态）：消耗1气获得3点护盾（不可叠加，取较大值）。"
+energy_cost = 1
+effects = Array[ExtResource("1_effect")]([SubResource("SE_md")])
+
+[sub_resource type="Resource" id="SE_ft_dmg"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 3
+target = 0
+
+[sub_resource type="Resource" id="SE_ft_par"]
+script = ExtResource("1_effect")
+effect_type = 2
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SE_ft_imm"]
+script = ExtResource("1_effect")
+effect_type = 52
+value = 0
+target = 2
+
+[sub_resource type="Resource" id="SD_ft"]
+script = ExtResource("2_skill")
+skill_name = "于彼方点缀的梦之童话"
+description = "限定技（5气）：指定任意一名其他玩家造成3点伤害并麻痹1回合，同时自身免疫下次受到的攻击（持续到下次被攻击时触发）。"
+energy_cost = 5
+min_range = 1
+max_range = 999
+is_limited = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ft_dmg"), SubResource("SE_ft_par"), SubResource("SE_ft_imm")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "奥伯龙"
+max_hp = 8
+basic_attack_cost = 1
+avatar_emoji = "奥"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_nc"), SubResource("SD_de"), SubResource("SD_md"), SubResource("SD_ft")])
+tags = Array[String](["法师"])
+grade = "S"

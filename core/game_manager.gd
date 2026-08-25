@@ -206,6 +206,16 @@ signal open_mind_triggered(herta_id: int)
 ## 魔法释放：主目标+所有【解】玩家AOE
 signal magic_used(caster_id: int, main_target_id: int)
 
+## ── 奥伯龙专属信号 ───────────────────────────────────────────────
+## 夜之帷幕触发：获得夜幕降临状态 + 1气
+signal night_curtain_activated(player_id: int)
+## 梦之终结触发：结束夜幕 + 目标下次伤害x2
+signal dream_end_used(caster_id: int, target_id: int)
+## 免疫下次攻击触发（终极技能赋予，被攻击时免疫）
+signal immune_next_attack_triggered(player_id: int)
+## 梦之终结弹窗：选择目标（含自己）
+signal dream_end_required(player_id: int, target_ids: Array[int])
+
 ## 所有玩家状态数组
 var _players: Array[PlayerState] = []
 ## 当前游戏阶段
@@ -922,6 +932,13 @@ func _get_preparation_skill(player: PlayerState) -> SkillData:
 		var backtrack := _get_skill_by_name(player, "别天神")
 		if backtrack != null and _is_new_shisui(player) and player.energy >= backtrack.energy_cost:
 			return backtrack
+	# 奥伯龙·夜之帷幕：自己回合准备阶段可发动（夜幕未激活时）
+	# 效果：获得夜幕降临状态 + 本回合获1气（准备阶段即时获得）+ 本回合无法造成伤害
+	# 夜幕一旦获得持续到主动用梦之终结取消，因此只在未激活时触发
+	if player.player_id == _sole_winner_id and _is_oberon(player) and not player.night_curtain_active:
+		var curtain := _get_skill_by_name(player, "夜之帷幕")
+		if curtain != null:
+			return curtain
 	return null
 
 ## 获取准备阶段技能在技能列表中的索引
@@ -948,6 +965,9 @@ func _get_preparation_skill_index(player: PlayerState) -> int:
 		var backtrack := _get_skill_by_name(player, "别天神")
 		if backtrack != null:
 			return -1
+	# 奥伯龙·夜之帷幕：被动技（被 get_all_skills 过滤），返回-1由 _begin_prep_player 按技能名 fallback
+	if player.player_id == _sole_winner_id and _is_oberon(player) and not player.night_curtain_active:
+		return -1
 	return -1
 
 ## 处理指定玩家的准备阶段：人类弹窗 / AI 自动决策
@@ -962,6 +982,8 @@ func _begin_prep_player(player: PlayerState) -> void:
 		skill = _get_skill_by_name(player, "宇智波的荣耀")
 		if skill == null:
 			skill = _get_skill_by_name(player, "别天神")
+		if skill == null:
+			skill = _get_skill_by_name(player, "夜之帷幕")
 	# ── 泉奈荣耀：在他回合准备阶段触发，目标为回合主 ──
 	if skill != null and skill.skill_name == "宇智波的荣耀":
 		var target := get_player(_sole_winner_id)
@@ -982,6 +1004,11 @@ func _begin_prep_player(player: PlayerState) -> void:
 			return
 		# AI：自动回溯
 		_apply_backtrack(player)
+		_process_prep_next()
+		return
+	# ── 奥伯龙·夜之帷幕：自己回合准备阶段触发（被动自动生效） ──
+	if skill != null and skill.skill_name == "夜之帷幕" and _is_oberon(player):
+		_apply_night_curtain(player)
 		_process_prep_next()
 		return
 	if skill == null or skill.skill_name != "投影":
@@ -1271,6 +1298,11 @@ func _apply_actions() -> void:
 				winner.pending_hp_payment = 0
 
 			if winner.energy < skill.energy_cost or winner.bell_count < skill.bell_cost:
+				_enter_phase(GamePhase.ELIMINATION)
+				return
+
+			# ── 奥伯龙·仲夏夜之梦：需处于夜幕降临状态才能使用 ──
+			if skill.skill_name == "仲夏夜之梦" and not winner.night_curtain_active:
 				_enter_phase(GamePhase.ELIMINATION)
 				return
 
@@ -2266,6 +2298,24 @@ func _apply_backtrack(player: PlayerState) -> void:
 	# 发射信号
 	backtrack_performed.emit(player.player_id, snap.get("round", 0))
 
+## ── 奥伯龙·夜之帷幕：准备阶段自动触发 ──────────────────────────
+## 获得夜幕降临状态 + 立即获得1气；本回合无法造成伤害（伤害归零，不取消夜幕）
+## 夜幕持续到主动用梦之终结取消
+func _apply_night_curtain(player: PlayerState) -> void:
+	if player == null or not player.is_alive:
+		return
+	player.night_curtain_active = true
+	# 立即获得1气
+	player.add_energy(1)
+	player_charged.emit(player.player_id, player.energy)
+	night_curtain_activated.emit(player.player_id)
+	print("[奥伯龙] %s 发动夜之帷幕，获得夜幕降临状态 +1气（当前气=%d）" % [player.player_name, player.energy])
+
+## ── 奥伯龙·梦之终结：结束阶段触发 ──────────────────────────────
+## 结束夜幕降临状态，选择任意玩家（含自己）使其下次伤害x2
+## 人类弹窗/AI自动决策，由 submit_dream_end 回调推进
+var _dream_end_pending: Dictionary = {}  # { player_id: int }
+
 ## 检查座位表是否包含指定玩家
 func _distance_system_contains(player_id: int) -> bool:
 	if _distance_system == null:
@@ -2439,24 +2489,35 @@ func _next_alive_counterclockwise(from_id: int, skip_id: int = -1) -> PlayerStat
 ## ── 燃烧/狂战士结算（END_PHASE中调用）──────────────────────────────────────────
 ## 燃烧：每回合结束失去1血（HP>1保护）
 ## 狂战士：本回合受过伤害则额外失去1血（可致死）
+## 奥伯龙·梦之终结：被标记玩家受到的燃烧/狂战士伤害也x2（触发后清除标记）
 func _process_burn_and_berserker() -> void:
 	for player in _players:
 		if not player.is_alive:
 			continue
 		# 燃烧扣血（HP>1保护）
 		if player.burning and player.hp > 1:
-			player.hp -= 1.0
+			var burn_dmg: float = 1.0
+			# ── 奥伯龙·梦之终结：被标记玩家的燃烧伤害x2 ──
+			if player.damage_double_next:
+				burn_dmg *= 2.0
+				player.damage_double_next = false
+			player.hp -= burn_dmg
 			var b_stats: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
 			if b_stats:
-				b_stats.total_damage_taken += 1.0
-			burn_damage_triggered.emit(player.player_id, 1.0, player.hp, "燃烧")
+				b_stats.total_damage_taken += burn_dmg
+			burn_damage_triggered.emit(player.player_id, burn_dmg, player.hp, "燃烧")
 		# 狂战士扣血（本回合受过伤害，可致死）
 		if player.berserker and player.took_damage_this_round:
-			player.hp = max(0.0, player.hp - 1.0)
+			var berserk_dmg: float = 1.0
+			# ── 奥伯龙·梦之终结：被标记玩家的狂战士伤害x2 ──
+			if player.damage_double_next:
+				berserk_dmg *= 2.0
+				player.damage_double_next = false
+			player.hp = max(0.0, player.hp - berserk_dmg)
 			var z_stats: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
 			if z_stats:
-				z_stats.total_damage_taken += 1.0
-			burn_damage_triggered.emit(player.player_id, 1.0, player.hp, "狂战士")
+				z_stats.total_damage_taken += berserk_dmg
+			burn_damage_triggered.emit(player.player_id, berserk_dmg, player.hp, "狂战士")
 
 
 ## ── 血付机制 ──────────────────────────────────────────────────────────────────
@@ -2604,7 +2665,63 @@ func _process_end_phase() -> void:
 				bell_gained.emit(player.player_id, player.bell_count)
 	# 2. 燃烧/狂战士结算
 	_process_burn_and_berserker()
-	# 3. 有钟的存活玩家决定是否招架
+	# 3. 奥伯龙·梦之终结（结束夜幕+标记伤害x2，在招架前处理）
+	_process_dream_end()
+	# 若梦之终结正在等待人类玩家决策，暂停结束阶段流程（submit_dream_end 会继续推进招架决策）
+	if not _dream_end_pending.is_empty():
+		return
+	# 4. 有钟的存活玩家决定是否招架
+	_process_bell_decisions()
+
+## ── 奥伯龙·梦之终结：结束阶段处理 ──────────────────────────────
+## 仅当奥伯龙处于夜幕降临状态时触发；结束后夜幕消失
+func _process_dream_end() -> void:
+	# 找到处于夜幕状态的奥伯龙
+	var oberon: PlayerState = null
+	for p in _players:
+		if p.is_alive and _is_oberon(p) and p.night_curtain_active:
+			oberon = p
+			break
+	if oberon == null:
+		return
+	if oberon.is_human:
+		# 人类玩家：弹窗选择目标
+		_dream_end_pending = { "player_id": oberon.player_id }
+		var target_ids: Array[int] = []
+		for p in get_alive_players():
+			target_ids.append(p.player_id)  # 含自己
+		dream_end_required.emit(oberon.player_id, target_ids)
+	else:
+		# AI：自动决策目标（优先标记自己下次高伤，或标记最低血敌人）
+		var target := _ai_controller.decide_dream_end_target(oberon, get_alive_players())
+		if target == null:
+			target = oberon  # fallback：标记自己
+		_apply_dream_end(oberon, target)
+		# 梦之终结处理完成后直接返回，_process_end_phase 继续到 _process_bell_decisions
+		# 注意：AI无弹窗等待，流程直接继续
+
+## 执行梦之终结：取消夜幕 + 标记目标下次伤害x2
+func _apply_dream_end(caster: PlayerState, target: PlayerState) -> void:
+	caster.night_curtain_active = false
+	target.damage_double_next = true
+	dream_end_used.emit(caster.player_id, target.player_id)
+	print("[奥伯龙] %s 发动梦之终结，结束夜幕，%s 下次伤害x2" % [caster.player_name, target.player_name])
+
+## 人类玩家梦之终结决策回调（由UI调用）
+func submit_dream_end(caster_id: int, target_id: int) -> void:
+	if _current_phase != GamePhase.END_PHASE:
+		return
+	if _dream_end_pending.is_empty():
+		return
+	_dream_end_pending = {}
+	var caster := get_player(caster_id)
+	var target := get_player(target_id)
+	if caster == null or target == null:
+		# 即使失败也继续推进结束阶段
+		_process_bell_decisions()
+		return
+	_apply_dream_end(caster, target)
+	# 梦之终结处理完成后继续到招架决策
 	_process_bell_decisions()
 
 ## 检查角色是否拥有钟机制（有招架或砸钟技能）
@@ -2795,8 +2912,25 @@ func _apply_delayed_damage(player: PlayerState, damage: float, attacker_id: int 
 	if player.invincible_turns > 0:
 		delayed_damage_triggered.emit(player.player_id, 0.0, player.hp)
 		return
+	# ── 奥伯龙·免疫下次攻击：延迟伤害也受免疫拦截（一次性消耗）──
+	if player.immune_next_attack:
+		player.immune_next_attack = false
+		immune_next_attack_triggered.emit(player.player_id)
+		delayed_damage_triggered.emit(player.player_id, 0.0, player.hp)
+		return
 	var dmg: float = damage
 	var clone_broken: bool = false
+	# ── 奥伯龙·梦之终结：攻击者下次伤害x2（延迟伤害也生效，触发后清除标记）──
+	if attacker_id >= 0:
+		var attacker := get_player(attacker_id)
+		if attacker != null and attacker.is_alive and attacker.damage_double_next:
+			dmg *= 2.0
+			attacker.damage_double_next = false
+	# ── 奥伯龙·夜幕降临：攻击者处于夜幕状态时伤害归零 ──
+	if attacker_id >= 0:
+		var attacker := get_player(attacker_id)
+		if attacker != null and attacker.night_curtain_active:
+			dmg = 0
 	# ── 希耶尔被动强化（仅来源为希耶尔时生效）──
 	var xiye_attacker: PlayerState = null
 	if attacker_id >= 0 and RoundResolver.is_xiye(get_player(attacker_id)):
@@ -3327,6 +3461,15 @@ func _is_herta(player: PlayerState) -> bool:
 		return false
 	for skill in player.character.skills:
 		if skill.skill_name == "送你砖石":
+			return true
+	return false
+
+## 判断角色是否为奥伯龙（通过技能名"夜之帷幕"判断）
+func _is_oberon(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	for skill in player.character.skills:
+		if skill.skill_name == "夜之帷幕":
 			return true
 	return false
 

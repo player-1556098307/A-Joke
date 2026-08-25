@@ -288,6 +288,10 @@ static func _apply_single_effect(
 			# 无敌状态：完全免疫伤害（包括九尾无敌）
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "invincible": true }
+			# ── 奥伯龙·免疫下次攻击（终极技能赋予）：一次性免疫，触发后消耗标记 ──
+			if target.immune_next_attack:
+				target.immune_next_attack = false
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "immune_next_attack": true }
 			var raw := effect.value
 			# 禁锢增伤：施法瞬间目标已禁锢则额外伤害（effect 优先，兼容 skill 级配置）
 			var paralyze_bonus: float = 0.0
@@ -314,6 +318,15 @@ static func _apply_single_effect(
 				if randf() < 0.5:
 					raw *= 2.0
 					pojun_crit = true
+			# ── 奥伯龙·梦之终结：攻击者下次伤害x2（所有伤害类型，触发后清除标记）──
+			var dream_end_doubled: bool = false
+			if attacker.damage_double_next:
+				raw *= 2.0
+				attacker.damage_double_next = false
+				dream_end_doubled = true
+			# ── 奥伯龙·夜幕降临：攻击者处于夜幕状态时伤害归零（不取消夜幕）──
+			if attacker.night_curtain_active:
+				raw = 0
 			var dmg: float = raw
 			var absorbed: float = 0.0
 			var clone_broken: bool = false
@@ -367,7 +380,7 @@ static func _apply_single_effect(
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
 			var ls_heal := _apply_lifesteal(attacker, dmg)
 			var dmg_blocked := raw - dmg
-			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "damage_blocked": dmg_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"] or pojun_crit, "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
+			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "damage_blocked": dmg_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"] or pojun_crit, "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered, "dream_end_doubled": dream_end_doubled }
 
 		SkillEffect.EffectType.TRUE_DAMAGE:
 			# 真实伤害：无视护盾/圣盾（全挡护盾），仅此而已。
@@ -375,9 +388,22 @@ static func _apply_single_effect(
 			# 无敌状态：完全免疫（包括九尾无敌）
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "true_damage": true, "invincible": true }
+			# ── 奥伯龙·免疫下次攻击（终极技能赋予）：一次性免疫，触发后消耗标记 ──
+			if target.immune_next_attack:
+				target.immune_next_attack = false
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "true_damage": true, "immune_next_attack": true }
 			var tdmg: float = effect.value
 			var clone_broken: bool = false
 			var counter_stance_triggered: bool = false
+			# ── 奥伯龙·梦之终结：攻击者下次伤害x2（触发后清除标记）──
+			var dream_end_doubled: bool = false
+			if attacker.damage_double_next:
+				tdmg *= 2.0
+				attacker.damage_double_next = false
+				dream_end_doubled = true
+			# ── 奥伯龙·夜幕降临：攻击者处于夜幕状态时伤害归零 ──
+			if attacker.night_curtain_active:
+				tdmg = 0
 			# 宇智波流招架（泉奈）：伤害减半 + 反击封技（伤害减免状态照常生效）
 			var uchiha_counter_triggered: bool = false
 			if target.uchiha_stance and not is_controlled(target):
@@ -408,17 +434,30 @@ static func _apply_single_effect(
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
 			var ls_heal := _apply_lifesteal(attacker, tdmg)
 			var tdmg_blocked := effect.value - tdmg
-			return { "damage_dealt": tdmg, "shield_absorbed": 0, "damage_blocked": tdmg_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": 0, "counter_damage": 1 if counter_stance_triggered else 0, "true_damage": true, "uchiha_counter_triggered": uchiha_counter_triggered }
+			return { "damage_dealt": tdmg, "shield_absorbed": 0, "damage_blocked": tdmg_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": 0, "counter_damage": 1 if counter_stance_triggered else 0, "true_damage": true, "uchiha_counter_triggered": uchiha_counter_triggered, "dream_end_doubled": dream_end_doubled }
 
 		SkillEffect.EffectType.PIERCE_DAMAGE:
 			# 穿透伤害（断头台）：无视护盾(数值/全挡)、无敌、圣盾(全挡护盾)，直接扣HP
 			# 被动强化：代行者+1 / 满血x2 / 暴击x2 全部生效
+			# ── 奥伯龙·免疫下次攻击：穿透伤害也受免疫拦截（一次性消耗）──
+			if target.immune_next_attack:
+				target.immune_next_attack = false
+				return { "damage_dealt": 0, "shield_absorbed": 0, "damage_blocked": float(effect.value), "lifesteal_heal": 0.0, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "pierce_damage": true, "immune_next_attack": true }
 			var pdmg: float = effect.value
 			pdmg += agent_bonus(attacker, target)
 			var ps := phase_sword_pre_apply(attacker, pdmg)
 			pdmg *= ps["multiplier"]
 			var crit := crit_check(attacker)
 			pdmg *= crit["multiplier"]
+			# ── 奥伯龙·梦之终结：攻击者下次伤害x2（触发后清除标记）──
+			var dream_end_doubled: bool = false
+			if attacker.damage_double_next:
+				pdmg *= 2.0
+				attacker.damage_double_next = false
+				dream_end_doubled = true
+			# ── 奥伯龙·夜幕降临：攻击者处于夜幕状态时伤害归零 ──
+			if attacker.night_curtain_active:
+				pdmg = 0
 			target.hp = max(0.0, target.hp - pdmg)
 			if pdmg > 0:
 				target.took_damage_this_round = true
@@ -427,18 +466,31 @@ static func _apply_single_effect(
 				attacker.can_crit_next = true
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
 			var ls_heal := _apply_lifesteal(attacker, pdmg)
-			return { "damage_dealt": pdmg, "shield_absorbed": 0, "damage_blocked": 0.0, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "pierce_damage": true, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"] }
+			return { "damage_dealt": pdmg, "shield_absorbed": 0, "damage_blocked": 0.0, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "pierce_damage": true, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"], "dream_end_doubled": dream_end_doubled }
 
 		SkillEffect.EffectType.PERCENT_DAMAGE:
 			# 百分比伤害（慈悲尖塔一次性技能祝福：斩魂）：按目标当前生命值百分比结算
 			# 与 DAMAGE 同等的减免链（无敌/护盾/分身/防反/坚壁），仅基础值计算不同
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "percent_damage": true, "invincible": true }
+			# ── 奥伯龙·免疫下次攻击：一次性免疫，触发后消耗标记 ──
+			if target.immune_next_attack:
+				target.immune_next_attack = false
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "percent_damage": true, "immune_next_attack": true }
 			var pct_raw: float = target.hp * effect.value
 			var pct_raw_init: float = pct_raw
 			var pct_absorbed: float = 0.0
 			var pct_clone_broken: bool = false
 			var pct_counter_triggered: bool = false
+			# ── 奥伯龙·梦之终结：攻击者下次伤害x2（触发后清除标记）──
+			var dream_end_doubled: bool = false
+			if attacker.damage_double_next:
+				pct_raw *= 2.0
+				attacker.damage_double_next = false
+				dream_end_doubled = true
+			# ── 奥伯龙·夜幕降临：攻击者处于夜幕状态时伤害归零 ──
+			if attacker.night_curtain_active:
+				pct_raw = 0
 			if target.counter_stance and not is_controlled(target):
 				pct_raw = ceilf(pct_raw / 2.0)
 				pct_counter_triggered = true
@@ -468,7 +520,7 @@ static func _apply_single_effect(
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
 			var ls_heal := _apply_lifesteal(attacker, pct_raw)
 			var pct_blocked := pct_raw_init - pct_raw
-			return { "damage_dealt": pct_raw, "shield_absorbed": pct_absorbed, "damage_blocked": pct_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": pct_clone_broken, "counter_stance_triggered": pct_counter_triggered, "paralyze_bonus": 0, "counter_damage": 1 if pct_counter_triggered else 0, "percent_damage": true }
+			return { "damage_dealt": pct_raw, "shield_absorbed": pct_absorbed, "damage_blocked": pct_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": pct_clone_broken, "counter_stance_triggered": pct_counter_triggered, "paralyze_bonus": 0, "counter_damage": 1 if pct_counter_triggered else 0, "percent_damage": true, "dream_end_doubled": dream_end_doubled }
 
 		SkillEffect.EffectType.DEATH_SENTENCE:
 			# 断罪死：与目标进行7次猜拳
@@ -700,6 +752,31 @@ static func _apply_single_effect(
 		SkillEffect.EffectType.KOTOAMATSUKAMI:
 			# 别天神（止水，被动限定技）：击杀时触发夺舍，由 GameManager 处理
 			return { "kotoamatsukami": true }
+
+		# ── 奥伯龙专属 ──────────────────────────────────────────
+		SkillEffect.EffectType.NIGHT_CURTAIN:
+			# 夜之帷幕：准备阶段由 GameManager 处理（_apply_night_curtain），此处仅标记
+			return { "night_curtain": true }
+
+		SkillEffect.EffectType.DREAM_END:
+			# 梦之终结：结束阶段由 GameManager 处理（_apply_dream_end），此处仅标记
+			return { "dream_end": true }
+
+		SkillEffect.EffectType.MIDSUMMER_DREAM:
+			# 仲夏夜之梦：消耗1气获得3护盾（不可叠加，取较大值）
+			var md_shield: int = int(effect.value)
+			if target.shield < 0:
+				target.shield = 0
+			# 不可叠加：取较大值（已有护盾>=3时不增加，否则设为3）
+			if target.shield < md_shield:
+				target.shield = md_shield
+			return { "shield_value": md_shield, "total_shield": target.shield }
+
+		SkillEffect.EffectType.FAIRY_TALE:
+			# 于彼方点缀的梦之童话（限定技）：3伤+麻痹+免疫下次攻击
+			# 伤害和麻痹由各自 EffectType 分支处理（FAIRY_TALE 效果只设置 immune_next_attack）
+			attacker.immune_next_attack = true
+			return { "fairy_tale": true, "immune_next_attack": true }
 
 	return {}
 

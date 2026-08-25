@@ -14,6 +14,7 @@ const CHARACTER_PRELOADS := [
 	preload("res://resources/characters/宇智波佐助.tres"),
 	preload("res://resources/characters/宇智波佐助（疾风传）.tres"),
 	preload("res://resources/characters/春野樱.tres"),
+	preload("res://resources/characters/奥伯龙.tres"),
 ]
 
 var _selected_char_index: int = 0

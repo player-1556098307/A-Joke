@@ -206,6 +206,18 @@ const LIST: Array[Dictionary] = [
 		"bg_color": "#FDF1F0",
 		"res_path": "res://resources/characters/大黑塔.tres",
 	},
+	{
+		"id": "oberon",
+		"name": "奥伯龙",
+		"sub": "OBERON",
+		"hp": 8,
+		"role": "法师",
+		"skills": "夜之帷幕 · 梦之终结 · 仲夏夜之梦 · 于彼方点缀的梦之童话",
+		"tags": ["法师"],
+		"color": "#2E4057",
+		"bg_color": "#ECEFF1",
+		"res_path": "res://resources/characters/奥伯龙.tres",
+	},
 ]
 
 static func get_by_id(char_id: String) -> Dictionary:
