@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+[ext_resource type="Texture2D" uid="uid://bcu3e1q351yi6" path="res://resources/portraits/oberon.png" id="4_portrait"]
 
 [sub_resource type="Resource" id="SE_ba"]
 script = ExtResource("1_effect")
@@ -92,6 +93,7 @@ script = ExtResource("3_char")
 character_name = "奥伯龙"
 max_hp = 8
 basic_attack_cost = 1
+portrait = ExtResource("4_portrait")
 avatar_emoji = "奥"
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_nc"), SubResource("SD_de"), SubResource("SD_md"), SubResource("SD_ft")])
 tags = Array[String](["法师"])
