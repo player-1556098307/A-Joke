@@ -24,24 +24,30 @@ const C_RED_GLOW := Color("#FF6060")
 ## tier: "normal"=小怪层可出；"elite"=仅精英层可出
 const REWARD_POOL := [
 	# ── 普通祝福（小怪层/精英层均可出）──
-	{ "id": "blade_power",  "name": "锋刃之力", "icon": "⚔", "desc": "普攻伤害 +1", "value": 1.0, "color": Color("#C83030"), "tier": "normal" },
-	{ "id": "charge_bonus", "name": "蓄锐",     "icon": "✦", "desc": "每回合额外聚气 +1（唯一）", "value": 1, "color": Color("#FAC775"), "tier": "normal", "unique": true },
-	{ "id": "clone",        "name": "影分身",   "icon": "◆", "desc": "开局获得 1 个影分身（唯一）", "value": 1, "color": Color("#A060C0"), "tier": "normal", "unique": true },
-	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气（可叠加）", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
+	{ "id": "blade_power",  "name": "锋刃之力", "icon": "⚔", "desc": "造成伤害 +1", "value": 1.0, "color": Color("#C83030"), "tier": "normal" },
+	{ "id": "charge_bonus", "name": "蓄锐",     "icon": "✦", "desc": "每回合额外聚气 +1", "value": 1, "color": Color("#FAC775"), "tier": "normal", "unique": true },
+	{ "id": "clone",        "name": "影分身",   "icon": "◆", "desc": "开局获得 1 个影分身", "value": 1, "color": Color("#A060C0"), "tier": "normal", "unique": true },
+	{ "id": "swift",        "name": "神速",     "icon": "⚡", "desc": "开局获得 2 点气", "value": 2, "color": Color("#FAC775"), "tier": "normal" },
 	{ "id": "protect",      "name": "庇护",     "icon": "❂", "desc": "开局获得 2 点护盾", "value": 2, "color": Color("#C0C0A0"), "tier": "normal" },
 	{ "id": "vitality",     "name": "生机",     "icon": "✚", "desc": "生命上限 +1", "value": 1, "color": Color("#60C060"), "tier": "normal" },
 	# ── 高级祝福（仅精英层可出）──
-	{ "id": "blade_power_2", "name": "锋芒",     "icon": "⚔", "desc": "普攻伤害 +2", "value": 2.0, "color": Color("#E04040"), "tier": "elite" },
-	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -0.5（唯一）", "value": 0.5, "color": Color("#6080A0"), "tier": "elite", "unique": true },
-	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "自己回合开始时回复 1 点生命（唯一）", "value": 1.0, "color": Color("#60C060"), "tier": "elite", "unique": true },
-	{ "id": "regen_2",      "name": "再生",     "icon": "♥", "desc": "自己回合开始时回复 2 点生命", "value": 2.0, "color": Color("#40A040"), "tier": "elite" },
+	{ "id": "blade_power_2", "name": "锋芒",     "icon": "⚔", "desc": "造成伤害 +2", "value": 2.0, "color": Color("#E04040"), "tier": "elite" },
+	{ "id": "shield_wall",  "name": "坚壁",     "icon": "▣", "desc": "受到伤害 -0.5", "value": 0.5, "color": Color("#6080A0"), "tier": "elite", "unique": true },
+	{ "id": "regen",        "name": "回生",     "icon": "♥", "desc": "自己回合开始时回复 1 点生命", "value": 1.0, "color": Color("#60C060"), "tier": "normal", "unique": true },
+	{ "id": "regen_2",      "name": "再生",     "icon": "♥", "desc": "自己回合开始时回复 2 点生命", "value": 2.0, "color": Color("#40A040"), "tier": "elite", "unique": true },
 	{ "id": "swift_2",      "name": "疾风",     "icon": "⚡", "desc": "开局获得 5 点气", "value": 5, "color": Color("#FAC775"), "tier": "elite" },
 	{ "id": "vitality_2",   "name": "龙血",     "icon": "✚", "desc": "生命上限 +3", "value": 3, "color": Color("#40C060"), "tier": "elite" },
 	# ── 趣味性祝福（一次性道具/被动吸血，不可叠加获取）──
-	{ "id": "lifesteal",    "name": "嗜血",     "icon": "☘", "desc": "造成伤害时恢复 1 点生命值（唯一）", "value": 1.0, "color": Color("#C04060"), "tier": "normal", "unique": true },
-	{ "id": "soul_slash",   "name": "斩魂",     "icon": "☠", "desc": "获得一次性技能：对敌人造成5点固定伤害（唯一）", "value": 5.0, "color": Color("#8040C0"), "tier": "normal", "unique": true },
-	{ "id": "spring",       "name": "回春",     "icon": "❀", "desc": "获得一次性技能：恢复自身 5 点生命值（唯一）", "value": 5.0, "color": Color("#40C080"), "tier": "normal", "unique": true },
+	{ "id": "lifesteal",    "name": "嗜血",     "icon": "☘", "desc": "造成伤害时恢复 1 点生命值", "value": 1.0, "color": Color("#C04060"), "tier": "normal", "unique": true },
+	{ "id": "soul_slash",   "name": "斩魂",     "icon": "☠", "desc": "获得一次性技能：对敌人造成5点固定伤害", "value": 5.0, "color": Color("#8040C0"), "tier": "normal", "unique": true },
+	{ "id": "spring",       "name": "回春",     "icon": "❀", "desc": "获得一次性技能：恢复自身 5 点生命值", "value": 5.0, "color": Color("#40C080"), "tier": "normal", "unique": true },
 	{ "id": "protect_2",    "name": "铁壁",     "icon": "❂", "desc": "开局获得 5 点护盾", "value": 5, "color": Color("#90B0C0"), "tier": "elite" },
+	# ── 新增：免死金牌（普通层可出，一次性被动，触发后回池）──
+	{ "id": "immortal_medal", "name": "免死金牌", "icon": "🛡", "desc": "免疫一次致命伤害（触发后消失，可再次获得）", "value": 1.0, "color": Color("#E8C060"), "tier": "normal", "unique": true },
+	# ── 新增：破军/霸体/涅槃（高级祝福，仅精英层可出）──
+	{ "id": "pojun",       "name": "破军",     "icon": "🔥", "desc": "普攻可暴击（50%概率造成双倍伤害）", "value": 1.0, "color": Color("#E06030"), "tier": "elite", "unique": true },
+	{ "id": "bati",        "name": "霸体",     "icon": "⛨", "desc": "免疫一切控制效果（麻痹/击飞/封技/无法选择）", "value": 1.0, "color": Color("#6090E0"), "tier": "elite", "unique": true },
+	{ "id": "niepan",      "name": "涅槃",     "icon": "♨", "desc": "持有者死后以半血重生（触发后失去，可再次获得）", "value": 1.0, "color": Color("#E06090"), "tier": "elite", "unique": true },
 ]
 
 ## ---- UI 引用 ----
@@ -194,6 +200,22 @@ func _build_card(reward: Dictionary, index: int) -> Panel:
 	sep.anchor_bottom = 0.425
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(sep)
+
+	# 类别标签（普通/精英 + 可叠加/不可叠加）
+	var tag_label := Label.new()
+	var tag_text: String = "精英" if reward.get("tier", "normal") == "elite" else "普通"
+	tag_text += " · " + ("不可叠加" if reward.get("unique", false) else "可叠加")
+	tag_label.text = tag_text
+	tag_label.add_theme_font_size_override("font_size", 11)
+	var tag_color := Color("#C8B090") if reward.get("tier", "normal") == "elite" else Color("#9A9182")
+	tag_label.add_theme_color_override("font_color", tag_color)
+	tag_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag_label.anchor_left = 0.0
+	tag_label.anchor_right = 1.0
+	tag_label.anchor_top = 0.44
+	tag_label.anchor_bottom = 0.48
+	tag_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(tag_label)
 
 	# 描述
 	var desc_label := Label.new()

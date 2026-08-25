@@ -23,6 +23,9 @@ func _ready() -> void:
 	await _test_all_buff_types_inject()
 	await _test_ai_auto_select_buff()
 	await _test_consumed_limited_buff()
+	await _test_pojun_crit()
+	await _test_bati_immune()
+	await _test_death_protection()
 
 	print("=== 塔奖励测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
@@ -256,7 +259,7 @@ func _test_reward_ui_pool() -> void:
 	add_child(ui)
 
 	var pool := ui.get_reward_pool()
-	_assert(pool.size() == 16, "7a: 奖励池16种（实际=%d）" % pool.size())
+	_assert(pool.size() == 20, "7a: 奖励池20种（实际=%d）" % pool.size())
 
 	# 每个奖励都有 tier 字段，且只允许 normal/elite 两种值
 	for i in range(pool.size()):
@@ -276,8 +279,8 @@ func _test_reward_ui_pool() -> void:
 		_assert(not rid in ids_seen, "7g%d: 奖励id不重复=%s" % [i, rid])
 		ids_seen.append(rid)
 
-	# 检查 13 种 id 都存在
-	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2", "lifesteal", "soul_slash", "spring"]
+	# 检查所有 id 都存在
+	var expected_ids := ["blade_power", "charge_bonus", "shield_wall", "regen", "clone", "swift", "protect", "vitality", "blade_power_2", "regen_2", "swift_2", "vitality_2", "protect_2", "lifesteal", "soul_slash", "spring", "immortal_medal", "pojun", "bati", "niepan"]
 	for eid in expected_ids:
 		_assert(eid in ids_seen, "7h: 奖励id=%s 存在" % eid)
 
@@ -285,7 +288,7 @@ func _test_reward_ui_pool() -> void:
 	_assert(not "energy_cap" in ids_seen, "7h1: energy_cap 已删除")
 	_assert(not "energy_cap_2" in ids_seen, "7h2: energy_cap_2 已删除")
 
-	# normal 池 9 种，elite 池 7 种
+	# normal 池 11 种（含回生回归+免死金牌），elite 池 9 种（含破军/霸体/涅槃+再生unique）
 	var normal_count := 0
 	var elite_count := 0
 	for r in pool:
@@ -293,10 +296,10 @@ func _test_reward_ui_pool() -> void:
 			elite_count += 1
 		else:
 			normal_count += 1
-	_assert(normal_count == 9, "7i: normal池9种（实际=%d）" % normal_count)
-	_assert(elite_count == 7, "7j: elite池7种（实际=%d）" % elite_count)
+	_assert(normal_count == 11, "7i: normal池11种（实际=%d）" % normal_count)
+	_assert(elite_count == 9, "7j: elite池9种（实际=%d）" % elite_count)
 
-	# unique 字段校验：蓄锐/坚壁/回生/影分身/嗜血/斩魂/回春 必须为 unique
+	# unique 字段校验：蓄锐/坚壁/回生/再生/影分身/嗜血/斩魂/回春/免死金牌/破军/霸体/涅槃 必须为 unique
 	var unique_map := {}
 	for r in pool:
 		if r.get("unique", false):
@@ -304,11 +307,16 @@ func _test_reward_ui_pool() -> void:
 	_assert(unique_map.has("charge_bonus"), "7k: charge_bonus 为唯一祝福")
 	_assert(unique_map.has("shield_wall"), "7l: shield_wall 为唯一祝福")
 	_assert(unique_map.has("regen"), "7m: regen 为唯一祝福")
+	_assert(unique_map.has("regen_2"), "7m0: regen_2 为唯一祝福")
 	_assert(unique_map.has("clone"), "7m2: clone 为唯一祝福")
 	_assert(unique_map.has("lifesteal"), "7m3: lifesteal 为唯一祝福")
 	_assert(unique_map.has("soul_slash"), "7m4: soul_slash 为唯一祝福")
 	_assert(unique_map.has("spring"), "7m5: spring 为唯一祝福")
-	_assert(unique_map.size() == 7, "7n: 唯一祝福共7个（实际=%d）" % unique_map.size())
+	_assert(unique_map.has("immortal_medal"), "7m6: immortal_medal 为唯一祝福")
+	_assert(unique_map.has("pojun"), "7m7: pojun 为唯一祝福")
+	_assert(unique_map.has("bati"), "7m8: bati 为唯一祝福")
+	_assert(unique_map.has("niepan"), "7m9: niepan 为唯一祝福")
+	_assert(unique_map.size() == 12, "7n: 唯一祝福共12个（实际=%d）" % unique_map.size())
 
 	ui.queue_free()
 
@@ -557,6 +565,27 @@ func _test_all_buff_types_inject() -> void:
 	player.shield = 0
 	_apply_single_buff(player, { "id": "protect_2", "value": 5 })
 	_assert(player.shield == 5, "10t: protect_2注入")
+
+	# ── 新增祝福注入验证 ──
+	# immortal_medal（免死金牌）：一次性被动
+	player.immortal_medal = false
+	_apply_single_buff(player, { "id": "immortal_medal", "value": 1.0 })
+	_assert(player.immortal_medal == true, "10u: immortal_medal注入")
+
+	# pojun（破军）：普攻可暴击
+	player.pojun_active = false
+	_apply_single_buff(player, { "id": "pojun", "value": 1.0 })
+	_assert(player.pojun_active == true, "10v: pojun注入")
+
+	# bati（霸体）：免疫控制
+	player.bati_active = false
+	_apply_single_buff(player, { "id": "bati", "value": 1.0 })
+	_assert(player.bati_active == true, "10w: bati注入")
+
+	# niepan（涅槃）：死亡半血重生
+	player.niepan_active = false
+	_apply_single_buff(player, { "id": "niepan", "value": 1.0 })
+	_assert(player.niepan_active == true, "10x: niepan注入")
 
 	tower.queue_free()
 
@@ -814,6 +843,14 @@ func _apply_single_buff(p: PlayerState, buff: Dictionary) -> void:
 		"vitality", "vitality_2":
 			p.max_hp_bonus += buff.get("value", 3)
 			p.hp += buff.get("value", 3)
+		"immortal_medal":
+			p.immortal_medal = true
+		"pojun":
+			p.pojun_active = true
+		"bati":
+			p.bati_active = true
+		"niepan":
+			p.niepan_active = true
 
 func _assert(cond: bool, msg: String) -> void:
 	if cond:
@@ -823,3 +860,182 @@ func _assert(cond: bool, msg: String) -> void:
 		_fail_count += 1
 		push_error("FAIL: " + msg)
 		print("FAIL: " + msg)
+
+## 测试13：破军祝福 — 普攻可暴击（50%概率双倍伤害）
+func _test_pojun_crit() -> void:
+	print("--- 破军普攻暴击 ---")
+	var char_data := load("res://resources/characters/漩涡鸣人（疾风传）.tres") as CharacterData
+	var attacker := PlayerState.new(0, "攻击者", char_data, true)
+	var target := PlayerState.new(1, "目标", char_data, false)
+	attacker.pojun_active = true
+
+	# 构建普攻效果（value=1）
+	var effect := SkillEffect.new()
+	effect.effect_type = SkillEffect.EffectType.DAMAGE
+	effect.value = 1.0
+	effect.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+
+	var dist := DistanceSystem.new()
+	dist.setup([0, 1])
+
+	# 多次测试：暴击概率约50%，伤害应为1或2
+	var crit_count := 0
+	var non_crit_count := 0
+	for _i in range(100):
+		target.hp = target.get_max_hp()
+		var hp_before := target.hp
+		RoundResolver.apply_effect_standalone(effect, attacker, target, dist, 0, false, "普攻")
+		var dmg := hp_before - target.hp
+		if dmg == 2.0:
+			crit_count += 1
+		elif dmg == 1.0:
+			non_crit_count += 1
+		else:
+			_assert(false, "13a: 破军普攻伤害异常=%.1f" % dmg)
+			return
+	# 暴击应出现（概率约50%，100次中应有暴击）
+	_assert(crit_count > 0, "13b: 破军暴击出现过（%d/100）" % crit_count)
+	_assert(non_crit_count > 0, "13c: 破军未暴击也出现过（%d/100）" % non_crit_count)
+
+	# 非普攻技能不触发破军暴击
+	attacker.pojun_active = true
+	var effect2 := SkillEffect.new()
+	effect2.effect_type = SkillEffect.EffectType.DAMAGE
+	effect2.value = 1.0
+	effect2.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+	var crit_non_basic := 0
+	for _i in range(100):
+		target.hp = target.get_max_hp()
+		var hp_before := target.hp
+		RoundResolver.apply_effect_standalone(effect2, attacker, target, dist, 0, false, "螺旋丸")
+		var dmg := hp_before - target.hp
+		if dmg == 2.0:
+			crit_non_basic += 1
+	# 非普攻不应触发破军暴击（伤害恒为1）
+	_assert(crit_non_basic == 0, "13d: 非普攻技能不触发破军暴击（暴击次数=%d）" % crit_non_basic)
+
+	# 未持有破军时普攻不暴击
+	attacker.pojun_active = false
+	var crit_no_pojun := 0
+	for _i in range(100):
+		target.hp = target.get_max_hp()
+		var hp_before := target.hp
+		RoundResolver.apply_effect_standalone(effect, attacker, target, dist, 0, false, "普攻")
+		var dmg := hp_before - target.hp
+		if dmg == 2.0:
+			crit_no_pojun += 1
+	_assert(crit_no_pojun == 0, "13e: 无破军时普攻不暴击（暴击次数=%d）" % crit_no_pojun)
+
+## 测试14：霸体祝福 — 免疫麻痹/击飞/封技
+func _test_bati_immune() -> void:
+	print("--- 霸体免疫控制 ---")
+	var char_data := load("res://resources/characters/漩涡鸣人（疾风传）.tres") as CharacterData
+	var attacker := PlayerState.new(0, "攻击者", char_data, true)
+	var target := PlayerState.new(1, "目标", char_data, false)
+	target.bati_active = true
+
+	var dist := DistanceSystem.new()
+	dist.setup([0, 1])
+
+	# 麻痹免疫
+	var paralyze_effect := SkillEffect.new()
+	paralyze_effect.effect_type = SkillEffect.EffectType.PARALYZE
+	paralyze_effect.value = 2
+	paralyze_effect.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+	var res_p := RoundResolver.apply_effect_standalone(paralyze_effect, attacker, target, dist)
+	_assert(target.paralyze_turns == 0, "14a: 霸体免疫麻痹（剩余=%d）" % target.paralyze_turns)
+	_assert(res_p.get("bati", false) == true, "14b: 麻痹返回bati标记")
+
+	# 击飞免疫
+	var knockdown_effect := SkillEffect.new()
+	knockdown_effect.effect_type = SkillEffect.EffectType.KNOCKDOWN
+	knockdown_effect.value = 2
+	knockdown_effect.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+	var res_k := RoundResolver.apply_effect_standalone(knockdown_effect, attacker, target, dist)
+	_assert(target.knockdown_turns == 0, "14c: 霸体免疫击飞（剩余=%d）" % target.knockdown_turns)
+	_assert(res_k.get("bati", false) == true, "14d: 击飞返回bati标记")
+
+	# 封技免疫
+	var disable_effect := SkillEffect.new()
+	disable_effect.effect_type = SkillEffect.EffectType.DISABLE_SKILL
+	disable_effect.value = 2
+	disable_effect.target = SkillEffect.EffectTarget.ENEMY_SINGLE
+	var res_d := RoundResolver.apply_effect_standalone(disable_effect, attacker, target, dist)
+	_assert(target.skill_disabled_turns == 0, "14e: 霸体免疫封技（剩余=%d）" % target.skill_disabled_turns)
+	_assert(res_d.get("bati", false) == true, "14f: 封技返回bati标记")
+
+	# 无霸体时正常受控
+	target.bati_active = false
+	RoundResolver.apply_effect_standalone(paralyze_effect, attacker, target, dist)
+	_assert(target.paralyze_turns == 2, "14g: 无霸体时正常受麻痹（剩余=%d）" % target.paralyze_turns)
+
+## 测试15：免死金牌 + 涅槃 — 死亡保护
+func _test_death_protection() -> void:
+	print("--- 死亡保护：免死金牌/涅槃 ---")
+	var gm := GameManager
+	var char_data := load("res://resources/characters/漩涡鸣人（疾风传）.tres") as CharacterData
+
+	SceneManager.last_tower_config.erase("tower_buffs")
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
+	SceneManager.last_tower_config["players"] = [
+		{ "character": char_data, "is_human": true },
+	]
+	SceneManager.last_tower_config["tower_mode"] = true
+
+	var tower := TowerManager.new()
+	add_child(tower)
+	tower.start_tower([{ "character": char_data, "is_human": true }])
+	await get_tree().process_frame
+
+	var player := _get_player(gm)
+	_assert(player != null, "15a: 玩家存在")
+	if player == null:
+		tower.queue_free()
+		return
+
+	# ── 免死金牌：HP归零时保留1血 ──
+	player.immortal_medal = true
+	player.hp = 0.0
+	var protected: bool = gm.call("_try_tower_death_protection", player)
+	_assert(protected == true, "15b: 免死金牌触发保护")
+	_assert(player.hp == 1.0, "15c: 免死金牌后HP=1（实际=%.1f）" % player.hp)
+	_assert(player.immortal_medal == false, "15d: 免死金牌触发后标记清除")
+	_assert(player.is_alive == true, "15e: 免死金牌后仍存活")
+
+	# ── 涅槃：HP归零时半血重生 ──
+	player.niepan_active = true
+	player.hp = 0.0
+	var protected2: bool = gm.call("_try_tower_death_protection", player)
+	_assert(protected2 == true, "15f: 涅槃触发保护")
+	_assert(player.hp == player.get_max_hp() * 0.5, "15g: 涅槃后半血（实际=%.1f，期望=%.1f）" % [player.hp, player.get_max_hp() * 0.5])
+	_assert(player.niepan_active == false, "15h: 涅槃触发后标记清除")
+	_assert(player.is_alive == true, "15i: 涅槃后仍存活")
+
+	# ── 两者同时持有时：先消耗免死金牌 ──
+	player.immortal_medal = true
+	player.niepan_active = true
+	player.hp = 0.0
+	gm.call("_try_tower_death_protection", player)
+	_assert(player.hp == 1.0, "15j: 免死金牌优先于涅槃（HP=1）")
+	_assert(player.immortal_medal == false, "15k: 免死金牌先消耗")
+	_assert(player.niepan_active == true, "15l: 涅槃未消耗（保留）")
+
+	# ── 无祝福时HP归零不保护 ──
+	player.immortal_medal = false
+	player.niepan_active = false
+	player.hp = 0.0
+	var protected3: bool = gm.call("_try_tower_death_protection", player)
+	_assert(protected3 == false, "15m: 无祝福时不触发保护")
+
+	# ── HP>0时不触发 ──
+	player.immortal_medal = true
+	player.hp = 5.0
+	var protected4: bool = gm.call("_try_tower_death_protection", player)
+	_assert(protected4 == false, "15n: HP>0时不触发免死金牌")
+	_assert(player.immortal_medal == true, "15o: HP>0时标记不消耗")
+
+	# 清理
+	SceneManager.last_tower_config.erase("tower_buffs_per_player")
+	SceneManager.last_tower_config.erase("players")
+	SceneManager.last_tower_config.erase("tower_mode")
+	tower.queue_free()

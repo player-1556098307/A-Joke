@@ -124,7 +124,7 @@ static func apply_effects(
 				for tgt in targets:
 					var dist := distance_system.get_distance(attacker.player_id, tgt.player_id)
 					if dist >= skill.min_range and dist <= skill.max_range:
-						var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage)
+						var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage, skill.skill_name)
 						logs.append({
 							"attacker_id": attacker.player_id,
 							"target_id":   tgt.player_id,
@@ -137,7 +137,7 @@ static func apply_effects(
 			SkillEffect.EffectTarget.ENEMY_SPLASH:
 				# 溵射目标由 game_manager 按 splash_range 预计算，此处直接应用
 				for tgt in splash_targets:
-					var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage)
+					var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage, skill.skill_name)
 					logs.append({
 						"attacker_id": attacker.player_id,
 						"target_id":   tgt.player_id,
@@ -267,9 +267,10 @@ static func apply_effect_standalone(
 	target: PlayerState,
 	distance_system: DistanceSystem,
 	bonus_if_paralyzed: int = 0,
-	has_damage: bool = false
+	has_damage: bool = false,
+	p_skill_name: String = ""
 ) -> Dictionary:
-	return _apply_single_effect(effect, attacker, target, distance_system, bonus_if_paralyzed, has_damage)
+	return _apply_single_effect(effect, attacker, target, distance_system, bonus_if_paralyzed, has_damage, p_skill_name)
 
 ## 应用单个技能效果到目标，处理伤害吸收链：无敌 → 防反 → 影分身 → 无限盾 → 数值盾 → HP
 ## has_damage：当前技能是否包含伤害效果（防反只免疫伴随伤害的攻击的控制，纯控制技能正常生效）
@@ -279,7 +280,8 @@ static func _apply_single_effect(
 	target: PlayerState,
 	distance_system: DistanceSystem,
 	bonus_if_paralyzed: int = 0,
-	has_damage: bool = false
+	has_damage: bool = false,
+	p_skill_name: String = ""
 ) -> Dictionary:
 	match effect.effect_type:
 		SkillEffect.EffectType.DAMAGE:
@@ -305,6 +307,13 @@ static func _apply_single_effect(
 			raw *= crit["multiplier"]
 			# ── 慈悲尖塔 buff：普攻固定增伤（锋刃之力）──
 			raw += attacker.damage_bonus_basic
+			# ── 慈悲尖塔祝福：破军（普攻可暴击，50%概率双倍伤害）──
+			# 仅普攻触发，不与希耶尔暴击叠加（希耶尔走 crit_check）
+			var pojun_crit: bool = false
+			if not crit["crit"] and attacker.pojun_active and p_skill_name == "普攻":
+				if randf() < 0.5:
+					raw *= 2.0
+					pojun_crit = true
 			var dmg: float = raw
 			var absorbed: float = 0.0
 			var clone_broken: bool = false
@@ -357,7 +366,7 @@ static func _apply_single_effect(
 				attacker.can_crit_next = true
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
 			_apply_lifesteal(attacker, dmg)
-			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
+			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"] or pojun_crit, "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.TRUE_DAMAGE:
 			# 真实伤害：无视护盾/圣盾（全挡护盾），仅此而已。
@@ -496,6 +505,9 @@ static func _apply_single_effect(
 			# 无敌状态：免疫控制
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "turns": target.paralyze_turns, "counter_immune": true, "invincible": true }
+			# 霸体（慈悲尖塔祝福）：免疫一切控制效果
+			if target.bati_active:
+				return { "turns": target.paralyze_turns, "counter_immune": true, "bati": true }
 			# 谋略（司马懿）：免疫判定效果
 			if is_strategist(target):
 				return { "turns": target.paralyze_turns, "counter_immune": true }
@@ -509,6 +521,9 @@ static func _apply_single_effect(
 			# 无敌状态：免疫控制
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "disabled_turns": target.skill_disabled_turns, "counter_immune": true, "invincible": true }
+			# 霸体（慈悲尖塔祝福）：免疫一切控制效果
+			if target.bati_active:
+				return { "disabled_turns": target.skill_disabled_turns, "counter_immune": true, "bati": true }
 			# 谋略（司马懿）：免疫判定效果
 			if is_strategist(target):
 				return { "disabled_turns": target.skill_disabled_turns, "counter_immune": true }
@@ -522,6 +537,9 @@ static func _apply_single_effect(
 			# 无敌状态：免疫控制
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
 				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true, "invincible": true }
+			# 霸体（慈悲尖塔祝福）：免疫一切控制效果
+			if target.bati_active:
+				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true, "bati": true }
 			# 谋略（司马懿）：免疫判定效果
 			if is_strategist(target):
 				return { "knockdown_turns": target.knockdown_turns, "counter_immune": true }
@@ -628,6 +646,9 @@ static func _apply_single_effect(
 
 		SkillEffect.EffectType.UNTARGETABLE:
 			# 无法选择：value=持续回合数，期间其他玩家任何技能无法指定该玩家为目标
+			# 霸体（慈悲尖塔祝福）：免疫一切控制效果
+			if target.bati_active:
+				return { "untargetable_turns": target.untargetable_turns, "counter_immune": true, "bati": true }
 			# 谋略（司马懿）：免疫判定效果
 			if is_strategist(target):
 				return { "untargetable_turns": target.untargetable_turns, "counter_immune": true }

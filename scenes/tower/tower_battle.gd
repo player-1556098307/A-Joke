@@ -258,6 +258,18 @@ func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
 		"spring":
 			# 一次性技能祝福：将回春技能副本加入 unlocked_skills（防重复）
 			_add_limited_skill_buff(p, "回春", "res://resources/characters/skills/回春.tres")
+		"immortal_medal":
+			# 免死金牌：一次性被动，免疫一次致命伤害
+			p.immortal_medal = true
+		"pojun":
+			# 破军：普攻可暴击
+			p.pojun_active = true
+		"bati":
+			# 霸体：免疫一切控制效果
+			p.bati_active = true
+		"niepan":
+			# 涅槃：死亡时以半血重生（一次性被动）
+			p.niepan_active = true
 
 ## 后期小怪攻击力强化：第3-4轮小怪普攻增伤
 func _inject_enemy_attack_bonus() -> void:
@@ -270,10 +282,11 @@ func _inject_enemy_attack_bonus() -> void:
 			continue
 		p.damage_bonus_basic += atk_bonus
 
-## 换层前清理已消耗的一次性技能祝福
+## 换层前清理已消耗的一次性祝福
 ## 斩魂/回春是消耗品：用完一次永久失效，从持久化 buff 列表移除 → 祝福池可再次随机到
+## 免死金牌/涅槃是一次性被动：触发后消费（medal_used/niepan_used 标记）同样移除回池
 func _cleanup_consumed_limited_buffs() -> void:
-	var consumed_buff_ids := { "soul_slash": true, "spring": true }
+	var consumed_buff_ids := { "soul_slash": true, "spring": true, "immortal_medal": true, "niepan": true }
 	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
 	if per_player.is_empty():
 		return
@@ -292,7 +305,7 @@ func _cleanup_consumed_limited_buffs() -> void:
 		if team_idx >= per_player.size() or not (per_player[team_idx] is Array):
 			continue
 		var buffs: Array = per_player[team_idx]
-		# 检查该玩家是否有已使用的限定技祝福
+		# 检查该玩家是否有已使用/已触发的限定技祝福
 		var to_remove := []
 		for b in buffs:
 			if not (b is Dictionary):
@@ -300,9 +313,17 @@ func _cleanup_consumed_limited_buffs() -> void:
 			var bid: String = b.get("id", "")
 			if not consumed_buff_ids.has(bid):
 				continue
-			# 查对应技能名是否在 limited_skills_used 中
-			var skill_name: String = "斩魂" if bid == "soul_slash" else "回春"
-			if skill_name in p.limited_skills_used:
+			var consumed: bool = false
+			match bid:
+				"soul_slash":
+					consumed = "斩魂" in p.limited_skills_used
+				"spring":
+					consumed = "回春" in p.limited_skills_used
+				"immortal_medal":
+					consumed = not p.immortal_medal  # 触发后标记被清除
+				"niepan":
+					consumed = not p.niepan_active
+			if consumed:
 				to_remove.append(b)
 		for b in to_remove:
 			buffs.erase(b)

@@ -175,6 +175,14 @@ var max_hp_bonus: float = 0.0
 var start_energy_bonus: int = 0
 ## 吸血（嗜血祝福：造成伤害时恢复 N 点生命值，不超过上限）
 var lifesteal_per_hit: float = 0.0
+## 免死金牌（一次性被动：免疫一次致命伤害，触发后标记消费）
+var immortal_medal: bool = false
+## 破军（普攻可暴击，50%概率双倍伤害）
+var pojun_active: bool = false
+## 霸体（免疫一切控制效果：麻痹/击飞/封技/无法选择）
+var bati_active: bool = false
+## 涅槃（一次性被动：死亡时以半血重生，触发后标记消费）
+var niepan_active: bool = false
 
 ## 有效最大生命值 = 角色基础 + 慈悲尖塔 buff 加成（不污染共享 CharacterData 资源）
 func get_max_hp() -> float:
@@ -212,6 +220,10 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	max_hp_bonus        = 0.0
 	start_energy_bonus  = 0
 	lifesteal_per_hit   = 0.0
+	immortal_medal      = false
+	pojun_active        = false
+	bati_active         = false
+	niepan_active       = false
 	pending_skill_index = -1
 	# 秽土柱间·仙人之力：气上限6
 	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
@@ -367,6 +379,10 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"max_hp_bonus": max_hp_bonus,
 		"start_energy_bonus": start_energy_bonus,
 		"lifesteal_per_hit": lifesteal_per_hit,
+		"immortal_medal": immortal_medal,
+		"pojun_active": pojun_active,
+		"bati_active": bati_active,
+		"niepan_active": niepan_active,
 		"blade_stage": blade_stage,
 		"fury_marks": fury_marks,
 		"action_points": action_points,
@@ -440,6 +456,10 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	max_hp_bonus             = snap.get("max_hp_bonus", max_hp_bonus)
 	start_energy_bonus       = snap.get("start_energy_bonus", start_energy_bonus)
 	lifesteal_per_hit        = snap.get("lifesteal_per_hit", lifesteal_per_hit)
+	immortal_medal           = snap.get("immortal_medal", immortal_medal)
+	pojun_active             = snap.get("pojun_active", pojun_active)
+	bati_active              = snap.get("bati_active", bati_active)
+	niepan_active            = snap.get("niepan_active", niepan_active)
 	blade_stage              = snap.get("blade_stage", blade_stage)
 	fury_marks               = snap.get("fury_marks", fury_marks)
 	action_points            = snap.get("action_points", action_points)

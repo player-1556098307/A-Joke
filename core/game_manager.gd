@@ -95,6 +95,8 @@ signal skill_lost(player_id: int, skill_name: String)
 signal hp_payment_made(player_id: int, hp_paid: float)
 ## 燃烧/狂战士扣血
 signal burn_damage_triggered(player_id: int, damage: float, remaining_hp: float, reason: String)
+## 慈悲尖塔祝福触发：免死金牌/涅槃（一次性被动）
+signal tower_blessing_triggered(player_id: int, blessing_name: String)
 
 ## ── 波风水门专属信号 ───────────────────────────────────────────
 ## 飞雷神标记数量变化
@@ -2443,11 +2445,36 @@ func _process_burn_and_berserker() -> void:
 ## 血付决策：人类玩家在 UI 弹窗选择，AI 在 ai_controller.decide_action 中直接设置
 ## pending_hp_payment；结算在 _apply_actions（能量校验前）统一处理
 
+## 慈悲尖塔死亡保护：免死金牌（免疫致命伤，保留1血）→ 涅槃（半血重生）
+## 两者均为一次性被动；返回 true 表示已触发保护（该玩家不淘汰）
+func _try_tower_death_protection(player: PlayerState) -> bool:
+	if not _is_tower_mode or player == null or not player.is_alive or player.hp > 0:
+		return false
+	# 免死金牌优先：免疫一次致命伤害，血量保留为1（不死亡）
+	if player.immortal_medal:
+		player.immortal_medal = false
+		player.hp = 1.0
+		# 立即将玩家移出距离系统？不需要：死亡保护未淘汰，保持在场
+		tower_blessing_triggered.emit(player.player_id, "免死金牌")
+		print("[塔] %s 触发免死金牌，保留1血存活" % player.player_name)
+		return true
+	# 涅槃：以半血重生
+	if player.niepan_active:
+		player.niepan_active = false
+		player.hp = player.get_max_hp() * 0.5
+		tower_blessing_triggered.emit(player.player_id, "涅槃")
+		print("[塔] %s 触发涅槃，半血复活（%.1f）" % [player.player_name, player.hp])
+		return true
+	return false
+
 ## 检测淘汰：HP<=0的玩家标记死亡、从距离系统移除、发射淘汰信号
 ## 别天神夺舍：止水击杀时若满足条件触发弹窗/自动夺舍；夺舍体死亡时回退到夺舍前状态
 func _check_elimination() -> void:
 	for player in _players:
 		if player.is_alive and player.hp <= 0:
+			# ── 慈悲尖塔祝福：免死金牌 / 涅槃（死亡保护，先于淘汰判定）──
+			if _try_tower_death_protection(player):
+				continue
 			# 夺舍体死亡：回退到夺舍前止水状态（不淘汰、不终止游戏）
 			if _revert_takeover_if_needed(player):
 				continue
@@ -2633,6 +2660,9 @@ func _end_round() -> void:
 	# 九尾伤害后检测淘汰
 	for player in _players:
 		if player.is_alive and player.hp <= 0:
+			# ── 慈悲尖塔祝福：免死金牌 / 涅槃（死亡保护，先于淘汰判定）──
+			if _try_tower_death_protection(player):
+				continue
 			# 宙斯召唤物死亡爆炸
 			if _is_mutant(player) or _is_clodia(player):
 				_process_zeus_summon_explosion(player)
@@ -2654,6 +2684,9 @@ func _end_round() -> void:
 	# 延迟伤害后再次检测淘汰
 	for player in _players:
 		if player.is_alive and player.hp <= 0:
+			# ── 慈悲尖塔祝福：免死金牌 / 涅槃（死亡保护，先于淘汰判定）──
+			if _try_tower_death_protection(player):
+				continue
 			# 宙斯召唤物死亡爆炸
 			if _is_mutant(player) or _is_clodia(player):
 				_process_zeus_summon_explosion(player)
