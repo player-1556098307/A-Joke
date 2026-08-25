@@ -50,6 +50,7 @@ static func from_dict(data: Dictionary) -> MatchRecord:
 		ps.max_hp = d.get("max_hp", 0.0)
 		ps.total_damage_dealt = d.get("total_damage_dealt", 0.0)
 		ps.total_damage_taken = d.get("total_damage_taken", 0.0)
+		ps.total_damage_blocked = d.get("total_damage_blocked", 0.0)
 		ps.total_healing = d.get("total_healing", 0.0)
 		ps.skill_use_count = d.get("skill_use_count", 0)
 		ps.charge_count = d.get("charge_count", 0)

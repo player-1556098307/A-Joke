@@ -1199,6 +1199,9 @@ func _process_tower_regen(player: PlayerState) -> void:
 	var heal: float = min(player.regen_per_round, player.get_max_hp() - player.hp)
 	if heal > 0:
 		player.hp += heal
+		var r_stats: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
+		if r_stats:
+			r_stats.total_healing += heal
 		burn_damage_triggered.emit(player.player_id, -heal, player.hp, "回生")
 
 ## 执行胜者行动：CHARGE充能（含影分身加成）或 USE_SKILL释放技能
@@ -1961,8 +1964,11 @@ func _apply_glory_takeover(caster: PlayerState, target: PlayerState) -> void:
 		var t_stats: PlayerMatchStats = _match_record.player_stats.get(target.player_id)
 		if t_stats:
 			t_stats.total_damage_taken += dmg
-
-	# 回合主转移：本回合行动权归泉奈
+	# 抵挡伤害统计：被护盾/分身/无敌吸收的量
+	if absorbed > 0:
+		var t_stats2: PlayerMatchStats = _match_record.player_stats.get(target.player_id)
+		if t_stats2:
+			t_stats2.total_damage_blocked += absorbed
 	_sole_winner_id = caster.player_id
 	# 目标本回合行动权被剥夺
 	glory_takeover.emit(caster.player_id, target.player_id, dmg, absorbed, clone_broken)
@@ -2440,10 +2446,16 @@ func _process_burn_and_berserker() -> void:
 		# 燃烧扣血（HP>1保护）
 		if player.burning and player.hp > 1:
 			player.hp -= 1.0
+			var b_stats: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
+			if b_stats:
+				b_stats.total_damage_taken += 1.0
 			burn_damage_triggered.emit(player.player_id, 1.0, player.hp, "燃烧")
 		# 狂战士扣血（本回合受过伤害，可致死）
 		if player.berserker and player.took_damage_this_round:
 			player.hp = max(0.0, player.hp - 1.0)
+			var z_stats: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
+			if z_stats:
+				z_stats.total_damage_taken += 1.0
 			burn_damage_triggered.emit(player.player_id, 1.0, player.hp, "狂战士")
 
 
@@ -2845,6 +2857,12 @@ func _apply_delayed_damage(player: PlayerState, damage: float, attacker_id: int 
 		var v_stats: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
 		if v_stats:
 			v_stats.total_damage_taken += dmg
+	# 抵挡伤害统计：被防反/分身/护盾/无敌吸收的量
+	var blocked := damage - dmg
+	if blocked > 0:
+		var v_stats2: PlayerMatchStats = _match_record.player_stats.get(player.player_id)
+		if v_stats2:
+			v_stats2.total_damage_blocked += blocked
 	if clone_broken:
 		clone_destroyed.emit(player.player_id)
 	delayed_damage_triggered.emit(player.player_id, dmg, player.hp)
@@ -2945,18 +2963,24 @@ func _record_action(winner: PlayerState, skill: SkillData, logs: Array[Dictionar
 				var t_stats: PlayerMatchStats = _match_record.player_stats.get(tid)
 				if t_stats:
 					t_stats.total_damage_taken += res.get("damage_dealt", 0)
+					t_stats.total_damage_blocked += res.get("damage_blocked", 0.0)
+				stats.total_healing += res.get("lifesteal_heal", 0.0)
 			SkillEffect.EffectType.TRUE_DAMAGE:
 				stats.total_damage_dealt += res.get("damage_dealt", 0)
 				var tid: int = entry.get("target_id", -1)
 				var t_stats: PlayerMatchStats = _match_record.player_stats.get(tid)
 				if t_stats:
 					t_stats.total_damage_taken += res.get("damage_dealt", 0)
+					t_stats.total_damage_blocked += res.get("damage_blocked", 0.0)
+				stats.total_healing += res.get("lifesteal_heal", 0.0)
 			SkillEffect.EffectType.PIERCE_DAMAGE:
 				stats.total_damage_dealt += res.get("damage_dealt", 0)
 				var tid: int = entry.get("target_id", -1)
 				var t_stats: PlayerMatchStats = _match_record.player_stats.get(tid)
 				if t_stats:
 					t_stats.total_damage_taken += res.get("damage_dealt", 0)
+					t_stats.total_damage_blocked += res.get("damage_blocked", 0.0)
+				stats.total_healing += res.get("lifesteal_heal", 0.0)
 			SkillEffect.EffectType.DEATH_SENTENCE:
 				stats.total_damage_dealt += res.get("damage_dealt", 0)
 				stats.total_healing += res.get("total_heal", 0)
@@ -2964,6 +2988,7 @@ func _record_action(winner: PlayerState, skill: SkillData, logs: Array[Dictionar
 				var t_stats: PlayerMatchStats = _match_record.player_stats.get(tid)
 				if t_stats:
 					t_stats.total_damage_taken += res.get("damage_dealt", 0)
+					t_stats.total_damage_blocked += res.get("damage_blocked", 0.0)
 			SkillEffect.EffectType.HEAL:
 				stats.total_healing += res.get("heal_amount", 0)
 			SkillEffect.EffectType.PARALYZE:
@@ -2983,6 +3008,7 @@ func _record_action(winner: PlayerState, skill: SkillData, logs: Array[Dictionar
 				var t_stats: PlayerMatchStats = _match_record.player_stats.get(tid)
 				if t_stats:
 					t_stats.total_damage_taken += res.get("damage_dealt", 0)
+					t_stats.total_damage_blocked += res.get("damage_blocked", 0.0)
 	# Build ActionLog for snapshot
 	var alog := ActionLog.new()
 	alog.actor_id = winner.player_id
@@ -3522,6 +3548,9 @@ func _process_zeus_summon_explosion(summon: PlayerState) -> void:
 	var damage := 1 if _is_mutant(summon) else 3
 	# 爆炸伤害走真实伤害（直接扣HP，不经过吸收链）
 	zeus.hp = max(0.0, zeus.hp - float(damage))
+	var z_stats: PlayerMatchStats = _match_record.player_stats.get(zeus.player_id)
+	if z_stats:
+		z_stats.total_damage_taken += float(damage)
 	zeus_summon_destroyed.emit(summon.player_id, damage, zeus.player_id)
 	burn_damage_triggered.emit(zeus.player_id, float(damage), zeus.hp, "召唤物爆炸")
 
@@ -3714,6 +3743,12 @@ func _apply_nine_tails_damage(target: PlayerState, damage: float, caster: Player
 		var v_stats: PlayerMatchStats = _match_record.player_stats.get(target.player_id)
 		if v_stats:
 			v_stats.total_damage_taken += dmg
+	# 抵挡伤害统计
+	var nt_blocked := damage - dmg
+	if nt_blocked > 0:
+		var v_stats2: PlayerMatchStats = _match_record.player_stats.get(target.player_id)
+		if v_stats2:
+			v_stats2.total_damage_blocked += nt_blocked
 
 
 ## ── 飞雷神换位/闪避拦截逻辑 ──────────────────────────────────────────────────

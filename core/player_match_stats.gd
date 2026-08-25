@@ -11,7 +11,8 @@ var final_hp: float                        ## 最终生命值
 var max_hp: float                          ## 最大生命值
 var total_damage_dealt: float = 0.0       ## 造成的总伤害
 var total_damage_taken: float = 0.0       ## 承受的总伤害
-var total_healing: float = 0.0             ## 总治疗量
+var total_damage_blocked: float = 0.0     ## 抵挡的总伤害（护盾/分身/减伤/防反减免）
+var total_healing: float = 0.0             ## 总治疗量（含吸血/回生/技能回血）
 var skill_use_count: int = 0             ## 使用技能次数
 var charge_count: int = 0                ## 充能次数
 var win_count: int = 0                   ## 猜拳胜出次数
@@ -34,6 +35,7 @@ func to_dict() -> Dictionary:
 		"max_hp": max_hp,
 		"total_damage_dealt": total_damage_dealt,
 		"total_damage_taken": total_damage_taken,
+		"total_damage_blocked": total_damage_blocked,
 		"total_healing": total_healing,
 		"skill_use_count": skill_use_count,
 		"charge_count": charge_count,

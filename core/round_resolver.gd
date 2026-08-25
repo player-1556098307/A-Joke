@@ -287,7 +287,7 @@ static func _apply_single_effect(
 		SkillEffect.EffectType.DAMAGE:
 			# 无敌状态：完全免疫伤害（包括九尾无敌）
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
-				return { "damage_dealt": 0, "shield_absorbed": effect.value, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "invincible": true }
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "invincible": true }
 			var raw := effect.value
 			# 禁锢增伤：施法瞬间目标已禁锢则额外伤害（effect 优先，兼容 skill 级配置）
 			var paralyze_bonus: float = 0.0
@@ -365,15 +365,16 @@ static func _apply_single_effect(
 			if target.hp <= 0 and dmg > 0:
 				attacker.can_crit_next = true
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
-			_apply_lifesteal(attacker, dmg)
-			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"] or pojun_crit, "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
+			var ls_heal := _apply_lifesteal(attacker, dmg)
+			var dmg_blocked := raw - dmg
+			return { "damage_dealt": dmg, "shield_absorbed": absorbed, "damage_blocked": dmg_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": paralyze_bonus, "counter_damage": 1 if counter_stance_triggered else 0, "crit": crit["crit"] or pojun_crit, "multiplier": ps["multiplier"] * crit["multiplier"], "energy_gained": ps["energy_gained"], "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.TRUE_DAMAGE:
 			# 真实伤害：无视护盾/圣盾（全挡护盾），仅此而已。
 			# 无敌、伤害减免（防反/宇智波流招架）、分身等防御机制照常生效。
 			# 无敌状态：完全免疫（包括九尾无敌）
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
-				return { "damage_dealt": 0, "shield_absorbed": effect.value, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "true_damage": true, "invincible": true }
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "true_damage": true, "invincible": true }
 			var tdmg: float = effect.value
 			var clone_broken: bool = false
 			var counter_stance_triggered: bool = false
@@ -405,8 +406,9 @@ static func _apply_single_effect(
 				target.took_damage_this_round = true
 				target.last_hit_by_id = attacker.player_id
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
-			_apply_lifesteal(attacker, tdmg)
-			return { "damage_dealt": tdmg, "shield_absorbed": 0, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": 0, "counter_damage": 1 if counter_stance_triggered else 0, "true_damage": true, "uchiha_counter_triggered": uchiha_counter_triggered }
+			var ls_heal := _apply_lifesteal(attacker, tdmg)
+			var tdmg_blocked := effect.value - tdmg
+			return { "damage_dealt": tdmg, "shield_absorbed": 0, "damage_blocked": tdmg_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": clone_broken, "counter_stance_triggered": counter_stance_triggered, "paralyze_bonus": 0, "counter_damage": 1 if counter_stance_triggered else 0, "true_damage": true, "uchiha_counter_triggered": uchiha_counter_triggered }
 
 		SkillEffect.EffectType.PIERCE_DAMAGE:
 			# 穿透伤害（断头台）：无视护盾(数值/全挡)、无敌、圣盾(全挡护盾)，直接扣HP
@@ -424,15 +426,16 @@ static func _apply_single_effect(
 			if target.hp <= 0:
 				attacker.can_crit_next = true
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
-			_apply_lifesteal(attacker, pdmg)
-			return { "damage_dealt": pdmg, "shield_absorbed": 0, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "pierce_damage": true, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"] }
+			var ls_heal := _apply_lifesteal(attacker, pdmg)
+			return { "damage_dealt": pdmg, "shield_absorbed": 0, "damage_blocked": 0.0, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "pierce_damage": true, "crit": crit["crit"], "multiplier": ps["multiplier"] * crit["multiplier"] }
 
 		SkillEffect.EffectType.PERCENT_DAMAGE:
 			# 百分比伤害（慈悲尖塔一次性技能祝福：斩魂）：按目标当前生命值百分比结算
 			# 与 DAMAGE 同等的减免链（无敌/护盾/分身/防反/坚壁），仅基础值计算不同
 			if target.invincible_turns > 0 or target.nine_tails_invincible:
-				return { "damage_dealt": 0, "shield_absorbed": effect.value, "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "percent_damage": true, "invincible": true }
+				return { "damage_dealt": 0, "shield_absorbed": effect.value, "damage_blocked": float(effect.value), "remaining_hp": target.hp, "clone_destroyed": false, "counter_stance_triggered": false, "paralyze_bonus": 0, "counter_damage": 0, "percent_damage": true, "invincible": true }
 			var pct_raw: float = target.hp * effect.value
+			var pct_raw_init: float = pct_raw
 			var pct_absorbed: float = 0.0
 			var pct_clone_broken: bool = false
 			var pct_counter_triggered: bool = false
@@ -463,8 +466,9 @@ static func _apply_single_effect(
 			if target.hp <= 0 and pct_raw > 0:
 				attacker.can_crit_next = true
 			# 慈悲尖塔 buff：吸血（嗜血，造成伤害后恢复生命）
-			_apply_lifesteal(attacker, pct_raw)
-			return { "damage_dealt": pct_raw, "shield_absorbed": pct_absorbed, "remaining_hp": target.hp, "clone_destroyed": pct_clone_broken, "counter_stance_triggered": pct_counter_triggered, "paralyze_bonus": 0, "counter_damage": 1 if pct_counter_triggered else 0, "percent_damage": true }
+			var ls_heal := _apply_lifesteal(attacker, pct_raw)
+			var pct_blocked := pct_raw_init - pct_raw
+			return { "damage_dealt": pct_raw, "shield_absorbed": pct_absorbed, "damage_blocked": pct_blocked, "lifesteal_heal": ls_heal, "remaining_hp": target.hp, "clone_destroyed": pct_clone_broken, "counter_stance_triggered": pct_counter_triggered, "paralyze_bonus": 0, "counter_damage": 1 if pct_counter_triggered else 0, "percent_damage": true }
 
 		SkillEffect.EffectType.DEATH_SENTENCE:
 			# 断罪死：与目标进行7次猜拳
@@ -499,7 +503,7 @@ static func _apply_single_effect(
 				target.took_damage_this_round = true
 			if target.hp <= 0:
 				attacker.can_crit_next = true
-			return { "damage_dealt": total_dmg, "remaining_hp": target.hp, "rounds": rounds, "win_count": win_count, "lose_count": int(effect.value) - win_count, "total_heal": total_heal, "instant_kill": instant_kill }
+			return { "damage_dealt": total_dmg, "damage_blocked": 0.0, "remaining_hp": target.hp, "rounds": rounds, "win_count": win_count, "lose_count": int(effect.value) - win_count, "total_heal": total_heal, "instant_kill": instant_kill }
 
 		SkillEffect.EffectType.PARALYZE:
 			# 无敌状态：免疫控制
@@ -599,6 +603,7 @@ static func _apply_single_effect(
 		SkillEffect.EffectType.FTG_MARK:
 			# 飞雷神标记：造成0.5伤害并标记目标
 			var ftg_dmg: float = effect.value
+			var ftg_dmg_init: float = ftg_dmg
 			var ftg_counter_triggered: bool = false
 			# 无敌/防反/分身/护盾拦截同DAMAGE
 			## 被控制（麻痹/封技）期间：招架保留但不触发
@@ -606,7 +611,7 @@ static func _apply_single_effect(
 				# 无敌只免疫伤害：标记作为状态仍照常施加（与DELAYED_DAMAGE不受无敌影响一致）
 				if not target.ftg_marked_by.has(attacker.player_id):
 					target.ftg_marked_by.append(attacker.player_id)
-				return { "damage_dealt": 0, "ftg_marked": true, "remaining_hp": target.hp, "invincible": true }
+				return { "damage_dealt": 0, "damage_blocked": float(effect.value), "ftg_marked": true, "remaining_hp": target.hp, "invincible": true }
 			if target.counter_stance and not is_controlled(target):
 				ftg_dmg = ceilf(ftg_dmg / 2.0)
 				ftg_counter_triggered = true
@@ -628,7 +633,8 @@ static func _apply_single_effect(
 			# 标记目标
 			if not target.ftg_marked_by.has(attacker.player_id):
 				target.ftg_marked_by.append(attacker.player_id)
-			return { "damage_dealt": ftg_dmg, "ftg_marked": true, "remaining_hp": target.hp, "counter_stance_triggered": ftg_counter_triggered, "counter_damage": 1 if ftg_counter_triggered else 0 }
+			var ftg_blocked := ftg_dmg_init - ftg_dmg
+			return { "damage_dealt": ftg_dmg, "damage_blocked": ftg_blocked, "ftg_marked": true, "remaining_hp": target.hp, "counter_stance_triggered": ftg_counter_triggered, "counter_damage": 1 if ftg_counter_triggered else 0 }
 
 		SkillEffect.EffectType.FTG_CHARGE:
 			# 聚气：自身+1飞雷神标记
@@ -734,14 +740,15 @@ static func apply_multi_hit_damage(
 
 ## 慈悲尖塔 buff：吸血（嗜血祝福 — 造成伤害时恢复生命值）
 ## 在伤害结算后调用，按 attacker.lifesteal_per_hit 恢复（不超过最大生命值）
-static func _apply_lifesteal(attacker: PlayerState, damage_dealt: float) -> void:
+static func _apply_lifesteal(attacker: PlayerState, damage_dealt: float) -> float:
 	if attacker == null or not attacker.is_alive:
-		return
+		return 0.0
 	if damage_dealt <= 0.0:
-		return
+		return 0.0
 	var ls: float = attacker.lifesteal_per_hit
 	if ls <= 0.0:
-		return
+		return 0.0
 	var heal: float = min(ls, attacker.get_max_hp() - attacker.hp)
 	if heal > 0.0:
 		attacker.hp += heal
+	return heal

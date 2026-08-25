@@ -14,6 +14,10 @@ var _glow: ColorRect
 var _glow_base_a: float = 0.0  ## 光晕基础透明度
 var _glow_timer: float = 0.0
 var _phase: String = "idle"  ## "idle", "transition", "entry_dialogue", "battle", "exit_dialogue", "reward", "result"
+
+## 跨层战报统计累积器：每层结束时从 MatchRecord 收集 team_id=1 的玩家统计
+## key = 角色名，value = { char_name, is_human, damage_dealt, damage_taken, damage_blocked, healing, win_count }
+var _tower_stats: Dictionary = {}
 var _reward_ui: TowerRewardUI
 var _buff_btn: Button
 var _buff_panel: Panel
@@ -135,6 +139,9 @@ func _ready() -> void:
 	tower_mgr.tower_defeat.connect(_on_tower_defeat)
 	# 设为手动推进：由过渡动画+对话控制层间流程
 	tower_mgr.set_auto_advance(false)
+
+	# 监听 game_over 信号：每层结束时累积战报统计
+	GameManager.game_over.connect(_on_game_over_for_stats)
 
 	# 连接 GameManager 战斗中信号（剧情触发）
 	GameManager.player_eliminated.connect(_on_player_eliminated)
@@ -710,6 +717,46 @@ func _proceed_to_next_floor() -> void:
 	_transition.start(next_floor, enemy_name, entry_dlg)
 
 # ============================================================
+#  跨层战报统计
+# ============================================================
+
+## 每层 game_over 信号触发时：收集 team_id=1 玩家统计到累积器
+func _on_game_over_for_stats(_winner_id: int, record: MatchRecord) -> void:
+	if record == null:
+		return
+	for pid in record.player_stats:
+		var ps: PlayerMatchStats = record.player_stats[pid]
+		if ps == null:
+			continue
+		var player := GameManager.get_player(pid)
+		if player == null or player.team_id != 1:
+			continue
+		var key := ps.character.character_name if ps.character != null else ps.player_name
+		if not _tower_stats.has(key):
+			_tower_stats[key] = {
+				"char_name": key,
+				"is_human": ps.is_human,
+				"damage_dealt": 0.0,
+				"damage_taken": 0.0,
+				"damage_blocked": 0.0,
+				"healing": 0.0,
+				"win_count": 0,
+			}
+		var entry: Dictionary = _tower_stats[key]
+		entry["damage_dealt"] += ps.total_damage_dealt
+		entry["damage_taken"] += ps.total_damage_taken
+		entry["damage_blocked"] += ps.total_damage_blocked
+		entry["healing"] += ps.total_healing
+		entry["win_count"] += ps.win_count
+
+## 构建战报统计数组（用于传递给结果界面）
+func _build_tower_stats_array() -> Array:
+	var result: Array = []
+	for key in _tower_stats:
+		result.append(_tower_stats[key])
+	return result
+
+# ============================================================
 #  通关 / 失败
 # ============================================================
 
@@ -735,6 +782,7 @@ func _go_to_victory_result() -> void:
 	SceneManager.pending_game_result = {
 		"tower_victory": true,
 		"floors_cleared": tower_mgr.get_current_floor(),
+		"tower_stats": _build_tower_stats_array(),
 	}
 	SceneManager.go_to("res://scenes/tower/tower_result.tscn")
 
@@ -746,6 +794,7 @@ func _on_tower_defeat() -> void:
 		"tower_defeat": true,
 		"failed_floor": tower_mgr.get_current_floor(),
 		"enemy_name": tower_mgr.get_current_enemy_name(),
+		"tower_stats": _build_tower_stats_array(),
 	}
 	SceneManager.go_to("res://scenes/tower/tower_result.tscn")
 
