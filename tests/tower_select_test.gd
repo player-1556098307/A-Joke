@@ -111,7 +111,44 @@ func _ready() -> void:
 	sel._on_swap_pressed(2)
 	_assert(sel._swap_pending == -1, "12b: 再次点击同一槽位取消换位")
 
-	# 13. 清理
+	# 13. 高亮同步（回归：选中 _chars[0]（鸣人），列表按等级排序，高亮必须落在该角色卡片上）
+	sel._set_active_slot(0)
+	sel._select_for_active(sel._chars[0])  # 显式选中 _chars[0]，避免前序换位测试污染状态
+	# 找到 _chars[0]（原始列表第一个角色）在排序后卡片列表中的位置
+	var card_idx: int = -1
+	for ci in sel._card_chars.size():
+		if sel._card_chars[ci] == sel._chars[0]:
+			card_idx = ci
+			break
+	_assert(card_idx >= 0, "13a: _chars[0] 在卡片列表中存在（实际索引=%d）" % card_idx)
+	# 高亮卡片必须等于 _chars[0] 所在卡片（而非卡片0）
+	for ci in sel._card_buttons.size():
+		var expect_sel: bool = ci == card_idx
+		var actual_sel: bool = sel._card_sel_badges[ci].visible
+		if ci == card_idx:
+			_assert(actual_sel, "13b: 卡片%d（%s）应显示已选徽章" % [ci, sel._card_chars[ci].character_name])
+		else:
+			_assert(not actual_sel, "13c: 卡片%d（%s）不应显示已选徽章" % [ci, sel._card_chars[ci].character_name])
+	# 详情与高亮一致
+	_assert(sel._name_label.text == sel._chars[0].character_name, "13d: 详情显示 _chars[0]（实际=%s）" % sel._name_label.text)
+
+	# 14. 切到另一个角色后高亮跟随（选中 _chars[1]，高亮落在其卡片）
+	sel._select_for_active(sel._chars[1])
+	var sel_idx2: int = -1
+	for ci in sel._card_chars.size():
+		if sel._card_chars[ci] == sel._chars[1]:
+			sel_idx2 = ci
+			break
+	_assert(sel_idx2 >= 0, "14a: _chars[1] 在卡片列表中存在（实际索引=%d）" % sel_idx2)
+	for ci in sel._card_buttons.size():
+		var expect: bool = ci == sel_idx2
+		if ci == sel_idx2:
+			_assert(sel._card_sel_badges[ci].visible, "14b: 卡片%d 应高亮（_chars[1]）" % ci)
+		else:
+			_assert(not sel._card_sel_badges[ci].visible, "14c: 卡片%d 不应高亮" % ci)
+	_assert(sel._name_label.text == sel._chars[1].character_name, "14d: 详情跟随 _chars[1]（实际=%s）" % sel._name_label.text)
+
+	# 15. 清理
 	sel.queue_free()
 
 	print("=== 塔选人冒烟测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")

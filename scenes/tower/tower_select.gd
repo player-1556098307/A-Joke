@@ -606,9 +606,12 @@ func _refresh_all() -> void:
 	_update_start_label()
 
 func _refresh_list_highlight() -> void:
+	## 卡片列表按等级排序（S→A→B→C），卡片索引 ≠ _chars 角色索引，
+	## 高亮必须依据 _card_chars 与选中角色的对应关系判断，否则错位
 	var selected_idx: int = _selections[_active_slot]
+	var selected_char: CharacterData = _chars[selected_idx] if selected_idx >= 0 and selected_idx < _chars.size() else null
 	for i in _card_buttons.size():
-		var is_sel: bool = i == selected_idx and _matches_filter(_card_chars[i])
+		var is_sel: bool = selected_char != null and _card_chars[i] == selected_char and _matches_filter(_card_chars[i])
 		if is_sel:
 			_card_buttons[i].add_theme_stylebox_override("normal", _make_flat(Color("#EAF3DE"), Color("#3B6D11"), 3, 6))
 			_card_name_lbls[i].add_theme_color_override("font_color", Color("#27500A"))
