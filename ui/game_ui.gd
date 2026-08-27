@@ -165,6 +165,17 @@ func _ready() -> void:
 	GameManager.hiroari_targets_required.connect(_on_hiroari_targets_required)
 	GameManager.hiroari_used.connect(_on_hiroari_used)
 	GameManager.hiano_interrupt_required.connect(_on_hiano_interrupt_required)
+	# ── 奥伯龙 / 卡斯特 专属信号 ──
+	GameManager.dream_end_required.connect(_on_dream_end_required)
+	GameManager.lake_blessing_required.connect(_on_lake_blessing_required)
+	GameManager.sword_forge_required.connect(_on_sword_forge_required)
+	GameManager.pilgrimage_shield_gained.connect(_on_pilgrimage_shield_gained)
+	GameManager.sword_forge_unlocked_signal.connect(_on_sword_forge_unlocked)
+	GameManager.sword_forge_used.connect(_on_sword_forge_used)
+	GameManager.sword_forge_fallback.connect(_on_sword_forge_fallback)
+	GameManager.lake_blessing_used.connect(_on_lake_blessing_used)
+	GameManager.caliburn_used.connect(_on_caliburn_used)
+	GameManager.dream_end_used.connect(_on_dream_end_used)
 
 func _style_panels() -> void:
 	# LogPanelBg — white background, dark border (matching SVG)
@@ -3527,6 +3538,21 @@ func _on_action_result(data: Dictionary) -> void:
 			_on_hiroari_used(data.get('player_id', -1), data.get('target_ids', []))
 		'backtrack_performed':
 			_on_backtrack_performed(data.get('player_id', -1), data.get('round', 0))
+		# ── 奥伯龙 / 卡斯特 网络事件分发 ──
+		'dream_end_used':
+			_on_dream_end_used(data.get('caster_id', -1), data.get('target_id', -1))
+		'lake_blessing_used':
+			_on_lake_blessing_used(data.get('caster_id', -1), data.get('target_id', -1))
+		'sword_forge_used':
+			_on_sword_forge_used(data.get('caster_id', -1), data.get('target_id', -1), data.get('skill_name', ''))
+		'sword_forge_fallback':
+			_on_sword_forge_fallback(data.get('caster_id', -1), data.get('target_id', -1))
+		'pilgrimage_shield_gained':
+			_on_pilgrimage_shield_gained(data.get('player_id', -1))
+		'sword_forge_unlocked':
+			_on_sword_forge_unlocked(data.get('player_id', -1))
+		'caliburn_used':
+			_on_caliburn_used(data.get('caster_id', -1), data.get('target_id', -1))
 
 func _on_full_state_sync(players: Array, phase: int, round: int) -> void:
 	_current_round = round
@@ -3992,6 +4018,307 @@ func _submit_hiano_interrupt(player_id: int, interrupt_at: int) -> void:
 		net_client.submit_hiano_interrupt(player_id, interrupt_at)
 	else:
 		GameManager.submit_hiano_interrupt(player_id, interrupt_at)
+
+
+# ══════════════════════════════════════════════════════════════════
+# ── 奥伯龙 / 卡斯特 专属 UI ─────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+
+# ── 通用目标选择弹窗（梦之终结 / 湖之加护 复用） ──
+var _target_pick_dialog: PanelContainer = null
+var _target_pick_ctx: Dictionary = {}  # {title, hint, player_id, target_ids, callback}
+
+## 通用的目标选择弹窗。callback 形如 func(target_id: int) -> void
+func _show_target_pick_dialog(title: String, hint: String, player_id: int,
+		target_ids: Array[int], callback: Callable) -> void:
+	if _target_pick_dialog != null:
+		_target_pick_dialog.queue_free()
+	_target_pick_ctx = {"callback": callback, "player_id": player_id}
+	_target_pick_dialog = PanelContainer.new()
+	_target_pick_dialog.position = Vector2(240, 150)
+	_target_pick_dialog.size = Vector2(480, 300)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#2A4A8C")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_target_pick_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_target_pick_dialog.add_child(vbox)
+
+	var lbl_title := Label.new()
+	lbl_title.text = title
+	lbl_title.add_theme_font_size_override("font_size", 15)
+	lbl_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_title.add_theme_color_override("font_color", Color("#2A4A8C"))
+	vbox.add_child(lbl_title)
+
+	var lbl_hint := Label.new()
+	lbl_hint.text = hint
+	lbl_hint.add_theme_font_size_override("font_size", 12)
+	lbl_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_hint.add_theme_color_override("font_color", Color("#5F5E5A"))
+	lbl_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(lbl_hint)
+
+	for tid in target_ids:
+		var tp := GameManager.get_player(int(tid))
+		var t_name := tp.player_name if tp else str(tid)
+		var btn := Button.new()
+		btn.text = "%s（HP %.0f）" % [t_name, tp.hp if tp else 0.0]
+		btn.custom_minimum_size = Vector2(0, 32)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#EBF0FC"), Color("#2A4A8C"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#C1D2F7"), Color("#1A3A6F"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#A8C0F0"), Color("#1A3A6F"), 1, 4))
+		var target_id: int = int(tid)
+		btn.pressed.connect(func():
+			_dismiss_target_pick_dialog()
+			callback.call(target_id)
+		)
+		vbox.add_child(btn)
+
+	add_child(_target_pick_dialog)
+
+func _dismiss_target_pick_dialog() -> void:
+	if _target_pick_dialog:
+		_target_pick_dialog.queue_free()
+		_target_pick_dialog = null
+	_target_pick_ctx.clear()
+
+
+# ── 梦之终结（奥伯龙） ──
+
+func _on_dream_end_required(player_id: int, target_ids: Array[int]) -> void:
+	if player_id != _human_player_id:
+		return
+	_show_target_pick_dialog(
+		"🌙 梦之终结 — 选择目标",
+		"目标下次受到的伤害翻倍（可标记自己）",
+		player_id, target_ids,
+		func(target_id: int):
+			if net_client:
+				net_client.submit_dream_end(player_id, target_id)
+			else:
+				GameManager.submit_dream_end(player_id, target_id))
+
+func _on_dream_end_used(caster_id: int, target_id: int) -> void:
+	var caster := GameManager.get_player(caster_id)
+	var target := GameManager.get_player(target_id)
+	var c_name := caster.player_name if caster else str(caster_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("🌙 %s 梦之终结：%s 下次伤害x2" % [c_name, t_name], LT_STATUS, caster_id)
+	_refresh_player_card(caster_id)
+	_refresh_player_card(target_id)
+
+
+# ── 湖之加护（卡斯特） ──
+
+func _on_lake_blessing_required(player_id: int, target_ids: Array[int]) -> void:
+	if player_id != _human_player_id:
+		return
+	_show_target_pick_dialog(
+		"💧 湖之加护 — 选择目标",
+		"目标获得 1 气（可选自己）",
+		player_id, target_ids,
+		func(target_id: int):
+			if net_client:
+				net_client.submit_lake_blessing(player_id, target_id)
+			else:
+				GameManager.submit_lake_blessing(player_id, target_id))
+
+func _on_lake_blessing_used(caster_id: int, target_id: int) -> void:
+	var caster := GameManager.get_player(caster_id)
+	var target := GameManager.get_player(target_id)
+	var c_name := caster.player_name if caster else str(caster_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("💧 %s 湖之加护：%s 获得 1 气" % [c_name, t_name], LT_STATUS, caster_id)
+	_refresh_player_card(target_id)
+
+
+# ── 圣剑锻造（卡斯特）目标决策弹窗 ──
+
+var _sword_forge_dialog: PanelContainer = null
+var _sword_forge_dialog_step2: PanelContainer = null
+var _sword_forge_ctx: Dictionary = {}  # {player_id, skill_names, attack_target_ids, chosen_index}
+
+## 圣剑锻造弹窗：被锻造的目标人类玩家选择释放哪个技能+攻击谁
+## player_id = 被锻造目标（自己选）
+## skill_names = 可选技能名列表
+## attack_target_ids = 可选攻击目标ID列表
+func _on_sword_forge_required(player_id: int, skill_names: Array[String], attack_target_ids: Array[int]) -> void:
+	if player_id != _human_player_id:
+		return
+	_sword_forge_ctx = {
+		"player_id": player_id,
+		"skill_names": skill_names,
+		"attack_target_ids": attack_target_ids,
+		"chosen_index": -1,
+	}
+	_show_sword_forge_skill_select()
+
+## 第一步：选择释放哪个技能
+func _show_sword_forge_skill_select() -> void:
+	if _sword_forge_dialog != null:
+		_sword_forge_dialog.queue_free()
+	_sword_forge_dialog = PanelContainer.new()
+	_sword_forge_dialog.position = Vector2(220, 130)
+	_sword_forge_dialog.size = Vector2(520, 360)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#FFFDF5")
+	style.border_color = Color("#8C6A2A")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	_sword_forge_dialog.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_sword_forge_dialog.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "⚔ 圣剑锻造 — 选择释放的技能"
+	title.add_theme_font_size_override("font_size", 15)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("#8C6A2A"))
+	vbox.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "卡斯特为你锻造了剑！你将无消耗释放一次以下技能"
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", Color("#5F5E5A"))
+	vbox.add_child(hint)
+
+	var skill_names: Array = _sword_forge_ctx.get("skill_names", [])
+	for i in range(skill_names.size()):
+		var sname: String = skill_names[i]
+		var btn := Button.new()
+		btn.text = sname
+		btn.custom_minimum_size = Vector2(0, 34)
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#FDF6E8"), Color("#8C6A2A"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#F7E4C1"), Color("#6A4F1A"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#F0D8A8"), Color("#6A4F1A"), 1, 4))
+		var idx: int = i
+		btn.pressed.connect(func():
+			_sword_forge_ctx["chosen_index"] = idx
+			_sword_forge_dialog.queue_free()
+			_sword_forge_dialog = null
+			_show_sword_forge_target_select()
+		)
+		vbox.add_child(btn)
+
+	add_child(_sword_forge_dialog)
+
+## 第二步：选择攻击目标（无敌方目标的技能才需要；纯自身技能跳过）
+func _show_sword_forge_target_select() -> void:
+	var attack_target_ids: Array = _sword_forge_ctx.get("attack_target_ids", [])
+	# 若无可选攻击目标，直接提交（skill_index + attack_target_id=-1）
+	if attack_target_ids.is_empty():
+		_submit_sword_forge_choice()
+		return
+	if _sword_forge_dialog_step2 != null:
+		_sword_forge_dialog_step2.queue_free()
+	_sword_forge_dialog_step2 = PanelContainer.new()
+	_sword_forge_dialog_step2.position = Vector2(240, 150)
+	_sword_forge_dialog_step2.size = Vector2(480, 320)
+	var style2 := StyleBoxFlat.new()
+	style2.bg_color = Color("#FFFDF5")
+	style2.border_color = Color("#8C6A2A")
+	style2.set_border_width_all(3)
+	style2.set_corner_radius_all(8)
+	_sword_forge_dialog_step2.add_theme_stylebox_override("panel", style2)
+
+	var vbox2 := VBoxContainer.new()
+	vbox2.add_theme_constant_override("separation", 6)
+	_sword_forge_dialog_step2.add_child(vbox2)
+
+	var title2 := Label.new()
+	title2.text = "⚔ 圣剑锻造 — 选择攻击目标"
+	title2.add_theme_font_size_override("font_size", 15)
+	title2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title2.add_theme_color_override("font_color", Color("#8C6A2A"))
+	vbox2.add_child(title2)
+
+	var player_id: int = _sword_forge_ctx.get("player_id", -1)
+	for tid in attack_target_ids:
+		var tp := GameManager.get_player(int(tid))
+		var t_name := tp.player_name if tp else str(tid)
+		var btn := Button.new()
+		btn.text = "%s（HP %.0f，距离 %d）" % [
+			t_name,
+			tp.hp if tp else 0.0,
+			GameManager._distance_system.get_distance(player_id, int(tid)) if GameManager._distance_system else 0]
+		btn.custom_minimum_size = Vector2(0, 32)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_stylebox_override("normal", _make_flat(Color("#FDF6E8"), Color("#8C6A2A"), 1, 4))
+		btn.add_theme_stylebox_override("hover", _make_flat(Color("#F7E4C1"), Color("#6A4F1A"), 1, 4))
+		btn.add_theme_stylebox_override("pressed", _make_flat(Color("#F0D8A8"), Color("#6A4F1A"), 1, 4))
+		var target_id: int = int(tid)
+		btn.pressed.connect(func():
+			_sword_forge_ctx["attack_target_id"] = target_id
+			_sword_forge_dialog_step2.queue_free()
+			_sword_forge_dialog_step2 = null
+			_submit_sword_forge_choice()
+		)
+		vbox2.add_child(btn)
+
+	add_child(_sword_forge_dialog_step2)
+
+func _submit_sword_forge_choice() -> void:
+	var player_id: int = _sword_forge_ctx.get("player_id", -1)
+	var skill_index: int = _sword_forge_ctx.get("chosen_index", -1)
+	var attack_target_id: int = _sword_forge_ctx.get("attack_target_id", -1)
+	_sword_forge_ctx.clear()
+	if player_id < 0 or skill_index < 0:
+		return
+	if net_client:
+		net_client.submit_sword_forge(player_id, skill_index, attack_target_id)
+	else:
+		GameManager.submit_sword_forge(player_id, skill_index, attack_target_id)
+
+
+# ── 卡斯特 完成事件日志 ──
+
+func _on_sword_forge_used(caster_id: int, target_id: int, skill_name: String) -> void:
+	var caster := GameManager.get_player(caster_id)
+	var target := GameManager.get_player(target_id)
+	var c_name := caster.player_name if caster else str(caster_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("⚔ %s 圣剑锻造：%s 无消耗释放了 %s" % [c_name, t_name, skill_name], LT_STATUS, caster_id)
+	_refresh_player_card(caster_id)
+	_refresh_player_card(target_id)
+
+func _on_sword_forge_fallback(caster_id: int, target_id: int) -> void:
+	var caster := GameManager.get_player(caster_id)
+	var target := GameManager.get_player(target_id)
+	var c_name := caster.player_name if caster else str(caster_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("⚔ %s 圣剑锻造：%s 无可用技能，获得 3 气" % [c_name, t_name], LT_STATUS, caster_id)
+	_refresh_player_card(target_id)
+
+func _on_pilgrimage_shield_gained(player_id: int) -> void:
+	var p := GameManager.get_player(player_id)
+	var p_name := p.player_name if p else str(player_id)
+	_append_log("🛡 %s 巡礼触发，获得圣盾" % p_name, LT_STATUS, player_id)
+	_refresh_player_card(player_id)
+
+func _on_sword_forge_unlocked(player_id: int) -> void:
+	var p := GameManager.get_player(player_id)
+	var p_name := p.player_name if p else str(player_id)
+	_append_log("⚔ %s 巡礼累计4次，解锁圣剑锻造！" % p_name, LT_WIN, player_id)
+	_refresh_player_card(player_id)
+
+func _on_caliburn_used(caster_id: int, target_id: int) -> void:
+	var caster := GameManager.get_player(caster_id)
+	var target := GameManager.get_player(target_id)
+	var c_name := caster.player_name if caster else str(caster_id)
+	var t_name := target.player_name if target else str(target_id)
+	_append_log("⚔ %s Around Caliburn：%s 获得圣盾+下次伤害x2" % [c_name, t_name], LT_STATUS, caster_id)
+	_refresh_player_card(caster_id)
+	_refresh_player_card(target_id)
 
 
 # ============================================================

@@ -21,6 +21,9 @@ signal project_skill_received(player_id: int, target_ids: Array[int])
 signal phantom_dodge_received(player_id: int, attacker_id: int)
 signal backtrack_received(player_id: int)
 signal hiroari_received(player_id: int, target_ids: Array[int])
+signal dream_end_received(player_id: int, target_ids: Array[int])
+signal lake_blessing_received(player_id: int, target_ids: Array[int])
+signal sword_forge_received(player_id: int, skill_names: Array[String], attack_target_ids: Array[int])
 
 var my_player_id: int = -1
 var reconnect_token: String = ""
@@ -91,6 +94,19 @@ func server_broadcast(op: int, data: Dictionary) -> void:
 			hiroari_received.emit(
 				data.get("player_id", -1),
 				data.get("target_ids", []))
+		NetworkProtocol.SrvOp.DREAM_END_REQUIRED:
+			dream_end_received.emit(
+				data.get("player_id", -1),
+				data.get("target_ids", []))
+		NetworkProtocol.SrvOp.LAKE_BLESSING_REQUIRED:
+			lake_blessing_received.emit(
+				data.get("player_id", -1),
+				data.get("target_ids", []))
+		NetworkProtocol.SrvOp.SWORD_FORGE_REQUIRED:
+			sword_forge_received.emit(
+				data.get("player_id", -1),
+				data.get("skill_names", []),
+				data.get("attack_target_ids", []))
 
 ## 服务器调用：确认加入成功，返回 token 和 player_id
 @rpc("authority", "reliable")
@@ -139,6 +155,15 @@ func submit_backtrack_decision(player_id: int, use_backtrack: bool) -> void:
 
 func submit_hiroari_targets(player_id: int, targets: Array[int]) -> void:
 	rpc_id(1, "client_submit_hiroari_targets", player_id, targets)
+
+func submit_dream_end(caster_id: int, target_id: int) -> void:
+	rpc_id(1, "client_submit_dream_end", caster_id, target_id)
+
+func submit_lake_blessing(caster_id: int, target_id: int) -> void:
+	rpc_id(1, "client_submit_lake_blessing", caster_id, target_id)
+
+func submit_sword_forge(target_id: int, skill_index: int, attack_target_id: int) -> void:
+	rpc_id(1, "client_submit_sword_forge", target_id, skill_index, attack_target_id)
 
 func send_ping() -> void:
 	rpc_id(1, "client_ping", Time.get_unix_time_from_system())
@@ -199,6 +224,18 @@ func client_submit_backtrack_decision(_player_id: int, _use_backtrack: bool) -> 
 
 @rpc("any_peer", "reliable")
 func client_submit_hiroari_targets(_player_id: int, _targets: Array[int]) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_dream_end(_caster_id: int, _target_id: int) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_lake_blessing(_caster_id: int, _target_id: int) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_sword_forge(_target_id: int, _skill_index: int, _attack_target_id: int) -> void:
 	pass
 
 ## RoomManager 通知加入失败时调用

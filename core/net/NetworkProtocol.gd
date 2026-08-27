@@ -25,6 +25,9 @@ enum SrvOp {
 	PHANTOM_DODGE_REQUIRED = 56,  # 幻影闪避决策请求（新止水受击弹窗）
 	BACKTRACK_REQUIRED   = 57,  # 别天神回溯决策请求（新止水准备阶段弹窗）
 	HIROARI_REQUIRED     = 58,  # 日影舞目标选择请求（新止水行动阶段弹窗）
+	DREAM_END_REQUIRED   = 59,  # 梦之终结目标选择请求（奥伯龙结束阶段弹窗）
+	LAKE_BLESSING_REQUIRED = 60,  # 湖之加护目标选择请求（卡斯特结束阶段弹窗）
+	SWORD_FORGE_REQUIRED = 61,  # 圣剑锻造技能+目标选择请求（卡斯特→被锻造目标弹窗）
 }
 
 # ── 客户端 → 服务器 OpCode ────────────────────────────────────

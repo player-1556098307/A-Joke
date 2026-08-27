@@ -68,6 +68,9 @@ func _init_network_mode(is_host: bool) -> void:
 	_net_client.phantom_dodge_received.connect($GameUI._on_phantom_dodge_required)
 	_net_client.backtrack_received.connect($GameUI._on_backtrack_required)
 	_net_client.hiroari_received.connect($GameUI._on_hiroari_targets_required)
+	_net_client.dream_end_received.connect($GameUI._on_dream_end_required)
+	_net_client.lake_blessing_received.connect($GameUI._on_lake_blessing_required)
+	_net_client.sword_forge_received.connect($GameUI._on_sword_forge_required)
 
 	if config.has("my_player_id"):
 		_net_client.my_player_id = config["my_player_id"]

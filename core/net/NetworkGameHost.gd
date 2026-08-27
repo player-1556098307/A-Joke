@@ -79,6 +79,18 @@ func _connect_signals() -> void:
 	_game_manager.phantom_changed.connect(_on_phantom_changed)
 	_game_manager.hiroari_used.connect(_on_hiroari_used)
 	_game_manager.backtrack_performed.connect(_on_backtrack_performed)
+	# ── 奥伯龙 / 卡斯特 决策弹窗信号 ──
+	_game_manager.dream_end_required.connect(_on_dream_end_required)
+	_game_manager.lake_blessing_required.connect(_on_lake_blessing_required)
+	_game_manager.sword_forge_required.connect(_on_sword_forge_required)
+	# ── 卡斯特 完成/回退事件广播（客户端日志显示） ──
+	_game_manager.dream_end_used.connect(_on_dream_end_used)
+	_game_manager.lake_blessing_used.connect(_on_lake_blessing_used)
+	_game_manager.sword_forge_used.connect(_on_sword_forge_used)
+	_game_manager.sword_forge_fallback.connect(_on_sword_forge_fallback)
+	_game_manager.pilgrimage_shield_gained.connect(_on_pilgrimage_shield_gained)
+	_game_manager.sword_forge_unlocked_signal.connect(_on_sword_forge_unlocked)
+	_game_manager.caliburn_used.connect(_on_caliburn_used)
 
 # ─────────────────────────────────────────────────────────────
 # 玩家加入/断线
@@ -339,6 +351,30 @@ func client_submit_hiroari_targets(player_id: int, targets: Array[int]) -> void:
 	if sender_player_id < 0 or sender_player_id != player_id:
 		return
 	GameManager.submit_hiroari_targets(player_id, targets)
+
+@rpc("any_peer", "reliable")
+func client_submit_dream_end(caster_id: int, target_id: int) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != caster_id:
+		return
+	GameManager.submit_dream_end(caster_id, target_id)
+
+@rpc("any_peer", "reliable")
+func client_submit_lake_blessing(caster_id: int, target_id: int) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != caster_id:
+		return
+	GameManager.submit_lake_blessing(caster_id, target_id)
+
+@rpc("any_peer", "reliable")
+func client_submit_sword_forge(target_id: int, skill_index: int, attack_target_id: int) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var sender_player_id: int = _peer_to_player.get(peer_id, -1)
+	if sender_player_id < 0 or sender_player_id != target_id:
+		return
+	GameManager.submit_sword_forge(target_id, skill_index, attack_target_id)
 
 # ─────────────────────────────────────────────────────────────
 # GameManager 信号 → RPC 广播
@@ -639,6 +675,62 @@ func _on_projected_skill_lost(player_id: int, skill_name: String) -> void:
 	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
 		{"type": "projected_skill_lost", "player_id": player_id, "skill_name": skill_name},
 		_spectator_peers)
+
+# ── 奥伯龙 / 卡斯特 决策弹窗信号 ──
+
+## 梦之终结目标选择请求：仅发给奥伯龙人类玩家（结束阶段）
+func _on_dream_end_required(player_id: int, target_ids: Array[int]) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.DREAM_END_REQUIRED,
+			{"player_id": player_id, "target_ids": target_ids})
+
+## 湖之加护目标选择请求：仅发给卡斯特人类玩家（结束阶段）
+func _on_lake_blessing_required(player_id: int, target_ids: Array[int]) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.LAKE_BLESSING_REQUIRED,
+			{"player_id": player_id, "target_ids": target_ids})
+
+## 圣剑锻造技能+目标选择请求：仅发给被锻造的目标人类玩家
+func _on_sword_forge_required(player_id: int, skill_names: Array[String], attack_target_ids: Array[int]) -> void:
+	var peer_id: int = _player_to_peer.get(player_id, -1)
+	if peer_id > 0 and peer_id != multiplayer.get_unique_id():
+		rpc_id(peer_id, "server_broadcast",
+			NetworkProtocol.SrvOp.SWORD_FORGE_REQUIRED,
+			{"player_id": player_id, "skill_names": skill_names, "attack_target_ids": attack_target_ids})
+
+# ── 卡斯特 完成/回退 事件广播（客户端日志显示） ──
+
+func _on_dream_end_used(caster_id: int, target_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "dream_end_used", "caster_id": caster_id, "target_id": target_id}, _spectator_peers)
+
+func _on_lake_blessing_used(caster_id: int, target_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "lake_blessing_used", "caster_id": caster_id, "target_id": target_id}, _spectator_peers)
+
+func _on_sword_forge_used(caster_id: int, target_id: int, skill_name: String) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "sword_forge_used", "caster_id": caster_id, "target_id": target_id, "skill_name": skill_name}, _spectator_peers)
+
+func _on_sword_forge_fallback(caster_id: int, target_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "sword_forge_fallback", "caster_id": caster_id, "target_id": target_id}, _spectator_peers)
+
+func _on_pilgrimage_shield_gained(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "pilgrimage_shield_gained", "player_id": player_id}, _spectator_peers)
+
+func _on_sword_forge_unlocked(player_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "sword_forge_unlocked", "player_id": player_id}, _spectator_peers)
+
+func _on_caliburn_used(caster_id: int, target_id: int) -> void:
+	_broadcast(NetworkProtocol.SrvOp.ACTION_RESULT,
+		{"type": "caliburn_used", "caster_id": caster_id, "target_id": target_id}, _spectator_peers)
 
 # ─────────────────────────────────────────────────────────────
 # 广播工具
