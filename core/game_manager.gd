@@ -216,6 +216,24 @@ signal immune_next_attack_triggered(player_id: int)
 ## 梦之终结弹窗：选择目标（含自己）
 signal dream_end_required(player_id: int, target_ids: Array[int])
 
+## ── 阿尔托莉雅·卡斯特专属信号 ─────────────────────────────────────
+## 巡礼触发：获得圣盾（全挡护盾）
+signal pilgrimage_shield_gained(player_id: int)
+## 巡礼升级：累计4次后获得圣剑锻造
+signal sword_forge_unlocked_signal(player_id: int)
+## 湖之加护弹窗：选择目标（含自己）使其获得1气
+signal lake_blessing_required(player_id: int, target_ids: Array[int])
+## 湖之加护执行完成
+signal lake_blessing_used(caster_id: int, target_id: int)
+## Around Caliburn 释放：目标获得圣盾+下次伤害x2
+signal caliburn_used(caster_id: int, target_id: int)
+## 圣剑锻造弹窗：选择目标玩家+技能（复用投影弹窗格式）
+signal sword_forge_required(player_id: int, target_ids: Array[int])
+## 圣剑锻造执行完成
+signal sword_forge_used(caster_id: int, target_id: int, skill_name: String)
+## 圣剑锻造回退：目标无可用技能，获得3气
+signal sword_forge_fallback(caster_id: int, target_id: int)
+
 ## 所有玩家状态数组
 var _players: Array[PlayerState] = []
 ## 当前游戏阶段
@@ -307,6 +325,12 @@ var _hiroari_pending: Dictionary = {}
 var _hiroari_target_ids: Array[int] = [-1, -1, -1, -1]
 ## 幻影闪避待确认上下文（等待UI/网络选择是否闪避）
 var _phantom_dodge_pending: Dictionary = {}
+
+## ── 阿尔托莉雅·卡斯特阶段状态 ──────────────────────────────────
+## 湖之加护待确认上下文（等待UI/网络选择目标）
+var _lake_blessing_pending: Dictionary = {}
+## 圣剑锻造待确认上下文（等待UI/网络选择目标玩家+技能）
+var _sword_forge_pending: Dictionary = {}
 
 ## ── 卫宫（射手）阶段状态 ──────────────────────────────────────────
 ## 准备阶段当前进行中的玩家ID（-1=无）
@@ -413,6 +437,12 @@ func setup_game(config: Dictionary) -> void:
 			var blessing_value := _get_tower_blessing_value(p)
 			p.add_energy(blessing_value)
 			player_charged.emit(p.player_id, p.energy)
+	# ── 阿尔托莉雅·卡斯特·乐园妖精：开局获得5个气 ──
+	for p in _players:
+		if _is_caster(p):
+			p.add_energy(5)
+			player_charged.emit(p.player_id, p.energy)
+			print("[卡斯特] %s 乐园妖精生效，开局5气（当前气=%d）" % [p.player_name, p.energy])
 	# ── 宙斯Boss初始化 ──
 	for p in _players:
 		if _is_zeus(p):
@@ -1568,7 +1598,52 @@ func _apply_actions() -> void:
 						_enter_phase(GamePhase.ELIMINATION)
 					return
 
-			# ── 飞雷神拦截检查 ──────────────────────────────────────
+			# ── 阿尔托莉雅·卡斯特·圣剑锻造（操作阶段主动，3气）──
+			# 选择一名其他玩家，使其无消耗释放一次任意需耗气的技能
+			# 若目标无可用技能则获得3气
+			if skill.skill_name == "圣剑锻造":
+				var sf_target: PlayerState = targets[0] if targets.size() > 0 else null
+				if sf_target == null:
+					_enter_phase(GamePhase.ELIMINATION)
+					return
+				winner.energy -= skill.energy_cost
+				player_charged.emit(winner.player_id, winner.energy)
+				_process_pilgrimage(winner, skill.energy_cost)
+				_process_sword_forge(winner, sf_target)
+				_enter_phase(GamePhase.ELIMINATION)
+				return
+
+			# ── 阿尔托莉雅·卡斯特·Around Caliburn（3气，给目标圣盾+伤害x2）──
+			if skill.skill_name == "Around Caliburn":
+				var ac_target: PlayerState = targets[0] if targets.size() > 0 else null
+				if ac_target == null:
+					_enter_phase(GamePhase.ELIMINATION)
+					return
+				winner.energy -= skill.energy_cost
+				player_charged.emit(winner.player_id, winner.energy)
+				_process_pilgrimage(winner, skill.energy_cost)
+				# 目标获得圣盾（不可叠加）
+				if ac_target.shield == 0:
+					ac_target.shield = -1
+					player_shielded.emit(ac_target.player_id, -1.0)
+				# 目标下次伤害x2（复用奥伯龙的 damage_double_next 字段）
+				ac_target.damage_double_next = true
+				caliburn_used.emit(winner.player_id, ac_target.player_id)
+				var ac_logs: Array[Dictionary] = [{
+					"attacker_id": winner.player_id,
+					"target_id": ac_target.player_id,
+					"skill_name": "Around Caliburn",
+					"effect_type": SkillEffect.EffectType.SHIELD,
+					"value": -1.0,
+					"result": {"shield_gained": -1, "damage_double_next": true},
+				}]
+				skill_applied.emit(ac_logs)
+				player_charged.emit(_sole_winner_id, winner.energy)
+				_record_action(winner, skill, ac_logs)
+				_enter_phase(GamePhase.ELIMINATION)
+				return
+
+		# ── 飞雷神拦截检查 ──────────────────────────────────────
 			# 检查目标中是否有波风水门且可触发换位/闪避
 			var ftg_result := _check_ftg_intercept(winner, skill, targets)
 			if ftg_result.has("pending"):
@@ -1613,6 +1688,10 @@ func _apply_actions() -> void:
 				for t in targets:
 					blade_hp_before[t.player_id] = t.hp
 			var logs := RoundResolver.apply_effects(winner, skill, targets, _distance_system, splash_targets)
+
+			# ── 阿尔托莉雅·卡斯特·巡礼：消耗气时触发被动 ──
+			# apply_effects 内部已扣除 energy_cost，此处检测并触发
+			_process_pilgrimage(winner, skill.energy_cost)
 
 			# ── 新止水·幻影瞬身：普攻命中后获得1幻影（至多3）──
 			# 命中判定：普攻对目标造成了实际伤害（非无敌/护盾全挡/闪避）
@@ -2667,11 +2746,24 @@ func _process_end_phase() -> void:
 	_process_burn_and_berserker()
 	# 3. 奥伯龙·梦之终结（结束夜幕+标记伤害x2，在招架前处理）
 	_process_dream_end()
-	# 若梦之终结正在等待人类玩家决策，暂停结束阶段流程（submit_dream_end 会继续推进招架决策）
+	# 若梦之终结正在等待人类玩家决策，暂停结束阶段流程（submit_dream_end 会继续推进湖之加护+招架决策）
 	if not _dream_end_pending.is_empty():
+		return
+	# 3.5 阿尔托莉雅·卡斯特·湖之加护（施法者自己回合结束阶段，选择任意玩家+1气）
+	_process_lake_blessing_phase()
+	# 若湖之加护正在等待人类玩家决策，暂停（submit_lake_blessing 会继续推进招架决策）
+	if not _lake_blessing_pending.is_empty():
 		return
 	# 4. 有钟的存活玩家决定是否招架
 	_process_bell_decisions()
+
+## ── 阿尔托莉雅·卡斯特·湖之加护：结束阶段入口 ──────────────────
+## 遍历存活玩家，找到卡斯特且为本回合胜者时触发
+func _process_lake_blessing_phase() -> void:
+	for p in _players:
+		if p.is_alive and _is_caster(p) and p.player_id == _sole_winner_id:
+			_process_lake_blessing(p)
+			break
 
 ## ── 奥伯龙·梦之终结：结束阶段处理 ──────────────────────────────
 ## 仅当奥伯龙处于夜幕降临状态时触发；结束后夜幕消失
@@ -2717,11 +2809,17 @@ func submit_dream_end(caster_id: int, target_id: int) -> void:
 	var caster := get_player(caster_id)
 	var target := get_player(target_id)
 	if caster == null or target == null:
-		# 即使失败也继续推进结束阶段
+		# 即使失败也继续推进结束阶段（湖之加护→招架决策）
+		_process_lake_blessing_phase()
+		if not _lake_blessing_pending.is_empty():
+			return
 		_process_bell_decisions()
 		return
 	_apply_dream_end(caster, target)
-	# 梦之终结处理完成后继续到招架决策
+	# 梦之终结处理完成后继续到湖之加护→招架决策
+	_process_lake_blessing_phase()
+	if not _lake_blessing_pending.is_empty():
+		return
 	_process_bell_decisions()
 
 ## 检查角色是否拥有钟机制（有招架或砸钟技能）
@@ -3473,7 +3571,239 @@ func _is_oberon(player: PlayerState) -> bool:
 			return true
 	return false
 
-## 黑塔被动结算：在技能伤害应用后调用
+## 判断角色是否为阿尔托莉雅·卡斯特（通过技能名"巡礼"判断）
+func _is_caster(player: PlayerState) -> bool:
+	if player == null or player.character == null:
+		return false
+	for skill in player.character.skills:
+		if skill.skill_name == "巡礼":
+			return true
+	return false
+
+## ── 阿尔托莉雅·卡斯特·巡礼：消耗气时触发被动 ─────────────────────
+## 每次消耗气（energy_cost > 0 的技能释放）时触发：
+## 1. 获得一个圣盾（shield=-1 全挡护盾，不可叠加）
+## 2. pilgrimage_count +1，累计4次后解锁圣剑锻造并移除巡礼
+## cost: 本次技能消耗的气量（仅当 > 0 时触发）
+func _process_pilgrimage(player: PlayerState, cost: int) -> void:
+	if player == null or not player.is_alive:
+		return
+	if not _is_caster(player):
+		return
+	if cost <= 0:
+		return
+	if player.sword_forge_unlocked:
+		return  # 巡礼已升级，不再触发
+	# 1. 获得圣盾（全挡护盾，不可叠加：已有护盾时不覆盖）
+	if player.shield == 0:
+		player.shield = -1
+		pilgrimage_shield_gained.emit(player.player_id)
+	# 2. 累计计数 + 升级检查
+	player.pilgrimage_count += 1
+	if player.pilgrimage_count >= 4 and not player.sword_forge_unlocked:
+		player.sword_forge_unlocked = true
+		sword_forge_unlocked_signal.emit(player.player_id)
+		print("[卡斯特] %s 巡礼累计4次，升级为圣剑锻造！" % player.player_name)
+
+## ── 阿尔托莉雅·卡斯特·圣剑锻造 ─────────────────────────────────
+## 使目标无消耗释放一次任意需耗气的技能（无视释放条件）
+## 人类：弹窗选择目标→选择技能；AI：自动选择
+## 注意：目标不可选自己（已在 _build_skill_targets 中保证）
+func _process_sword_forge(caster: PlayerState, target: PlayerState) -> void:
+	if caster == null or target == null:
+		return
+	# 收集目标可用的技能（需耗气的非被动技，排除招架/限定技已用/巡礼/湖之加护等被动标记）
+	var target_skills: Array[SkillData] = []
+	for s in target.get_all_skills():
+		if s.is_passive:
+			continue
+		if s.energy_cost <= 0:
+			continue  # 只选需耗气的技能
+		if s.bell_cost > 0:
+			continue  # 忽略需消耗钟的技能
+		if s.skill_name == "巡礼" or s.skill_name == "湖之加护" or s.skill_name == "乐园妖精":
+			continue
+		target_skills.append(s)
+
+	if target_skills.is_empty():
+		# 目标无可用技能：获得3气
+		target.add_energy(3)
+		player_charged.emit(target.player_id, target.energy)
+		sword_forge_fallback.emit(caster.player_id, target.player_id)
+		print("[卡斯特] %s 圣剑锻造→%s 无可用技能，%s获得3气" % [caster.player_name, target.player_name, target.player_name])
+		return
+
+	# 存在可用技能：人类弹窗选择 / AI自动选择
+	_sword_forge_pending = {
+		"caster_id": caster.player_id,
+		"target_id": target.player_id,
+		"target_skills": target_skills,
+	}
+	if caster.is_human:
+		var skill_names: Array[String] = []
+		for s in target_skills:
+			skill_names.append(s.skill_name)
+		var tids: Array[int] = [target.player_id]
+		sword_forge_required.emit(caster.player_id, tids)
+		# 注意：实际 UI 需进一步展示技能列表选择，此处简化为人类选第一个
+		# 测试中由 submit_sword_forge 直接指定 skill_index
+	else:
+		# AI：选择伤害最高的技能
+		var best_idx := 0
+		var best_dmg: float = 0.0
+		for i in range(target_skills.size()):
+			var s: SkillData = target_skills[i]
+			for e in s.effects:
+				if e.effect_type == SkillEffect.EffectType.DAMAGE \
+				or e.effect_type == SkillEffect.EffectType.TRUE_DAMAGE \
+				or e.effect_type == SkillEffect.EffectType.PIERCE_DAMAGE:
+					if e.value > best_dmg:
+						best_dmg = e.value
+						best_idx = i
+						break
+		_execute_sword_forge(caster, target, target_skills[best_idx])
+
+## 执行圣剑锻造：让目标无消耗释放选定技能
+func _execute_sword_forge(caster: PlayerState, target: PlayerState, chosen_skill: SkillData) -> void:
+	if caster == null or target == null or chosen_skill == null:
+		_sword_forge_pending = {}
+		return
+	# 构建技能目标：ENEMY_SINGLE 选离施法者最近的存活其他玩家（目标是"目标的敌人"）
+	# 注意：圣剑锻造让目标释放技能，目标使用自己的技能，目标自身为"attacker"
+	var forge_targets: Array[PlayerState] = []
+	var has_enemy_target := false
+	for e in chosen_skill.effects:
+		if e.target == SkillEffect.EffectTarget.ENEMY_SINGLE or e.target == SkillEffect.EffectTarget.ENEMY_ALL:
+			has_enemy_target = true
+			break
+	if has_enemy_target:
+		# 目标选择：优先选离 target 最近的非自己存活玩家
+		var best_p: PlayerState = null
+		var best_dist: int = 999
+		for p in get_alive_players():
+			if p.player_id == target.player_id:
+				continue
+			if target.team_id != 0 and p.team_id == target.team_id:
+				continue
+			var d: int = _distance_system.get_distance(target.player_id, p.player_id)
+			if d < best_dist:
+				best_dist = d
+				best_p = p
+		if best_p != null:
+			forge_targets.append(best_p)
+	# 临时保存并清零目标的能量消耗（无消耗释放）
+	var saved_energy := target.energy
+	# 临时设为足够释放
+	target.energy = max(target.energy, chosen_skill.energy_cost)
+	# 构建假的 SkillData（不消耗能量）
+	var free_skill := _copy_skill_zero_cost(chosen_skill)
+	var free_splash: Array[PlayerState] = []
+	# 执行释放（以 target 为 attacker）
+	var forge_logs := RoundResolver.apply_effects(target, free_skill, forge_targets, _distance_system, free_splash)
+	# 恢复目标能量（无消耗）
+	target.energy = saved_energy
+	player_charged.emit(target.player_id, target.energy)
+	# 触发巡礼被动（目标消耗气时——但圣剑锻造是无消耗释放，不触发巡礼）
+	# 注意：圣剑锻造释放的技能是无消耗的，不触发巡礼
+	# 标准后效处理
+	for entry in forge_logs:
+		_emit_effect_signals(entry)
+	skill_applied.emit(forge_logs)
+	player_charged.emit(target.player_id, target.energy)
+	# 记录行动
+	var action_log := ActionLog.new()
+	action_log.actor_id = caster.player_id
+	action_log.action_type = PlayerState.ActionType.USE_SKILL
+	action_log.skill_name = "圣剑锻造→" + target.player_name + "→" + chosen_skill.skill_name
+	if _current_snapshot:
+		_current_snapshot.actions.append(action_log)
+	sword_forge_used.emit(caster.player_id, target.player_id, chosen_skill.skill_name)
+	print("[卡斯特] %s 圣剑锻造：%s 无消耗释放了 %s" % [caster.player_name, target.player_name, chosen_skill.skill_name])
+	_sword_forge_pending = {}
+
+## 人类玩家圣剑锻造决策入口（由UI调用）
+## target_id: 被锻造的目标（已在 _process_sword_forge 中锁定）
+## skill_index: 在 target_skills 列表中的索引
+func submit_sword_forge(caster_id: int, skill_index: int) -> void:
+	if _sword_forge_pending.is_empty():
+		return
+	var ctx: Dictionary = _sword_forge_pending
+	var caster := get_player(ctx.get("caster_id", -1))
+	var target := get_player(ctx.get("target_id", -1))
+	var target_skills: Array = ctx.get("target_skills", [])
+	if caster == null or target == null or skill_index < 0 or skill_index >= target_skills.size():
+		_sword_forge_pending = {}
+		return
+	_execute_sword_forge(caster, target, target_skills[skill_index])
+
+## 复制技能但不消耗能量（用于圣剑锻造的无消耗释放）
+func _copy_skill_zero_cost(src: SkillData) -> SkillData:
+	var copy := SkillData.new()
+	copy.skill_name = src.skill_name
+	copy.description = src.description
+	copy.energy_cost = 0
+	copy.min_range = src.min_range
+	copy.max_range = src.max_range
+	copy.effects = src.effects.duplicate()
+	copy.bell_cost = 0
+	copy.is_limited = false  # 不标记为限定技（防止消耗限定次数）
+	copy.bonus_if_paralyzed = src.bonus_if_paralyzed
+	copy.is_passive = false
+	copy.can_pay_with_hp = false
+	copy.ftg_cost = 0
+	return copy
+
+## ── 阿尔托莉雅·卡斯特·湖之加护 ─────────────────────────────────
+## 施法者自己回合结束阶段：选择任意玩家使其获得1气
+func _process_lake_blessing(caster: PlayerState) -> void:
+	if caster == null or not caster.is_alive:
+		return
+	if not _is_caster(caster):
+		return
+	# 仅施法者自己的回合（_sole_winner_id == caster）才触发
+	if _sole_winner_id != caster.player_id:
+		return
+	if caster.is_human:
+		_lake_blessing_pending = { "player_id": caster.player_id }
+		var target_ids: Array[int] = []
+		for p in get_alive_players():
+			target_ids.append(p.player_id)  # 含自己
+		lake_blessing_required.emit(caster.player_id, target_ids)
+	else:
+		# AI：优先给自己气（如果气少），否则给最低血队友/随机
+		var target := caster
+		if caster.team_id != 0:
+			for p in get_alive_players():
+				if p.team_id == caster.team_id and p.energy < caster.energy:
+					target = p
+					break
+		_apply_lake_blessing(caster, target)
+
+## 执行湖之加护：使目标获得1气
+func _apply_lake_blessing(caster: PlayerState, target: PlayerState) -> void:
+	if target == null:
+		return
+	target.add_energy(1)
+	player_charged.emit(target.player_id, target.energy)
+	lake_blessing_used.emit(caster.player_id, target.player_id)
+	print("[卡斯特] %s 湖之加护：%s 获得1气（当前气=%d）" % [caster.player_name, target.player_name, target.energy])
+
+## 人类玩家湖之加护决策入口（由UI调用）
+func submit_lake_blessing(caster_id: int, target_id: int) -> void:
+	if _lake_blessing_pending.is_empty():
+		return
+	if _current_phase != GamePhase.END_PHASE:
+		return
+	_lake_blessing_pending = {}
+	var caster := get_player(caster_id)
+	var target := get_player(target_id)
+	if caster == null or target == null:
+		_process_bell_decisions()
+		return
+	_apply_lake_blessing(caster, target)
+	_process_bell_decisions()
+
+## 奥伯龙·梦之终结：结束阶段触发（湖之加护在梦之终结之后、招架决策之前）
 ## 1. genjutsu：对每个受到实际伤害的目标，黑塔对其距离-1（本结算链每玩家至多一次，可跨回合累积至最小1）
 ## 2. 送你砖石：目标血量从 ≥50% 跨到 <50% 时，对与黑塔距离≤1的所有其他玩家造成1点伤害
 ##    砖石AOE伤害本身也触发 genjutsu 与砖石（连锁触发），每玩家每结算链至多作为触发源一次（防无限循环）

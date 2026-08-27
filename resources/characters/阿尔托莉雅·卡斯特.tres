@@ -1,0 +1,102 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
+[ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
+[ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
+
+[sub_resource type="Resource" id="SE_ba"]
+script = ExtResource("1_effect")
+effect_type = 0
+value = 1
+target = 0
+
+[sub_resource type="Resource" id="SD_ba"]
+script = ExtResource("2_skill")
+skill_name = "普攻"
+description = "远程魔法攻击，造成 1 点伤害。"
+energy_cost = 1
+min_range = 1
+max_range = 3
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ba")])
+
+[sub_resource type="Resource" id="SE_fp"]
+script = ExtResource("1_effect")
+effect_type = 53
+value = 5
+target = 2
+
+[sub_resource type="Resource" id="SD_fp"]
+script = ExtResource("2_skill")
+skill_name = "乐园妖精"
+description = "被动：开局获得5个气。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_fp")])
+
+[sub_resource type="Resource" id="SE_pg"]
+script = ExtResource("1_effect")
+effect_type = 54
+value = 0
+target = 2
+
+[sub_resource type="Resource" id="SD_pg"]
+script = ExtResource("2_skill")
+skill_name = "巡礼"
+description = "被动：每次消耗气时自动获得一个圣盾（全挡护盾，免一次所有伤害，不可叠加）。累计触发4次后消失并获得技能【圣剑锻造】。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_pg")])
+
+[sub_resource type="Resource" id="SE_ac"]
+script = ExtResource("1_effect")
+effect_type = 1
+value = -1
+target = 0
+
+[sub_resource type="Resource" id="SD_ac"]
+script = ExtResource("2_skill")
+skill_name = "Around Caliburn"
+description = "消耗3个气，选择任意一名玩家，使其获得圣盾（全挡护盾）+ 下一次造成的伤害翻倍。"
+energy_cost = 3
+min_range = 1
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_ac")])
+
+[sub_resource type="Resource" id="SE_lb"]
+script = ExtResource("1_effect")
+effect_type = 55
+value = 0
+target = 2
+
+[sub_resource type="Resource" id="SD_lb"]
+script = ExtResource("2_skill")
+skill_name = "湖之加护"
+description = "被动：自己回合结束阶段，选择任意一名玩家使其获得1个气。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([SubResource("SE_lb")])
+
+[sub_resource type="Resource" id="SE_sf"]
+script = ExtResource("1_effect")
+effect_type = 56
+value = 0
+target = 0
+
+[sub_resource type="Resource" id="SD_sf"]
+script = ExtResource("2_skill")
+skill_name = "圣剑锻造"
+description = "操作阶段，消耗3个气，选择一名其他玩家，使其无消耗释放一次他的任意需要耗气的技能（无视释放条件）。若目标无可用技能则获得3个气。"
+energy_cost = 3
+min_range = 1
+max_range = 999
+effects = Array[ExtResource("1_effect")]([SubResource("SE_sf")])
+
+[resource]
+script = ExtResource("3_char")
+character_name = "阿尔托莉雅·卡斯特"
+max_hp = 6
+basic_attack_cost = 1
+avatar_emoji = "雅"
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_fp"), SubResource("SD_pg"), SubResource("SD_ac"), SubResource("SD_lb"), SubResource("SD_sf")])
+tags = Array[String](["法师"])
+grade = "S"

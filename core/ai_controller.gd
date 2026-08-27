@@ -96,6 +96,12 @@ func decide_action(
 		if result.size() > 0:
 			return result
 
+	# 阿尔托莉雅·卡斯特特殊策略
+	if _is_caster(player):
+		var result := _decide_caster_action(player, others, distance_system)
+		if result.size() > 0:
+			return result
+
 	# 慈悲尖塔敌人差异化策略
 	if _is_tower_enemy(player):
 		var result := _decide_tower_enemy_action(player, alive_players, distance_system)
@@ -247,6 +253,74 @@ func _decide_oberon_action(
 			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
 
 	# 4. 夜幕状态下无好选择则充能（积累气等终极技能）
+	# 返回空让调用方走默认充能逻辑
+	return {}
+
+## 判断角色是否为阿尔托莉雅·卡斯特（通过技能名"巡礼"判断）
+func _is_caster(player: PlayerState) -> bool:
+	for skill in player.character.skills:
+		if skill.skill_name == "巡礼":
+			return true
+	return false
+
+## 阿尔托莉雅·卡斯特专用决策策略
+## 优先级：圣剑锻造（3气，升级后可用，让队友/自己无消耗释放技能）> Around Caliburn（3气，给目标圣盾+伤害x2）
+## > 普攻 > 充能
+## 乐园妖精开局5气/巡礼被动/湖之加护均自动触发，AI只需决定操作阶段行动
+func _decide_caster_action(
+	player: PlayerState,
+	others: Array[PlayerState],
+	distance_system: DistanceSystem
+) -> Dictionary:
+	var all_skills := player.get_all_skills()
+
+	# 1. 圣剑锻造（3气，升级后可用）：选技能最多的队友释放
+	var forge_idx := _find_skill_index(all_skills, player, "圣剑锻造")
+	if forge_idx >= 0 and player.energy >= 3:
+		# 优先选技能最多的队友（释放高伤技能）
+		var best_target: PlayerState = null
+		var best_skill_count: int = -1
+		for p in others:
+			if player.team_id != 0 and p.team_id != player.team_id:
+				continue  # 组队模式下只选队友
+			var cnt: int = p.get_all_skills().size()
+			if cnt > best_skill_count:
+				best_skill_count = cnt
+				best_target = p
+		# 非组队模式：选任意其他玩家
+		if best_target == null and player.team_id == 0:
+			for p in others:
+				var cnt: int = p.get_all_skills().size()
+				if cnt > best_skill_count:
+					best_skill_count = cnt
+					best_target = p
+		if best_target != null:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": forge_idx, "target_id": best_target.player_id }
+
+	# 2. Around Caliburn（3气）：给队友（组队）或自己圣盾+伤害x2
+	var caliburn_idx := _find_skill_index(all_skills, player, "Around Caliburn")
+	if caliburn_idx >= 0 and player.energy >= 3:
+		# 优先给高伤队友（伤害x2收益最大）
+		var best_target: PlayerState = null
+		if player.team_id != 0:
+			for p in others:
+				if p.team_id != player.team_id:
+					continue
+				if best_target == null or p.energy > best_target.energy:
+					best_target = p
+		# 非组队：给自己（下次普攻x2）
+		if best_target == null and player.team_id == 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": caliburn_idx, "target_id": player.player_id }
+		if best_target != null:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": caliburn_idx, "target_id": best_target.player_id }
+
+	# 3. 普攻：有气时攻击
+	var basic_idx := _find_skill_index(all_skills, player, "普攻")
+	if basic_idx >= 0 and player.energy >= 1:
+		var target := _pick_best_target(player, all_skills[basic_idx], others, distance_system)
+		if target >= 0:
+			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": basic_idx, "target_id": target }
+
 	# 返回空让调用方走默认充能逻辑
 	return {}
 

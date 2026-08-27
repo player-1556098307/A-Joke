@@ -218,6 +218,18 @@ const LIST: Array[Dictionary] = [
 		"bg_color": "#ECEFF1",
 		"res_path": "res://resources/characters/奥伯龙.tres",
 	},
+	{
+		"id": "caster",
+		"name": "阿尔托莉雅·卡斯特",
+		"sub": "CASTER",
+		"hp": 6,
+		"role": "法师",
+		"skills": "乐园妖精 · 巡礼 · Around Caliburn · 湖之加护 · 圣剑锻造",
+		"tags": ["法师"],
+		"color": "#534AB7",
+		"bg_color": "#EEEDFE",
+		"res_path": "res://resources/characters/阿尔托莉雅·卡斯特.tres",
+	},
 ]
 
 static func get_by_id(char_id: String) -> Dictionary:

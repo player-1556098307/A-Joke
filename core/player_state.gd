@@ -142,6 +142,13 @@ var backtrack_snapshot: Dictionary = {}
 ## 同一玩家可被多个大黑塔分别标记，各自独立生效、互不通用；永久存在（无自然消失机制）
 var jiedu_by: Array[int] = []
 
+## ── 阿尔托莉雅·卡斯特专属字段 ─────────────────────────────────────
+## 巡礼（被动）：累计消耗气的次数（消耗任意来源的气时+1，至多4次）
+## 达到4次后获得【圣剑锻造】技能（升级），不再继续累积
+var pilgrimage_count: int = 0
+## 圣剑锻造是否已解锁（累计消耗4次气后为true，永久）
+var sword_forge_unlocked: bool = false
+
 ## ── 奥伯龙专属字段 ───────────────────────────────────────────────
 ## 夜幕降临状态：持续到主动用梦之终结取消；效果=每次准备阶段+1气 + 本回合无法造成伤害
 var night_curtain_active: bool = false
@@ -238,6 +245,9 @@ func _init(id: int, p_name: String, char_data: CharacterData, human: bool) -> vo
 	night_curtain_active  = false
 	damage_double_next    = false
 	immune_next_attack    = false
+	# 阿尔托莉雅·卡斯特专属字段默认值
+	pilgrimage_count      = 0
+	sword_forge_unlocked  = false
 	# 秽土柱间·仙人之力：气上限6
 	# 注意：不能用"仙人之力"判断——仙人鸣人（仙人模式）也有同名被动技能（聚气+1），会误判
 	for skill in char_data.skills:
@@ -286,6 +296,8 @@ func save_pre_takeover_snapshot() -> void:
 		"night_curtain_active": night_curtain_active,
 		"damage_double_next": damage_double_next,
 		"immune_next_attack": immune_next_attack,
+		"pilgrimage_count": pilgrimage_count,
+		"sword_forge_unlocked": sword_forge_unlocked,
 	}
 
 ## 从快照恢复（夺舍体死亡后回退到夺舍前止水状态）
@@ -327,9 +339,12 @@ func restore_pre_takeover_snapshot() -> void:
 	glory_unlocked        = pre_takeover_snapshot.get("glory_unlocked", glory_unlocked)
 	susanoo_spiral_unlocked = pre_takeover_snapshot.get("susanoo_spiral_unlocked", susanoo_spiral_unlocked)
 	has_kotoamatsukami_skill = pre_takeover_snapshot.get("has_kotoamatsukami_skill", has_kotoamatsukami_skill)
-	night_curtain_active   = pre_takeover_snapshot.get("night_curtain_active", night_curtain_active)
+	night_curtain_active     = pre_takeover_snapshot.get("night_curtain_active", night_curtain_active)
 	damage_double_next     = pre_takeover_snapshot.get("damage_double_next", damage_double_next)
 	immune_next_attack     = pre_takeover_snapshot.get("immune_next_attack", immune_next_attack)
+	# 阿尔托莉雅·卡斯特字段恢复
+	pilgrimage_count       = pre_takeover_snapshot.get("pilgrimage_count", pilgrimage_count)
+	sword_forge_unlocked   = pre_takeover_snapshot.get("sword_forge_unlocked", sword_forge_unlocked)
 	# 夺舍回退后清除夺舍状态
 	takeover_active = false
 	koto_awaiting_confirm = false
@@ -412,6 +427,8 @@ func capture_backtrack_snapshot() -> Dictionary:
 		"night_curtain_active": night_curtain_active,
 		"damage_double_next": damage_double_next,
 		"immune_next_attack": immune_next_attack,
+		"pilgrimage_count": pilgrimage_count,
+		"sword_forge_unlocked": sword_forge_unlocked,
 	}
 
 ## 从回溯快照恢复自身状态（全部字段）
@@ -492,6 +509,9 @@ func restore_from_backtrack_snapshot(snap: Dictionary) -> void:
 	night_curtain_active     = snap.get("night_curtain_active", night_curtain_active)
 	damage_double_next       = snap.get("damage_double_next", damage_double_next)
 	immune_next_attack       = snap.get("immune_next_attack", immune_next_attack)
+	# 阿尔托莉雅·卡斯特字段恢复
+	pilgrimage_count         = snap.get("pilgrimage_count", pilgrimage_count)
+	sword_forge_unlocked     = snap.get("sword_forge_unlocked", sword_forge_unlocked)
 
 ## 重置回合临时数据（每回合开始时调用），持续状态字段不在此重置
 ## 防反（counter_stance）为持续状态：进入后持续到自己的下个回合行动开始（_start_action_input）时清除
@@ -532,6 +552,9 @@ func get_all_skills() -> Array[SkillData]:
 			continue  # 已永久失去的技能
 		if skill.skill_name == "宇智波的荣耀":
 			continue  # 荣耀：仅准备阶段触发，不进入常规技能列表
+		# 圣剑锻造：巡礼升级后才可用，未解锁时不显示
+		if skill.skill_name == "圣剑锻造" and not sword_forge_unlocked:
+			continue
 		all.append(skill)
 	for skill in unlocked_skills:
 		if skill_disabled_turns > 0:
