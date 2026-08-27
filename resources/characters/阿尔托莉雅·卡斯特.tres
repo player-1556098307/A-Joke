@@ -1,5 +1,6 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3]
 
+[ext_resource type="Texture2D" uid="uid://btncgb616k7ny" path="res://resources/characters/portraits/阿尔托莉雅·卡斯特.png" id="1_portrait"]
 [ext_resource type="Script" uid="uid://bkdmsc5i8nnec" path="res://resources/skill_effect.gd" id="1_effect"]
 [ext_resource type="Script" uid="uid://dfnpbvupc8l38" path="res://resources/skill_data.gd" id="2_skill"]
 [ext_resource type="Script" uid="uid://dx561rntxjbhw" path="res://resources/character_data.gd" id="3_char"]
@@ -97,6 +98,7 @@ character_name = "阿尔托莉雅·卡斯特"
 max_hp = 6
 basic_attack_cost = 1
 avatar_emoji = "雅"
+portrait = ExtResource("1_portrait")
 skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_fp"), SubResource("SD_pg"), SubResource("SD_ac"), SubResource("SD_lb"), SubResource("SD_sf")])
 tags = Array[String](["法师"])
 grade = "S"
