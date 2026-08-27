@@ -227,8 +227,9 @@ signal lake_blessing_required(player_id: int, target_ids: Array[int])
 signal lake_blessing_used(caster_id: int, target_id: int)
 ## Around Caliburn 释放：目标获得圣盾+下次伤害x2
 signal caliburn_used(caster_id: int, target_id: int)
-## 圣剑锻造弹窗：选择目标玩家+技能（复用投影弹窗格式）
-signal sword_forge_required(player_id: int, target_ids: Array[int])
+## 圣剑锻造弹窗：目标玩家选择释放哪个技能+攻击谁
+## player_id=被锻造的目标ID, skill_names=可选技能名列表, attack_target_ids=可选攻击目标ID列表
+signal sword_forge_required(player_id: int, skill_names: Array[String], attack_target_ids: Array[int])
 ## 圣剑锻造执行完成
 signal sword_forge_used(caster_id: int, target_id: int, skill_name: String)
 ## 圣剑锻造回退：目标无可用技能，获得3气
@@ -3607,8 +3608,8 @@ func _process_pilgrimage(player: PlayerState, cost: int) -> void:
 
 ## ── 阿尔托莉雅·卡斯特·圣剑锻造 ─────────────────────────────────
 ## 使目标无消耗释放一次任意需耗气的技能（无视释放条件）
-## 人类：弹窗选择目标→选择技能；AI：自动选择
-## 注意：目标不可选自己（已在 _build_skill_targets 中保证）
+## 决策权归目标：目标人类→弹窗选技能+攻击对象；目标AI→自动决策
+## 注意：铸造目标不可选自己（已在 _build_skill_targets 中保证）
 func _process_sword_forge(caster: PlayerState, target: PlayerState) -> void:
 	if caster == null or target == null:
 		return
@@ -3633,22 +3634,29 @@ func _process_sword_forge(caster: PlayerState, target: PlayerState) -> void:
 		print("[卡斯特] %s 圣剑锻造→%s 无可用技能，%s获得3气" % [caster.player_name, target.player_name, target.player_name])
 		return
 
-	# 存在可用技能：人类弹窗选择 / AI自动选择
+	# 存在可用技能：由目标自己决策
 	_sword_forge_pending = {
 		"caster_id": caster.player_id,
 		"target_id": target.player_id,
 		"target_skills": target_skills,
 	}
-	if caster.is_human:
+	if target.is_human:
+		# 目标是人类：弹窗让目标选技能 + 攻击对象
 		var skill_names: Array[String] = []
 		for s in target_skills:
 			skill_names.append(s.skill_name)
-		var tids: Array[int] = [target.player_id]
-		sword_forge_required.emit(caster.player_id, tids)
-		# 注意：实际 UI 需进一步展示技能列表选择，此处简化为人类选第一个
-		# 测试中由 submit_sword_forge 直接指定 skill_index
+		# 收集可选攻击目标（排除目标自己；组队模式排除队友）
+		var attack_target_ids: Array[int] = []
+		for p in get_alive_players():
+			if p.player_id == target.player_id:
+				continue
+			if target.team_id != 0 and p.team_id == target.team_id:
+				continue
+			attack_target_ids.append(p.player_id)
+		sword_forge_required.emit(target.player_id, skill_names, attack_target_ids)
+		# 测试中由 submit_sword_forge 直接指定 skill_index + attack_target_id
 	else:
-		# AI：选择伤害最高的技能
+		# 目标是AI：自动选择技能（伤害最高）+ 攻击对象（最近/最低血）
 		var best_idx := 0
 		var best_dmg: float = 0.0
 		for i in range(target_skills.size()):
@@ -3661,24 +3669,29 @@ func _process_sword_forge(caster: PlayerState, target: PlayerState) -> void:
 						best_dmg = e.value
 						best_idx = i
 						break
-		_execute_sword_forge(caster, target, target_skills[best_idx])
+		# AI选择攻击目标
+		var chosen_skill: SkillData = target_skills[best_idx]
+		var attack_target_id := _ai_sword_forge_pick_target(target, chosen_skill)
+		_execute_sword_forge(caster, target, chosen_skill, attack_target_id)
 
-## 执行圣剑锻造：让目标无消耗释放选定技能
-func _execute_sword_forge(caster: PlayerState, target: PlayerState, chosen_skill: SkillData) -> void:
-	if caster == null or target == null or chosen_skill == null:
-		_sword_forge_pending = {}
-		return
-	# 构建技能目标：ENEMY_SINGLE 选离施法者最近的存活其他玩家（目标是"目标的敌人"）
-	# 注意：圣剑锻造让目标释放技能，目标使用自己的技能，目标自身为"attacker"
-	var forge_targets: Array[PlayerState] = []
-	var has_enemy_target := false
-	for e in chosen_skill.effects:
-		if e.target == SkillEffect.EffectTarget.ENEMY_SINGLE or e.target == SkillEffect.EffectTarget.ENEMY_ALL:
-			has_enemy_target = true
-			break
-	if has_enemy_target:
-		# 目标选择：优先选离 target 最近的非自己存活玩家
-		var best_p: PlayerState = null
+## 目标为AI时，自动选择圣剑锻造的攻击目标
+## 优先选离自己最近且在技能射程内的最低血敌人
+func _ai_sword_forge_pick_target(target: PlayerState, chosen_skill: SkillData) -> int:
+	var best_p: PlayerState = null
+	var best_hp: float = 999.0
+	for p in get_alive_players():
+		if p.player_id == target.player_id:
+			continue
+		if target.team_id != 0 and p.team_id == target.team_id:
+			continue
+		var d: int = _distance_system.get_distance(target.player_id, p.player_id)
+		if d < chosen_skill.min_range or d > chosen_skill.max_range:
+			continue
+		if p.hp < best_hp:
+			best_hp = p.hp
+			best_p = p
+	# 若射程内无目标，选全局最近
+	if best_p == null:
 		var best_dist: int = 999
 		for p in get_alive_players():
 			if p.player_id == target.player_id:
@@ -3689,8 +3702,24 @@ func _execute_sword_forge(caster: PlayerState, target: PlayerState, chosen_skill
 			if d < best_dist:
 				best_dist = d
 				best_p = p
-		if best_p != null:
-			forge_targets.append(best_p)
+	return best_p.player_id if best_p != null else -1
+
+## 执行圣剑锻造：让目标无消耗释放选定技能，攻击指定对象
+func _execute_sword_forge(caster: PlayerState, target: PlayerState, chosen_skill: SkillData, attack_target_id: int) -> void:
+	if caster == null or target == null or chosen_skill == null:
+		_sword_forge_pending = {}
+		return
+	# 构建技能目标：根据技能效果类型决定
+	var forge_targets: Array[PlayerState] = []
+	var has_enemy_target := false
+	for e in chosen_skill.effects:
+		if e.target == SkillEffect.EffectTarget.ENEMY_SINGLE or e.target == SkillEffect.EffectTarget.ENEMY_ALL:
+			has_enemy_target = true
+			break
+	if has_enemy_target and attack_target_id >= 0:
+		var at: PlayerState = get_player(attack_target_id)
+		if at != null and at.is_alive:
+			forge_targets.append(at)
 	# 临时保存并清零目标的能量消耗（无消耗释放）
 	var saved_energy := target.energy
 	# 临时设为足够释放
@@ -3703,8 +3732,6 @@ func _execute_sword_forge(caster: PlayerState, target: PlayerState, chosen_skill
 	# 恢复目标能量（无消耗）
 	target.energy = saved_energy
 	player_charged.emit(target.player_id, target.energy)
-	# 触发巡礼被动（目标消耗气时——但圣剑锻造是无消耗释放，不触发巡礼）
-	# 注意：圣剑锻造释放的技能是无消耗的，不触发巡礼
 	# 标准后效处理
 	for entry in forge_logs:
 		_emit_effect_signals(entry)
@@ -3721,10 +3748,11 @@ func _execute_sword_forge(caster: PlayerState, target: PlayerState, chosen_skill
 	print("[卡斯特] %s 圣剑锻造：%s 无消耗释放了 %s" % [caster.player_name, target.player_name, chosen_skill.skill_name])
 	_sword_forge_pending = {}
 
-## 人类玩家圣剑锻造决策入口（由UI调用）
-## target_id: 被锻造的目标（已在 _process_sword_forge 中锁定）
+## 目标玩家圣剑锻造决策入口（由UI调用）
+## target_id: 被锻造的目标（自己选择释放什么技能）
 ## skill_index: 在 target_skills 列表中的索引
-func submit_sword_forge(caster_id: int, skill_index: int) -> void:
+## attack_target_id: 攻击目标ID（无敌方效果的技能传-1）
+func submit_sword_forge(target_id: int, skill_index: int, attack_target_id: int) -> void:
 	if _sword_forge_pending.is_empty():
 		return
 	var ctx: Dictionary = _sword_forge_pending
@@ -3734,7 +3762,7 @@ func submit_sword_forge(caster_id: int, skill_index: int) -> void:
 	if caster == null or target == null or skill_index < 0 or skill_index >= target_skills.size():
 		_sword_forge_pending = {}
 		return
-	_execute_sword_forge(caster, target, target_skills[skill_index])
+	_execute_sword_forge(caster, target, target_skills[skill_index], attack_target_id)
 
 ## 复制技能但不消耗能量（用于圣剑锻造的无消耗释放）
 func _copy_skill_zero_cost(src: SkillData) -> SkillData:

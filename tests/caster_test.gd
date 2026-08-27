@@ -238,6 +238,7 @@ func _test_sword_forge(caster_char: CharacterData, naruto_char: CharacterData, s
 	var gm: GameManager = arr[0]
 	var cs: PlayerState = arr[1]
 	var p1: PlayerState = arr[2]  # 鸣人（被锻造目标）
+	var p2: PlayerState = arr[3]  # 佐助（攻击目标）
 
 	# 先解锁圣剑锻造
 	cs.sword_forge_unlocked = true
@@ -254,19 +255,24 @@ func _test_sword_forge(caster_char: CharacterData, naruto_char: CharacterData, s
 	gm.sword_forge_used.connect(func(cid: int, tid: int, sname: String): sf_used_sig.append([cid, tid, sname]))
 
 	var sf_req_sig: Array = []
-	gm.sword_forge_required.connect(func(pid: int, tids: Array[int]): sf_req_sig.append([pid, tids]))
+	gm.sword_forge_required.connect(func(pid: int, snames: Array[String], ttids: Array[int]): sf_req_sig.append([pid, snames, ttids]))
 
 	gm.submit_action(0, PlayerState.ActionType.USE_SKILL, _find_skill_index(cs, "圣剑锻造"), 1)
 
 	_assert(cs.energy == 2, "6a: 圣剑锻造消耗3气后剩2（实际=%d）" % cs.energy)
-	_assert(sf_req_sig.size() >= 1, "6b: sword_forge_required信号（等待选择技能）")
+	# 弹窗发给目标(p1=鸣人)而非卡斯特
+	_assert(sf_req_sig.size() >= 1, "6b: sword_forge_required信号（发给目标）")
+	if sf_req_sig.size() >= 1:
+		_assert(sf_req_sig[0][0] == 1, "6b2: 弹窗发给目标player_id=1（实际=%d）" % sf_req_sig[0][0])
 
-	# 人类提交选择第0个技能（鸣人的普攻）
+	# 目标(鸣人)提交选择第0个技能（普攻），攻击p2(佐助)
+	var p2_hp_before: float = p2.hp
 	var saved_p1_energy := p1.energy
-	gm.submit_sword_forge(0, 0)
+	gm.submit_sword_forge(1, 0, 2)
 
 	_assert(sf_used_sig.size() >= 1, "6c: sword_forge_used信号触发")
 	_assert(p1.energy == saved_p1_energy, "6d: 目标能量不消耗（实际=%d）" % p1.energy)
+	_assert(p2.hp < p2_hp_before, "6e: 攻击目标受伤（%.1f→%.1f）" % [p2_hp_before, p2.hp])
 
 ## ═════════ 测试7：圣剑锻造 fallback（无可用技能→3气） ════════
 func _test_sword_forge_fallback(caster_char: CharacterData, naruto_char: CharacterData, sasuke_char: CharacterData, sakura_char: CharacterData) -> void:
@@ -291,17 +297,17 @@ func _test_sword_forge_fallback(caster_char: CharacterData, naruto_char: Charact
 	gm.sword_forge_fallback.connect(func(cid: int, tid: int): fb_sig.append([cid, tid]))
 
 	var sf_req_sig: Array = []
-	gm.sword_forge_required.connect(func(pid: int, tids: Array[int]): sf_req_sig.append([pid, tids]))
+	gm.sword_forge_required.connect(func(pid: int, snames: Array[String], ttids: Array[int]): sf_req_sig.append([pid, snames, ttids]))
 
 	gm.submit_action(0, PlayerState.ActionType.USE_SKILL, _find_skill_index(cs, "圣剑锻造"), 1)
 
-	# p1(鸣人)有普攻（耗气），走正常路径→人类玩家弹窗等待 submit_sword_forge
+	# p1(鸣人)有普攻（耗气），走正常路径→目标人类弹窗等待 submit_sword_forge
 	_assert(cs.energy == 2, "7a: 圣剑锻造消耗3气后剩2（实际=%d）" % cs.energy)
-	_assert(sf_req_sig.size() >= 1, "7b: sword_forge_required信号（等待人类选择技能）")
+	_assert(sf_req_sig.size() >= 1, "7b: sword_forge_required信号（发给目标）")
 
-	# 人类提交选择第0个技能（普攻）
+	# 目标提交选择第0个技能（普攻），攻击p2(佐助=2)
 	var saved_p1_energy := p1.energy
-	gm.submit_sword_forge(0, 0)
+	gm.submit_sword_forge(1, 0, 2)
 	_assert(p1.energy == saved_p1_energy, "7c: 目标能量不消耗（实际=%d）" % p1.energy)
 	_assert(fb_sig.size() == 0, "7d: 有可用技能时不触发fallback")
 
