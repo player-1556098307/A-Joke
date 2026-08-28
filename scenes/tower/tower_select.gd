@@ -260,12 +260,16 @@ func _build_ui() -> void:
 	sk_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(sk_header)
 	_skills_container = VBoxContainer.new()
-	_skills_container.anchor_left = 0.0; _skills_container.anchor_top = 0.0
-	_skills_container.anchor_right = 1.0; _skills_container.anchor_bottom = 1.0
-	_skills_container.offset_left = 540.0; _skills_container.offset_top = 270.0
-	_skills_container.offset_right = -12.0; _skills_container.offset_bottom = -58.0
 	_skills_container.add_theme_constant_override("separation", 6)
-	add_child(_skills_container)
+	_skills_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var sk_scroll := ScrollContainer.new()
+	sk_scroll.anchor_left = 0.0; sk_scroll.anchor_top = 0.0
+	sk_scroll.anchor_right = 1.0; sk_scroll.anchor_bottom = 1.0
+	sk_scroll.offset_left = 540.0; sk_scroll.offset_top = 270.0
+	sk_scroll.offset_right = -12.0; sk_scroll.offset_bottom = -58.0
+	sk_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sk_scroll.add_child(_skills_container)
+	add_child(sk_scroll)
 
 	# 底部成员槽位条（房间式：空/AI/真人）
 	var slot_bg := Panel.new()
@@ -488,6 +492,8 @@ func _make_character_card(char_data: CharacterData) -> Button:
 	sk_lbl.add_theme_font_size_override("font_size", 10)
 	sk_lbl.add_theme_color_override("font_color", Color("#5F5E5A"))
 	sk_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sk_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	sk_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
 	card.add_child(sk_lbl)
 
 	var sel_panel := Panel.new()
@@ -798,7 +804,7 @@ func _build_skill_cards(char_data: CharacterData) -> void:
 
 func _make_skill_row(skill: SkillData, idx: int, locked: bool) -> Panel:
 	var row := Panel.new()
-	row.custom_minimum_size = Vector2(0, 38)
+	row.custom_minimum_size = Vector2(0, 52)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bg: Color
@@ -830,7 +836,7 @@ func _make_skill_row(skill: SkillData, idx: int, locked: bool) -> Panel:
 	if skill.description != "":
 		name_lbl.anchor_bottom = 0.0
 		name_lbl.offset_left = 10.0; name_lbl.offset_top = 2.0
-		name_lbl.offset_right = 350.0; name_lbl.offset_bottom = 21.0
+		name_lbl.offset_right = 260.0; name_lbl.offset_bottom = 20.0
 	else:
 		name_lbl.anchor_bottom = 1.0
 		name_lbl.offset_left = 10.0; name_lbl.offset_right = 350.0
@@ -840,12 +846,12 @@ func _make_skill_row(skill: SkillData, idx: int, locked: bool) -> Panel:
 		desc_lbl.text = skill.description
 		desc_lbl.add_theme_font_size_override("font_size", 9)
 		desc_lbl.add_theme_color_override("font_color", detail_col)
-		desc_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		desc_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		desc_lbl.anchor_bottom = 0.0
-		desc_lbl.offset_left = 10.0; desc_lbl.offset_top = 21.0
-		desc_lbl.offset_right = 350.0; desc_lbl.offset_bottom = 36.0
+		desc_lbl.anchor_right = 1.0
+		desc_lbl.offset_left = 10.0; desc_lbl.offset_top = 20.0
+		desc_lbl.offset_right = -100.0; desc_lbl.offset_bottom = 50.0
 		row.add_child(desc_lbl)
 	var range_str: String
 	if skill.max_range >= 999:
@@ -862,8 +868,9 @@ func _make_skill_row(skill: SkillData, idx: int, locked: bool) -> Panel:
 	info_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	info_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info_lbl.anchor_left = 1.0; info_lbl.anchor_right = 1.0
-	info_lbl.anchor_bottom = 1.0
+	info_lbl.anchor_bottom = 0.0
 	info_lbl.offset_left = -96.0; info_lbl.offset_right = -6.0
+	info_lbl.offset_top = 0.0; info_lbl.offset_bottom = 20.0
 	row.add_child(info_lbl)
 	return row
 
