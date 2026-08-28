@@ -49,12 +49,20 @@ energy_cost = 0
 is_passive = true
 effects = Array[ExtResource("1_effect")]([SubResource("SE_bl")])
 
+[sub_resource type="Resource" id="SD_bati"]
+script = ExtResource("2_skill")
+skill_name = "霸体"
+description = "锁定技：免疫一切控制效果（麻痹/击飞/封技/无法选择）。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([])
+
 [resource]
 script = ExtResource("3_char")
 character_name = "石像鬼"
 max_hp = 8
 portrait = ExtResource("4_portrait")
 basic_attack_cost = 1
-skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_sk"), SubResource("SD_bl")])
+skills = Array[ExtResource("2_skill")]([SubResource("SD_ba"), SubResource("SD_sk"), SubResource("SD_bl"), SubResource("SD_bati")])
 tags = Array[String](["坦克"])
 grade = "B"

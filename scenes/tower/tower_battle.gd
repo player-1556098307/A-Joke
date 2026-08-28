@@ -31,6 +31,8 @@ var _party_size: int = 1
 
 ## 测试快速模式：跳过所有过渡动画和对话，直接启动战斗/推进层
 var fast_mode: bool = false
+## 敌人祝福随机数生成器（后期小怪自带祝福）
+var _rng := RandomNumberGenerator.new()
 
 ## 战斗中剧情触发标记
 var _enemy_hp50_triggered: bool = false    ## 敌人HP首次低于50%
@@ -42,6 +44,7 @@ var _enemy_name: String = ""
 var _bgm_player: AudioStreamPlayer
 
 func _ready() -> void:
+	_rng.randomize()
 	# 根节点全屏锚定（Control 继承，子 Control 才能正确布局）
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# 顶层提示层（独立全屏 Control，mouse 穿透，覆盖在 GameUI 之上）
@@ -235,6 +238,8 @@ func _inject_tower_buffs() -> void:
 	_ui.setup_players(GameManager.get_alive_players())
 	# 后期小怪攻击力强化（第3-4轮 +1/+2 普攻增伤）
 	_inject_enemy_attack_bonus()
+	# 后期小怪自带祝福（第3-4轮 cycle≥3 的普通小怪层，敌人随机获得 0-2 个普通祝福）
+	_inject_enemy_buffs()
 
 ## 应用单个 buff 到 PlayerState
 func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
@@ -288,6 +293,43 @@ func _inject_enemy_attack_bonus() -> void:
 		if p.team_id != 2:
 			continue
 		p.damage_bonus_basic += atk_bonus
+
+## 后期小怪自带祝福：第3-4轮（cycle≥3）的小怪层，敌人随机获得 0-2 个普通祝福
+## 仅对小怪层生效，精英层和Boss层不加（它们有自己的技能体系）
+func _inject_enemy_buffs() -> void:
+	var floor_num := tower_mgr.get_current_floor()
+	# 精英层（第4/8/12/16层）和Boss层不加祝福
+	if floor_num > 0 and floor_num <= TowerManager.MAX_FLOORS and floor_num % 4 == 0:
+		return
+	# 计算循环轮次（1-4）：ceili(floor / 4)
+	var cycle := ceili(float(floor_num) / 4.0)
+	if cycle < 3:
+		return
+	# 从 REWARD_POOL 中筛选普通祝福（tier=normal，排除一次性消耗品 soul_slash/spring/immortal_medal）
+	var normal_pool: Array[Dictionary] = []
+	for reward in TowerRewardUI.REWARD_POOL:
+		if reward.get("tier", "normal") != "normal":
+			continue
+		var rid: String = reward.get("id", "")
+		# 排除一次性消耗品（小怪不适合拥有一次性技能/被动）
+		if rid in ["soul_slash", "spring", "immortal_medal"]:
+			continue
+		normal_pool.append(reward)
+	if normal_pool.is_empty():
+		return
+	# 为每个敌人随机分配 0-2 个祝福
+	for p in GameManager.get_alive_players():
+		if p.team_id != 2:
+			continue
+		var buff_count := _rng.randi_range(0, 2)
+		var chosen: Array = []
+		# 不重复选取
+		var pool_copy := normal_pool.duplicate(true)
+		pool_copy.shuffle()
+		for i in range(min(buff_count, pool_copy.size())):
+			chosen.append(pool_copy[i])
+		for buff in chosen:
+			_apply_buff(p, buff)
 
 ## 换层前清理已消耗的一次性祝福
 ## 斩魂/回春是消耗品：用完一次永久失效，从持久化 buff 列表移除 → 祝福池可再次随机到
@@ -595,16 +637,22 @@ func _on_floor_cleared(floor_num: int, enemy_name: String) -> void:
 	else:
 		_dialogue_box.visible = true
 		_dialogue_box.start(exit_dlg)
+		# 行退场对话时也要暂停自动出拳
+		GameManager.tower_dialogue_paused = true
 
 ## 退场对话结束 → 弹出奖励选择（或直接推进）
 func _on_dialogue_generic_finished() -> void:
 	_dialogue_box.visible = false
 	_fade_portrait(false)
+	# 确保对话结束后恢复自动出拳（防止暂停标记残留）
+	GameManager.tower_dialogue_paused = false
 	if _phase == "exit_dialogue":
 		_show_reward_selection()
 	elif _phase == "zeus_transition":
 		_on_zeus_transition_dialogue_finished()
-	# 战斗中的叙事对话不改变 phase，只是弹出后消失
+	else:
+		# 战斗中的叙事对话（敌人HP<50%/玩家淘汰等）：恢复后立即继续自动出拳
+		GameManager.resume_auto_rps()
 
 ## 弹出层间奖励选择界面（每角色独立选祝福）
 ## 精英层（第4/8/12层）通关后可随机到高级祝福
@@ -843,6 +891,8 @@ func _show_enemy_low_hp_narrative(enemy: PlayerState) -> void:
 		return
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
+	# 战斗中叙事对话：暂停自动出拳
+	GameManager.tower_dialogue_paused = true
 
 ## 玩家队有人被淘汰时的叙事（player_eliminated 信号带 player_id 参数）
 func _on_player_eliminated(_player_id: int) -> void:
@@ -857,6 +907,8 @@ func _on_player_eliminated(_player_id: int) -> void:
 	}
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
+	# 玩家被淘汰叙事：暂停自动出拳
+	GameManager.tower_dialogue_paused = true
 
 ## 宙斯一阶段→二阶段转换：弹出过渡对话 + 播放二阶段BGM
 func _on_zeus_phase_transition(_zeus_id: int) -> void:
@@ -870,6 +922,7 @@ func _on_zeus_phase_transition(_zeus_id: int) -> void:
 	# 暂存当前 phase，对话结束后恢复
 	_zeus_transition_prev_phase = _phase
 	_phase = "zeus_transition"
+	GameManager.tower_dialogue_paused = true
 	_dialogue_box.visible = true
 	_dialogue_box.start(data)
 
@@ -890,6 +943,8 @@ func _on_zeus_transition_dialogue_finished() -> void:
 	_dialogue_box.visible = false
 	_fade_portrait(false)
 	_phase = _zeus_transition_prev_phase
+	# 对话已结束，恢复自动出拳（若当前处于出拳阶段）
+	GameManager.resume_auto_rps()
 	# 刷新UI：宙斯换了角色.tres，头像/血量/技能列表需要更新
 	_ui.setup_players(GameManager.get_alive_players())
 

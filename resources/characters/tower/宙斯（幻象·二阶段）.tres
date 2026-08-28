@@ -85,12 +85,21 @@ energy_cost = 0
 is_passive = true
 effects = Array[ExtResource("1_effect")]([SubResource("SE_gift")])
 
+; ── 霸体（被动锁定技）：免疫一切控制效果 ──
+[sub_resource type="Resource" id="SD_bati"]
+script = ExtResource("2_skill")
+skill_name = "霸体"
+description = "锁定技：免疫一切控制效果（麻痹/击飞/封技/无法选择）。"
+energy_cost = 0
+is_passive = true
+effects = Array[ExtResource("1_effect")]([])
+
 [resource]
 script = ExtResource("3_char")
 character_name = "宙斯（幻象·二阶段）"
 max_hp = 50
 portrait = ExtResource("4_p2")
 basic_attack_cost = 1
-skills = Array[ExtResource("2_skill")]([SubResource("SD_punish"), SubResource("SD_shield"), SubResource("SD_judgement"), SubResource("SD_summon_clodia"), SubResource("SD_gift")])
+skills = Array[ExtResource("2_skill")]([SubResource("SD_punish"), SubResource("SD_shield"), SubResource("SD_judgement"), SubResource("SD_summon_clodia"), SubResource("SD_gift"), SubResource("SD_bati")])
 tags = Array[String](["神"])
 grade = "S"

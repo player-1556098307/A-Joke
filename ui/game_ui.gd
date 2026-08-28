@@ -35,9 +35,21 @@ var net_client: NetworkGameClient = null
 var is_spectating: bool = false
 var _spectator_view_idx: int = 0
 
-const ARENA_CENTER := Vector2(480.0, 295.0)
 const ARENA_RADIUS := 155.0
+## 竞技场中心基准（960×540 设计分辨率下的值，运行时按实际尺寸缩放）
+const ARENA_CENTER_DESIGN := Vector2(480.0, 295.0)
 # Countdown duration is read from SettingsManager at runtime
+
+## 获取竞技场中心（根据 PlayersContainer 实际大小按比例缩放，适配不同宽高比）
+func _get_arena_center() -> Vector2:
+	var container_size := players_container.size
+	if container_size.x <= 0 or container_size.y <= 0:
+		return ARENA_CENTER_DESIGN
+	# 按 960×540 设计比例缩放竞技场中心位置
+	return Vector2(
+		container_size.x * (ARENA_CENTER_DESIGN.x / 960.0),
+		container_size.y * (ARENA_CENTER_DESIGN.y / 540.0)
+	)
 
 const CLASS_AVATAR_BG := {
 	"战士": Color("#B5D4F4"), "法师": Color("#EEEDFE"),
@@ -178,6 +190,20 @@ func _ready() -> void:
 	GameManager.dream_end_used.connect(_on_dream_end_used)
 
 func _style_panels() -> void:
+	# Background 锚定全屏（修正手机端 expand 模式下背景未铺满的问题）
+	var bg: ColorRect = $Background
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# PlayersContainer 锚定全屏（让竞技场容器随视口缩放，_get_arena_center 据此居中）
+	players_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	players_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# BorderFrame 锚定全屏（边框铺满视口）
+	var border_frame: Panel = $BorderFrame
+	border_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	border_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	# LogPanelBg — white background, dark border (matching SVG)
 	var log_panel: Panel = $LogPanelBg
 	log_panel.add_theme_stylebox_override("panel", _make_flat(Color("#FFFDF5"), Color("#2C2C2A"), 2, 4))
@@ -271,6 +297,8 @@ func _on_auto_rps_toggled() -> void:
 	_update_auto_rps_btn_style()
 	if GameManager.auto_rps_enabled:
 		_append_log("── 自动出拳已开启 ──", LT_STATUS)
+		# 开启时立即触发自动出拳（若当前正处于出拳阶段且玩家未提交手势）
+		GameManager.resume_auto_rps()
 
 ## 黑白配（手心手背）选择面板
 var _odd_even_panel: VBoxContainer
@@ -623,11 +651,12 @@ func setup_players(players: Array[PlayerState]) -> void:
 			_human_player_id = player.player_id
 
 	var count := players.size()
+	var center := _get_arena_center()
 	for i in count:
 		var player := players[i]
 		var angle  := -PI / 2.0 + i * (TAU / count)
-		var cx     := ARENA_CENTER.x + ARENA_RADIUS * cos(angle)
-		var cy     := ARENA_CENTER.y + ARENA_RADIUS * sin(angle)
+		var cx     := center.x + ARENA_RADIUS * cos(angle)
+		var cy     := center.y + ARENA_RADIUS * sin(angle)
 		var card   := _build_player_card(player)
 		card.position = Vector2(cx - 52.0, cy - 55.0)
 		# 宙斯Boss卡片放大（更有Boss压迫感）：绕卡片中心缩放，位置不变
@@ -3660,11 +3689,12 @@ func _setup_from_sync(players_data: Array) -> void:
 	GameManager._distance_system.setup(seat_order)
 
 	var count := player_states.size()
+	var center := _get_arena_center()
 	for i in count:
 		var ps := player_states[i]
 		var angle := -PI / 2.0 + i * (TAU / count)
-		var cx := ARENA_CENTER.x + ARENA_RADIUS * cos(angle)
-		var cy := ARENA_CENTER.y + ARENA_RADIUS * sin(angle)
+		var cx := center.x + ARENA_RADIUS * cos(angle)
+		var cy := center.y + ARENA_RADIUS * sin(angle)
 		var card := _build_player_card(ps)
 		card.position = Vector2(cx - 52.0, cy - 55.0)
 		players_container.add_child(card)

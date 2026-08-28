@@ -1,5 +1,6 @@
 ## TowerResult — 慈悲尖塔通关/失败结算界面
 ## 从 SceneManager.pending_game_result 读取结果，展示结算信息
+## 内容超出屏幕时自动滚动（确保按钮始终可达）
 extends Control
 
 ## ---- 配色 ----
@@ -13,6 +14,8 @@ const C_RED      := Color("#E24B4A")
 const C_GREEN    := Color("#3B6D11")
 
 var _result: Dictionary = {}
+## 滚动内容容器：所有 UI 元素挂在此节点下，内容超高时自动滚动
+var _content: Control
 
 func _ready() -> void:
 	_result = SceneManager.pending_game_result
@@ -26,6 +29,20 @@ func _build_ui() -> void:
 	bg.show_behind_parent = true
 	add_child(bg)
 
+	# 滚动容器：内容超过屏幕高度时自动滚动
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(scroll)
+
+	# 内容容器：承载所有 UI 元素，宽度固定 960，高度随内容增长
+	_content = Control.new()
+	_content.custom_minimum_size = Vector2(960, 0)
+	_content.mouse_filter = Control.MOUSE_FILTER_STOP
+	scroll.add_child(_content)
+
 	var is_victory: bool = _result.get("tower_victory", false)
 	var is_defeat: bool = _result.get("tower_defeat", false)
 
@@ -36,6 +53,14 @@ func _build_ui() -> void:
 	else:
 		# 未知状态，回主菜单
 		SceneManager.go_to("res://scenes/main_menu.tscn")
+
+## 添加顶层元素到内容容器（替代直接 add_child）
+func _add(node: Control) -> void:
+	_content.add_child(node)
+
+## 构建完成后设置内容容器高度（确保滚动区域正确）
+func _finalize_content_height(last_y: float) -> void:
+	_content.custom_minimum_size = Vector2(960, last_y + 10.0)
 
 ## ============== 通关结算 ==============
 func _build_victory_ui() -> void:
@@ -51,7 +76,7 @@ func _build_victory_ui() -> void:
 	title.anchor_left = 0.0; title.anchor_right = 1.0
 	title.offset_top = 60.0; title.offset_bottom = 100.0
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(title)
+	_add(title)
 
 	# 副标题
 	var subtitle := Label.new()
@@ -62,7 +87,7 @@ func _build_victory_ui() -> void:
 	subtitle.anchor_left = 0.0; subtitle.anchor_right = 1.0
 	subtitle.offset_top = 108.0; subtitle.offset_bottom = 130.0
 	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(subtitle)
+	_add(subtitle)
 
 	# 分割线装饰
 	_add_divider(145.0)
@@ -75,7 +100,7 @@ func _build_victory_ui() -> void:
 	ps.bg_color = C_PANEL_BG; ps.border_color = C_BORDER
 	ps.set_border_width_all(2); ps.set_corner_radius_all(8)
 	panel.add_theme_stylebox_override("panel", ps)
-	add_child(panel)
+	_add(panel)
 
 	var enemy_names := ["破败王者（怒）", "漩涡鸣人（仙人模式）", "司马懿（狂）"]
 	var y_offset := 20.0
@@ -124,7 +149,10 @@ func _build_victory_ui() -> void:
 	var after_stats := _build_tower_stats_panel(stats_y + 70.0)
 
 	# 按钮
-	_add_buttons(true, after_stats + 15.0)
+	var btn_bottom := _add_buttons(true, after_stats + 15.0)
+
+	# 设置内容高度（确保滚动区域覆盖所有元素+按钮）
+	_finalize_content_height(btn_bottom)
 
 ## ============== 失败结算 ==============
 func _build_defeat_ui() -> void:
@@ -141,7 +169,7 @@ func _build_defeat_ui() -> void:
 	title.anchor_left = 0.0; title.anchor_right = 1.0
 	title.offset_top = 80.0; title.offset_bottom = 130.0
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(title)
+	_add(title)
 
 	# 失败信息
 	var info := Label.new()
@@ -152,7 +180,7 @@ func _build_defeat_ui() -> void:
 	info.anchor_left = 0.0; info.anchor_right = 1.0
 	info.offset_top = 150.0; info.offset_bottom = 175.0
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(info)
+	_add(info)
 
 	# 敌人信息面板
 	var panel := Panel.new()
@@ -162,7 +190,7 @@ func _build_defeat_ui() -> void:
 	ps.bg_color = C_PANEL_BG; ps.border_color = C_BORDER
 	ps.set_border_width_all(2); ps.set_corner_radius_all(8)
 	panel.add_theme_stylebox_override("panel", ps)
-	add_child(panel)
+	_add(panel)
 
 	var enemy_lbl := Label.new()
 	enemy_lbl.text = "守层者：%s" % enemy_name
@@ -195,10 +223,12 @@ func _build_defeat_ui() -> void:
 	quote.anchor_left = 0.1; quote.anchor_right = 0.9
 	quote.offset_top = after_stats + 5.0; quote.offset_bottom = after_stats + 30.0
 	quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(quote)
+	_add(quote)
 
 	# 按钮
-	_add_buttons(false, after_stats + 45.0)
+	var btn_bottom := _add_buttons(false, after_stats + 45.0)
+
+	_finalize_content_height(btn_bottom)
 
 ## ============== 通用组件 ==============
 
@@ -206,14 +236,14 @@ func _add_divider(y: float) -> void:
 	var line := HSeparator.new()
 	line.anchor_left = 0.3; line.anchor_right = 0.7
 	line.offset_top = y; line.offset_bottom = y + 2.0
-	add_child(line)
+	_add(line)
 
 func _add_stat_line(label_text: String, value_text: String, y: float) -> void:
 	var hbox := HBoxContainer.new()
 	hbox.anchor_left = 0.3; hbox.anchor_right = 0.7
 	hbox.offset_top = y; hbox.offset_bottom = y + 28.0
 	hbox.add_theme_constant_override("separation", 16)
-	add_child(hbox)
+	_add(hbox)
 
 	var lbl := Label.new()
 	lbl.text = label_text
@@ -230,7 +260,8 @@ func _add_stat_line(label_text: String, value_text: String, y: float) -> void:
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(val)
 
-func _add_buttons(is_victory: bool, btn_y: float = 440.0) -> void:
+## 添加按钮，返回按钮底部的 Y 坐标（用于计算内容高度）
+func _add_buttons(is_victory: bool, btn_y: float = 440.0) -> float:
 
 	# 再战按钮（失败）或 返回主菜单（通关）
 	if is_victory:
@@ -246,7 +277,7 @@ func _add_buttons(is_victory: bool, btn_y: float = 440.0) -> void:
 		main_btn.add_theme_stylebox_override("hover", _make_flat(Color("#3B6D11"), C_BORDER, 2, 8))
 		main_btn.add_theme_color_override("font_color", C_TEXT)
 		main_btn.pressed.connect(func(): SceneManager.go_to("res://scenes/main_menu.tscn"))
-		add_child(main_btn)
+		_add(main_btn)
 	else:
 		# 再战按钮
 		var retry_btn := Button.new()
@@ -261,7 +292,7 @@ func _add_buttons(is_victory: bool, btn_y: float = 440.0) -> void:
 		retry_btn.add_theme_stylebox_override("hover", _make_flat(Color("#3B6D11"), C_BORDER, 2, 8))
 		retry_btn.add_theme_color_override("font_color", C_TEXT)
 		retry_btn.pressed.connect(func(): SceneManager.go_to("res://scenes/tower/tower_select.tscn"))
-		add_child(retry_btn)
+		_add(retry_btn)
 
 		# 主菜单按钮
 		var main_btn := Button.new()
@@ -276,7 +307,9 @@ func _add_buttons(is_victory: bool, btn_y: float = 440.0) -> void:
 		main_btn.add_theme_stylebox_override("hover", _make_flat(Color("#3A342A"), C_BORDER, 2, 8))
 		main_btn.add_theme_color_override("font_color", C_TEXT_DIM)
 		main_btn.pressed.connect(func(): SceneManager.go_to("res://scenes/main_menu.tscn"))
-		add_child(main_btn)
+		_add(main_btn)
+
+	return btn_y + 40.0
 
 func _make_flat(bg: Color, bdr: Color, bw: int, radius: int) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -305,7 +338,7 @@ func _build_tower_stats_panel(y_start: float) -> float:
 	ps.set_border_width_all(2); ps.set_corner_radius_all(8)
 	panel.add_theme_stylebox_override("panel", ps)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(panel)
+	_add(panel)
 
 	# 标题
 	var title := Label.new()

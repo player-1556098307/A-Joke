@@ -272,6 +272,8 @@ var _odd_even_active: bool = false
 var _odd_even_done_this_round: bool = false
 ## 自动出拳模式（塔模式可用）：true时人类玩家手势由AI随机代理
 var auto_rps_enabled: bool = false
+## 塔模式对话暂停标记：true时阻止自动出拳（剧情对话弹出时设为true，对话结束恢复）
+var tower_dialogue_paused: bool = false
 ## 黑白配（手心手背）自动模式：true时系统自动为所有参与者（含人类）随机选择，不要求手动点击
 ## 保留阶段动画与延时，仅跳过手动输入；测试中可设为 false 以手动控制分组
 var odd_even_auto: bool = true
@@ -438,6 +440,10 @@ func setup_game(config: Dictionary) -> void:
 			var blessing_value := _get_tower_blessing_value(p)
 			p.add_energy(blessing_value)
 			player_charged.emit(p.player_id, p.energy)
+	# ── 霸体（被动锁定技）：拥有"霸体"技能的角色开局设 bati_active=true ──
+	for p in _players:
+		if _tower_has_skill(p, "霸体"):
+			p.bati_active = true
 	# ── 阿尔托莉雅·卡斯特·乐园妖精：开局获得5个气 ──
 	for p in _players:
 		if _is_caster(p):
@@ -670,6 +676,9 @@ func _human_player_alive() -> bool:
 
 ## 自动为人类玩家提交随机手势（auto_rps_enabled时调用）
 func _auto_submit_human_gesture() -> void:
+	# 对话暂停期间不自动出拳（由 resume_auto_rps 在对话结束后重新触发）
+	if tower_dialogue_paused:
+		return
 	for p in _players:
 		if p.is_alive and p.is_human and p.current_gesture == PlayerState.Gesture.NONE:
 			var pid := p.player_id
@@ -680,6 +689,33 @@ func _auto_submit_human_gesture() -> void:
 				if _current_phase == GamePhase.GESTURE_INPUT:
 					submit_gesture(pid, g), CONNECT_ONE_SHOT)
 			break
+
+## 恢复自动出拳：对话结束后调用，若当前处于出拳阶段且自动出拳已开启则立即触发
+func resume_auto_rps() -> void:
+	if not auto_rps_enabled or tower_dialogue_paused or not _human_player_alive():
+		return
+	if _current_phase == GamePhase.GESTURE_INPUT:
+		_auto_submit_human_gesture()
+	elif _current_phase == GamePhase.TIEBREAK_INPUT:
+		_auto_submit_human_tiebreak()
+
+## 自动为人类玩家提交加赛手势（auto_rps_enabled + TIEBREAK_INPUT时调用）
+func _auto_submit_human_tiebreak() -> void:
+	if tower_dialogue_paused:
+		return
+	var human_pid := -1
+	for tid in _tiebreak_candidates:
+		var tp := get_player(tid)
+		if tp != null and tp.is_human and tp.is_alive:
+			human_pid = tid
+			break
+	if human_pid < 0:
+		return
+	var hg := _ai_controller.decide_gesture(get_player(human_pid))
+	var t := get_tree().create_timer(0.3)
+	t.timeout.connect(func():
+		if _current_phase == GamePhase.TIEBREAK_INPUT:
+			submit_tiebreak_gesture(human_pid, hg), CONNECT_ONE_SHOT)
 
 ## 处理AI出拳：每个AI延时后提交手势（延时由SettingsManager决定）
 ## 仅处理当前RPS参与方中的AI玩家
@@ -805,18 +841,7 @@ func _start_tiebreak_input() -> void:
 				_delayed_submit_tiebreak_gesture.bind(id, gesture), CONNECT_ONE_SHOT)
 	# 自动出拳模式：人类玩家由AI代理加赛手势
 	if auto_rps_enabled and _has_human_in_tiebreak:
-		var human_pid := -1
-		for tid in _tiebreak_candidates:
-			var tp := get_player(tid)
-			if tp != null and tp.is_human and tp.is_alive:
-				human_pid = tid
-				break
-		if human_pid >= 0:
-			var hg := _ai_controller.decide_gesture(get_player(human_pid))
-			var t := get_tree().create_timer(0.3)
-			t.timeout.connect(func():
-				if _current_phase == GamePhase.TIEBREAK_INPUT:
-					submit_tiebreak_gesture(human_pid, hg), CONNECT_ONE_SHOT)
+		_auto_submit_human_tiebreak()
 
 func _delayed_submit_tiebreak_gesture(pid: int, gesture: PlayerState.Gesture) -> void:
 	if _current_phase == GamePhase.TIEBREAK_INPUT:

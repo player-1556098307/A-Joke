@@ -3,16 +3,16 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '492da144-2648-4de3-ae54-df58744f135f'
-  PropagateID: '492da144-2648-4de3-ae54-df58744f135f'
-  ReservedCode1: '0266446c-a592-45c4-8118-031d923c0ccf'
-  ReservedCode2: '0266446c-a592-45c4-8118-031d923c0ccf'
+  ProduceID: 'f19792d1-c91d-400a-ba7e-78f7154b5055'
+  PropagateID: 'f19792d1-c91d-400a-ba7e-78f7154b5055'
+  ReservedCode1: '6d60113f-3b7d-47eb-9a6a-f521e8675d68'
+  ReservedCode2: '6d60113f-3b7d-47eb-9a6a-f521e8675d68'
 ---
 
 # A-Joke Test 项目上下文
 
 > 本文件供 AI Agent 快速理解项目全貌，无需重复探索即可开始开发/测试/运维。
-> 最后更新：2026-08-22
+> 最后更新：2026-08-28
 
 ---
 
@@ -43,10 +43,10 @@ A-Joke/
 ├── test_rpc.py                # RPC 测试脚本
 │
 ├── core/                      # 核心逻辑（所有autoload单例+游戏机制）
-│   ├── game_manager.gd        # 游戏主循环状态机（~3147行）★最核心
-│   ├── player_state.gd        # 玩家运行时状态（~450行）★
+│   ├── game_manager.gd        # 游戏主循环状态机（~4690行）★最核心
+│   ├── player_state.gd        # 玩家运行时状态（~611行）★
 │   ├── round_resolver.gd      # 手势结算 + 技能效果执行
-│   ├── ai_controller.gd       # AI 决策逻辑（~548行）
+│   ├── ai_controller.gd       # AI 决策逻辑（~1078行）
 │   ├── distance_system.gd     # 环形座位距离计算
 │   ├── action_log.gd          # 行动日志
 │   ├── match_record.gd        # 对局记录
@@ -58,7 +58,7 @@ A-Joke/
 │   ├── settings_manager.gd    # 设置持久化（autoload）
 │   ├── net/                   # 联机层
 │   │   ├── NetworkManager.gd  # Nakama 认证 + ENet 连接（autoload）
-│   │   ├── NetworkProtocol.gd # 协议定义 SrvOp(18种) + CliOp(5种)
+│   │   ├── NetworkProtocol.gd # 协议定义 SrvOp(61种) + CliOp(5种)
 │   │   ├── NetworkGameHost.gd # 主机：GameManager 信号→RPC 广播
 │   │   ├── NetworkGameClient.gd # 客户端：RPC→信号映射
 │   │   ├── ClientStateSync.gd # 状态同步
@@ -86,28 +86,21 @@ A-Joke/
 │   ├── character_data.gd      # CharacterData 类定义
 │   ├── skill_data.gd          # SkillData 类定义
 │   ├── skill_effect.gd        # SkillEffect 类定义（含 EffectType 枚举）
-│   ├── characters/            # 15个角色 .tres 文件
-│   │   ├── 漩涡鸣人.tres
-│   │   ├── 宇智波佐助.tres
-│   │   ├── 宇智波佐助（疾风传）.tres
-│   │   ├── 春野樱.tres
-│   │   ├── 春野樱（疾风传）.tres
-│   │   ├── 漩涡鸣人（疾风传）.tres
-│   │   ├── 千手柱间.tres
-│   │   ├── 千手柱间（秽土转生）.tres
-│   │   ├── 迈特凯.tres
-│   │   ├── 希耶尔.tres
-│   │   ├── 卫宫.tres
-│   │   ├── 宇智波泉奈.tres
-│   │   ├── 宇智波止水（须佐能）.tres
-│   │   ├── 宇智波止水（天劫）.tres
+│   ├── characters/            # 17+2个角色 .tres 文件
+│   │   ├── 漩涡鸣人.tres / 宇智波佐助.tres / 宇智波佐助（疾风传）.tres
+│   │   ├── 春野樱.tres / 春野樱（疾风传）.tres / 漩涡鸣人（疾风传）.tres
+│   │   ├── 千手柱间.tres / 千手柱间（秽土转生）.tres / 迈特凯.tres
+│   │   ├── 希耶尔.tres / 卫宫.tres / 宇智波泉奈.tres
+│   │   ├── 宇智波止水（须佐能）.tres / 宇智波止水（天劫）.tres
 │   │   ├── 波风水门.tres      # 仅在 character_select.gd preload，未注册到 LIST
+│   │   ├── 黑塔.tres / 大黑塔.tres
+│   │   ├── 奥伯龙.tres / 阿尔托莉雅·卡斯特.tres
 │   │   ├── portraits/         # 角色立绘图片
 │   │   └── skills/            # 止水技能独立资源文件
 │   └── portaits/              # （拼写如此，旧目录）
 │
 ├── ui/
-│   ├── game_ui.gd             # 主游戏界面（~3316行）★
+│   ├── game_ui.gd             # 主游戏界面（~4365行）★
 │   └── references/            # UI 参考资源
 │
 ├── scenes/                    # 场景文件
@@ -121,7 +114,7 @@ A-Joke/
 │   ├── net/                   # 联机场景
 │   └── hgw/                   # HGW 场景
 │
-├── tests/                     # 测试套件（35个，2044断言）
+├── tests/                     # 测试套件（40个）
 │   ├── *.gd                   # 测试脚本（extends Node）
 │   └── *.tscn                 # 测试场景
 │
@@ -144,7 +137,7 @@ A-Joke/
 
 | 单例名 | 脚本 | 职责 |
 |---|---|---|
-| `GameManager` | `core/game_manager.gd` | 游戏主循环状态机（~3147行），管理所有玩家/回合/结算/淘汰 |
+| `GameManager` | `core/game_manager.gd` | 游戏主循环状态机（~4690行），管理所有玩家/回合/结算/淘汰 |
 | `SceneManager` | `core/scene_manager.gd` | 跨场景数据传递 |
 | `SettingsManager` | `core/settings_manager.gd` | 设置持久化（ConfigFile → user://settings.cfg） |
 | `NetworkManager` | `core/net/NetworkManager.gd` | Nakama 会话 + ENet 游戏连接 |
@@ -286,7 +279,7 @@ bonus_if_paralyzed: int = 0
 lose_skill_name: String = ""# LOSE_SKILL用
 ```
 
-### 5.5 EffectType 完整枚举（32种）
+### 5.5 EffectType 完整枚举（57种）
 
 | 值 | 枚举名 | 说明 |
 |---|---|---|
@@ -322,11 +315,31 @@ lose_skill_name: String = ""# LOSE_SKILL用
 | 29 | BACKTRACK | 天劫·回溯（新止水，全体快照回滚） |
 | 30 | HIROARI | 日影舞（新止水，4段2伤跨目标分配） |
 | 31 | PHANTOM_BODY | 幻影瞬身（新止水被动，获幻影+闪避） |
-| 32 | DIAMOND_AOE | 送你砖石（黑塔被动：目标血量<50%时对范围1敌人造成1伤） |
+| 32 | GIFT_DIAMOND | 送你钻石（黑塔被动：目标血量<50%时对范围1敌人造成1伤） |
 | 33 | GENJUTSU | genjutsu（黑塔被动：伤害后目标与大黑塔距离-1） |
-| 34 | KAIJI_MARK | 解读（大黑塔被动：伤害后标记【解】，【解】玩家与大黑塔距离-1且受伤+1） |
-| 35 | KAIJI_ENERGY | 格局打开（大黑塔被动：【解】玩家受伤后大黑塔+1气） |
+| 34 | JIEDU | 解读（大黑塔被动：伤害后标记【解】，【解】玩家与大黑塔距离-1且受伤+1） |
+| 35 | OPEN_MIND | 格局打开（大黑塔被动：【解】玩家受伤后大黑塔+1气） |
 | 36 | MAGIC | 魔法（大黑塔主动：3气对目标2伤+对全体【解】1伤） |
+| 37 | TOWER_BLESSING | 尖塔祝福（塔敌通用被动：开局2气） |
+| 38 | BLADE_OF_THE_FALLEN | 破败王者之刃（破败王者锁定技） |
+| 39 | HEARTBREAK | 悲痛（破败王者被动） |
+| 40 | SAGE_STRENGTH | 仙人之力（仙人鸣人被动） |
+| 41 | FROG_KATA | 蛙组手（仙人鸣人主动：2耗必中2真伤） |
+| 42 | FURY | 反馈（司马懿被动） |
+| 43 | GENIUS | 鬼才（司马懿被动） |
+| 44 | STRATEGY | 谋略（司马懿被动：免疫控制） |
+| 45 | PERCENT_DAMAGE | 百分比伤害（塔一次性祝福斩魂） |
+| 46 | ZEUS_JUDGEMENT | 神大罚（宙斯限定技：HP降至1+麻痹3回合） |
+| 47 | ZEUS_SUMMON_MUTANT | 变异军团（宙斯召唤异种） |
+| 48 | ZEUS_SUMMON_CLODIA | 变异军团升级（宙斯二阶段召唤克罗狄亚） |
+| 49 | NIGHT_CURTAIN | 夜之帷幕（奥伯龙准备阶段被动：夜幕状态） |
+| 50 | DREAM_END | 梦之终结（奥伯龙结束阶段：取消夜幕+下次伤害x2） |
+| 51 | MIDSUMMER_DREAM | 仲夏夜之梦（奥伯龙：1气3护盾不可叠加） |
+| 52 | FAIRY_TALE | 于彼方点缀的梦之童话（奥伯龙5气限定技） |
+| 53 | FAIRY_PARADISE | 乐园妖精（卡斯特被动：开局5气） |
+| 54 | PILGRIMAGE | 巡礼（卡斯特被动：耗气获圣盾，4次后升级圣剑锻造） |
+| 55 | LAKE_BLESSING | 湖之加护（卡斯特结束阶段：目标+1气） |
+| 56 | SWORD_FORGE | 圣剑锻造（卡斯特3气：目标无消耗释放技能） |
 
 > **新增效果类型时**：在 `skill_effect.gd` 的 enum 末尾追加，编号自动递增。同步更新 `game_manager.gd` 中所有匹配该枚举的处理逻辑。
 
@@ -350,7 +363,7 @@ GameManager 通过 **40+ 信号** 驱动 UI（`ui/game_ui.gd` ~3316行），UI �
 
 ---
 
-## 7. 角色列表（15+2个）
+## 7. 角色列表（17+2个）
 
 | ID | 角色名 | HP | 定位 | grade | 核心技能 |
 |---|---|---|---|---|---|
@@ -369,12 +382,14 @@ GameManager 通过 **40+ 信号** 驱动 UI（`ui/game_ui.gd` ~3316行），UI �
 | sakura_fy | 春野樱（疾风传） | 8 | 战士/坦克 | - | 怪力·恢复 |
 | naruto_fy | 漩涡鸣人（疾风传） | 8 | 法师/刺客 | - | 螺旋丸·螺旋手里剑·影分身 |
 | minato | 波风水门 | - | - | - | 飞雷神·螺旋丸·九尾（仅在 character_select.gd preload，未注册到 LIST） |
-| herta | 黑塔 | 6 | 法师 | B | 普攻·送你砖石(被动)·genjutsu(被动) — EffectType 32/33 |
+| herta | 黑塔 | 6 | 法师 | B | 普攻·送你钻石(被动)·genjutsu(被动) — EffectType 32/33 |
 | big_herta | 大黑塔 | 8 | 法师 | A | 普攻·解读(被动)·格局打开(被动)·魔法 — EffectType 34/35/36 |
+| oberon | 奥伯龙 | 8 | 法师 | S | 夜之帷幕(被动)·梦之终结·仲夏夜之梦·于彼方点缀的梦之童话 — EffectType 49/50/51/52 |
+| caster | 阿尔托莉雅·卡斯特 | 6 | 法师 | S | 乐园妖精(被动)·巡礼(被动)·Around Caliburn·湖之加护·圣剑锻造 — EffectType 53/54/55/56 |
 
-**慈悲尖塔专属角色**（`resources/characters/tower/`，仅塔模式使用，11个敌人）:
-- 司马懿（狂）、漩涡鸣人（仙人模式）、破败王者（怒）— Boss/特殊敌人
-- 医疗兵、影刃、术师、爆破手、狂战士、石像鬼、训练兵、铁盾兵 — 8种小怪
+> **慈悲尖塔专属角色**（`resources/characters/tower/`，仅塔模式使用，11个敌人）:
+> - 司马懿（狂）、漩涡鸣人（仙人模式）、破败王者（怒）— Boss/特殊敌人
+> - 医疗兵、影刃、术师、爆破手、狂战士、石像鬼、训练兵、铁盾兵 — 8种小怪
 
 ### 角色注册（3处硬编码同步）
 
@@ -471,14 +486,14 @@ GameManager 通过 **40+ 信号** 驱动 UI（`ui/game_ui.gd` ~3316行），UI �
 | 层 | 文件 | 职责 |
 |---|---|---|
 | 顶层 | `NetworkManager.gd` | Nakama认证 + ENet连接 |
-| 协议 | `NetworkProtocol.gd` | SrvOp(18种) + CliOp(5种)，JSON序列化 |
+| 协议 | `NetworkProtocol.gd` | SrvOp(61种) + CliOp(5种)，JSON序列化 |
 | 服务器 | `NetworkGameHost.gd` | 包装GameManager→RPC广播 |
 | 客户端 | `NetworkGameClient.gd` | 接收RPC→映射同名信号 |
 | 状态同步 | `ClientStateSync.gd` | 写入本地GameManager缓存 |
 | 房间 | `RoomManager.gd` | lobby+game生命周期 |
 
-**网络适配新角色/新机制时需同步**:
-- `NetworkProtocol.gd` — 新增 SrvOp/CliOp
+**网络适配新角色/新机制时需同步**（奥伯龙/卡斯特示例）:
+- `NetworkProtocol.gd` — 新增 SrvOp（DREAM_END_REQUIRED=59 / LAKE_BLESSING_REQUIRED=60 / SWORD_FORGE_REQUIRED=61）
 - `NetworkGameHost.gd` — 信号→RPC广播
 - `NetworkGameClient.gd` — RPC→信号映射
 - `ClientStateSync.gd` — 状态字段同步
@@ -575,7 +590,7 @@ script = ExtResource("1_test")
 
 **断言计数**：每个测试文件末尾输出 `=== xxx测试结束：PASS=NN FAIL=0 ===`，退出码 0=全过，1=有失败。
 
-### 11.5 现有测试套件（35个，2044断言）
+### 11.5 现有测试套件（40个）
 
 **核心对战测试**:
 
@@ -599,6 +614,8 @@ script = ExtResource("1_test")
 | `crossover_scenario_test` | 多角色组合场景 | 57 |
 | `herta_test` | 黑塔完整机制 | 37 |
 | `big_herta_test` | 大黑塔完整机制 | 48 |
+| `oberon_test` | 奥伯龙完整机制 | - |
+| `caster_test` | 阿尔托莉雅·卡斯特完整机制 | 59 |
 
 **慈悲尖塔测试**:
 
@@ -621,8 +638,11 @@ script = ExtResource("1_test")
 | `elimination_effect_test` | 淘汰特效 | 7 |
 | `hp50_dialogue_integration_test` | Boss半血对话 | 8 |
 | `sfx_manager_test` | 战斗音效系统 | 49 |
+| `tower_stats_test` | 塔模式战报统计 | - |
+| `tower_zeus_test` | 宙斯Boss机制 | - |
+| `odd_even_test` | 奇偶机制 | - |
 
-> 断言数取自最近一次全量回归（2026-08-22，35 套件 2044 项断言 0 FAIL）。
+> 断言数取自最近一次全量回归（2026-08-27，40 套件 0 FAIL，仅 crossover_scenario_test 3 个已知旧失败）。
 
 ### 11.6 常见测试问题排查
 
@@ -653,28 +673,21 @@ git push origin main
 
 **最近提交记录**:
 ```
-7e768b2 fix: 祝福面板布局修复(VBox容器) + 位置调整避开手势区
-8fd72c0 feat: 塔战斗buff查看按钮——右下角按钮+浮窗面板展示已获祝福
-5fcee02 feat: 慈悲尖塔平衡性优化——祝福池调整+后期小怪强化
-c93f912 fix: 战斗日志过滤按钮每层累积导致溢出显示错误
-efdeb60 fix: 气标z_index降至弹窗之下，祝福/对话场景不再浮于最外层
-c350bb1 feat: 合并神速/起势奖励+修复防反触发后取消招架状态
-c1d13b9 fix(ui): 修复气标志菱形遮挡血条+数字未居中
-9740506 feat(tower): 奖励池分级+回生时机+新buff+悬停修复
-95964ee feat: 悬停角色卡片显示技能详情面板(含被动/限定技全量列表)
-3ff7b50 feat: 战斗UI气标志改为菱形蓝色方片+白色黑体数字
-16d2993 feat: 慈悲塔P2-3层间奖励选择(8种buff+红黑UI+持久化注入)
-d2c154e fix: 对话移至精英层(4/8/12)+层间过渡/退场对话加梅塔特隆立绘
-ddfa84f feat: 慈悲尖塔16层关卡重构+8种小怪+全量测试适配
-58b4f1b test: 新增Boss半血对话触发验证测试(8项全PASS)
-a12fd50 feat: 战斗音效系统 SFXManager（程序合成音效+外部音频替换+设置开关）
+d8eb044 feat: UI层+网络层适配奥伯龙/卡斯特决策弹窗
+1f53683 feat: 添加卡斯特立绘（220x220裁剪）并引用至角色资源
+b99bdf5 refactor: 圣剑锻造决策权改为目标自主选择
+7548898 feat: 新增角色阿尔托莉雅·卡斯特（S级法师6血）
+470950f feat: 奥伯龙立绘导入（花之魔术师风格半身像）
+57753a5 feat: 新增角色奥伯龙（S级法师）
+4eb531b feat(tower): 慈悲尖塔战报统计系统——跨层累积伤害/抵挡/治疗/猜拳胜场
+794c03f feat: 黑白配系统自动进行+保留动画，修复塔跨关自动出拳按钮状态残留
 ```
 
-> **Git 状态**: 截至 2026-08-22 工作区干净（无未提交变更）。慈悲尖塔相关开发全部已 commit，均未 push（本地开发模式，按需推送）。
+> **Git 状态**: 截至 2026-08-28，工作区有 2 个未提交修改：`export_presets.cfg`、`project.godot`（Android 打包 ETC2/SDK 设置）。慈悲尖塔与奥伯龙/卡斯特相关开发全部已 commit（未 push）。
 
 ### 12.1 未提交变更
 
-> 截至 2026-08-22：**工作区干净**，无未提交变更。所有慈悲尖塔开发（层间奖励选择、buff 查看、战斗、平衡性优化等）均已 commit（本地未 push）。
+> 截至 2026-08-28：工作区有 **2 个未提交变更**（`export_presets.cfg`、`project.godot`）——即 Android 打包所需的 ETC2 纹理压缩 + min/target SDK 清空设置，**建议保留并随下次 commit 提交**。
 
 **.gitignore**: `.godot/`、`.claude/`、`.temp/`、`/android/`、`builds/` 被忽略。
 
@@ -703,6 +716,31 @@ a12fd50 feat: 战斗音效系统 SFXManager（程序合成音效+外部音频替
 
 ---
 
+## 13.5 Android 打包（调试版 APK）
+
+**已打通：v1.0.7 调试版 APK**（`E:\ajoke-g\A-Joke\builds\A-Joke-Test-v1.0.7.apk`，69.87MB，包名 `com.ajoke.test`，arm64-v8a+armeabi-v7a，minSdk 24/targetSdk 36，debug 签名）。
+
+**环境（Godot Steam 版自包含模式）**:
+- 编辑器设置：`D:\SteamLibrary\steamapps\common\Godot Engine\editor_data\editor_settings-4.7.tres`（.tres 格式，非 %APPDATA%\Godot）
+- 导出模板：`D:\SteamLibrary\steamapps\common\Godot Engine\editor_data\export_templates\4.7.2.stable\`
+- Android SDK：`D:\AndroidSDK`（platform-tools / build-tools 35.0.1 / platforms android-35 / cmdline-tools）；`ANDROID_HOME`/`ANDROID_SDK_ROOT` 已设用户级环境变量
+- Java 17：`D:\JAVA17`（JAVA_HOME）
+- Debug keystore：`D:\AndroidSDK\keystores\debug.keystore`（密码 android，别名 androiddebugkey）
+
+**导出命令**:  
+```powershell
+& "D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe" --headless --path "E:\ajoke-g\A-Joke" --export-debug "Android" "E:\ajoke-g\A-Joke\builds\A-Joke-Test-vX.Y.Z.apk"
+```
+
+**三个关键修复（必做）**:
+1. **非 Gradle 模式不能设置 min/target SDK**：`export_presets.cfg` 中 `gradle_build/min_sdk` 与 `gradle_build/target_sdk` **必须清空为空字符串**，否则报错 `"Min SDK" can only be overridden when "Use Gradle Build" is enabled`
+2. **ETC2 纹理压缩属性路径**：正确路径是 `rendering/textures/vram_compression/import_etc2_astc=true`（旧路径 `rendering/vram_compression/...` 无效），写入 `project.godot` 的 `[rendering]` 段
+3. **导出前必须 `--import`**：修改 ETC2 设置后先 `godot --headless --path 项目 --import` 重新导入资源，再 `--export-debug` 才能生效
+
+**日志警告（无害）**: `Could not find version of build tools that matches Target SDK, using 35.0.1` 可忽略。
+
+---
+
 ## 14. 高频易错点速查
 
 | 易错点 | 正确做法 |
@@ -718,6 +756,10 @@ a12fd50 feat: 战斗音效系统 SFXManager（程序合成音效+外部音频替
 | 手动调 `_process_end_phase` | 不要手动调用，END_PHASE会自动执行，手动调用可能触发招架弹窗挂起 |
 | 回溯扣气顺序 | 扣气在快照恢复**之后**，不会被快照覆盖 |
 | 回溯快照不含 delayed_damages | `delayed_damages` 仅在 pre_takeover_snapshot 中，backtrack 快照不含 |
+| Android 非 Gradle 模式设置 min/target SDK | 报错 `"Min SDK" can only be overridden when "Use Gradle Build" is enabled`；将 `export_presets.cfg` 的 `gradle_build/min_sdk`、`gradle_build/target_sdk` 清空为空字符串 |
+| ETC2 纹理压缩路径 | 正确路径 `rendering/textures/vram_compression/import_etc2_astc=true`；旧路径 `rendering/vram_compression/...` 无效 |
+| 修改 ETC2 后未重新导入 | 必须先 `--import` 再 `--export-debug`，否则 APK 不含新纹理设置 |
+| Android 导出模板缺失 | 检查 `editor_data\export_templates\4.7.2.stable\` 是否存在 android_debug.apk/android_release.apk；缺则报 missing template 需下载 |
 
 ---
 
@@ -734,7 +776,7 @@ a12fd50 feat: 战斗音效系统 SFXManager（程序合成音效+外部音频替
 6. **GameManager 适配**: 新机制需在 `game_manager.gd` 中添加处理逻辑
 7. **网络适配**: 新增 SrvOp/CliOp + Host/Client 信号映射 + 状态同步
 8. **专项测试**: 编写 `tests/xxx_test.gd + .tscn`
-9. **全量回归**: 运行全部35个套件确认 0 FAIL
+9. **全量回归**: 运行全部40个套件确认 0 FAIL
 10. **Git 提交推送**: `git add → commit → push origin main`
 
 ---
@@ -767,6 +809,9 @@ resources/characters/tower/   # 塔模式专属敌人（8种小怪）
 - PlayerState 新增 4 个 buff 字段：`damage_bonus_basic` / `charge_bonus` / `damage_reduction` / `regen_per_round`
 - buff id 与效果：`blade_power`(增伤) / `charge_bonus`(聚气+) / `shield_wall`(减伤) / `regen`(回血) / `clone`(分身) / `swift`(起势) / `protect`(护盾) / `vitality`(上限+回满)
 - 祝福设定：回生/坚壁为精英层专属且获取后不再出现；蓄锐为唯一祝福；气上限祝福已删除
+- 一次性祝福（斩魂/回春/免死金牌/涅槃）触发后回到池中可再次抽取；回生普通层可刷出，再生不可叠加
+- 祝福卡片需标明类别（普通/精英）与是否可叠加
+- 新增：免死金牌（HP≤0→保留1血）、涅槃（HP≤0→半血重生）、破军、霸体（免疫控制）——统一经 `_try_tower_death_protection()` 接入
 
 **战斗中 buff 查看**（tower_battle.gd）:
 - 右下角"✦ 祝福"按钮（有祝福且在战斗阶段时显示）→ 点击弹出浮窗面板
