@@ -30,6 +30,9 @@ var _current_round: int = 0
 var _elimination_log: Array[Dictionary] = []
 var _elim_order: int = 0
 var _is_draw_reentry: bool = false
+## 当前行动角色高亮（bug3）：正在行动/出拳的角色卡片 id（-1 无高亮）
+var _highlighted_action_pid: int = -1
+var _action_glow: ColorRect = null
 ## 联机模式客户端引用（非 null 时走网络通道）
 var net_client: NetworkGameClient = null
 var is_spectating: bool = false
@@ -145,6 +148,8 @@ func _ready() -> void:
 	GameManager.skill_lost.connect(_on_skill_lost)
 	GameManager.burn_damage_triggered.connect(_on_burn_damage_triggered)
 	GameManager.hp_payment_made.connect(_on_hp_payment_made)
+	# ── 慈悲尖塔一次性被动祝福触发（免死金牌/涅槃）──
+	GameManager.tower_blessing_triggered.connect(_on_tower_blessing_triggered)
 	# ── 波风水门专属信号 ──
 	GameManager.ftg_marks_changed.connect(_on_ftg_marks_changed)
 	GameManager.ftg_mark_applied.connect(_on_ftg_mark_applied)
@@ -829,6 +834,36 @@ func _build_player_card(player: PlayerState) -> Control:
 	energy_lbl.z_index = 1  # 与菱形同级，弹窗弹出时一起被覆盖
 	body.add_child(energy_lbl)
 
+	# 免死金牌图标（一次性被动：免疫一次致命伤害，触发后消失）
+	# 显示在卡片右上角能量菱形下方，金色盾牌徽章样式
+	if player.immortal_medal:
+		var medal := Panel.new()
+		medal.name = "ImmortalMedalIcon"
+		medal.position = Vector2(83.0, 26.0)  # body 坐标系：右上角、能量菱形下方
+		medal.size = Vector2(18.0, 18.0)
+		medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		medal.z_index = 1
+		var medal_s := StyleBoxFlat.new()
+		medal_s.bg_color = Color("#FAC775")          # 金色底
+		medal_s.border_color = Color("#8B6914")       # 深金描边
+		medal_s.set_border_width_all(1)
+		medal_s.set_corner_radius_all(9)              # 圆形徽章
+		medal.add_theme_stylebox_override("panel", medal_s)
+		body.add_child(medal)
+
+		var medal_lbl := Label.new()
+		medal_lbl.text = "免"
+		medal_lbl.add_theme_font_size_override("font_size", 11)
+		medal_lbl.add_theme_color_override("font_color", Color("#FFFDF5"))
+		medal_lbl.add_theme_color_override("font_outline_color", Color("#8A6914"))
+		medal_lbl.add_theme_constant_override("outline_size", 1)
+		medal_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		medal_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		medal_lbl.size = medal.size
+		medal_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		medal_lbl.z_index = 1
+		medal.add_child(medal_lbl)
+
 	# Distance (non-human, top-left of body)
 	if not player.is_human:
 		var dist_lbl := Label.new()
@@ -1158,6 +1193,10 @@ func _refresh_player_card(player_id: int) -> void:
 		var dist_lbl: Label = body.get_node_or_null("DistLabel")
 		if dist_lbl and _human_player_id >= 0 and player_id != _human_player_id:
 			dist_lbl.text = "↔%d" % GameManager.get_distance(_human_player_id, player_id)
+		# 免死金牌图标：持有显示，触发后隐藏
+		var medal: Panel = body.get_node_or_null("ImmortalMedalIcon")
+		if medal:
+			medal.visible = player.immortal_medal
 
 	var status_row: HBoxContainer = card.get_node_or_null("StatusRow")
 	if status_row:
@@ -1721,6 +1760,62 @@ func _restore_card_styles() -> void:
 			var bdr_col := Color("#185FA5") if player.is_human else Color("#2C2C2A")
 			body.add_theme_stylebox_override("panel", _make_flat(Color("#FFFDF5"), bdr_col, 2, 4))
 
+# ── 当前行动角色高亮（bug3）───────────────────────────────────────────────────
+
+## 高亮当前行动角色：卡片金色描边 + 轻微放大 + 呼吸光晕
+## AI 角色也高亮（明确"轮到谁行动"），人类角色行动时额外保留原蓝框强调
+func _highlight_action_player(player_id: int) -> void:
+	_clear_action_highlight()
+	if player_id < 0:
+		return
+	var card: Control = _player_cards.get(player_id)
+	if card == null:
+		return
+	_highlighted_action_pid = player_id
+	var body: Panel = card.get_node_or_null("CardBody")
+	if body:
+		var is_human := false
+		var p := GameManager.get_player(player_id)
+		is_human = p != null and p.is_human
+		# 金色高亮边框（3px），人类玩家用亮金、AI 用暖棕金
+		var bdr_col := Color("#FAC775") if is_human else Color("#B08D3E")
+		var card_bg := Color("#FFFDF5")
+		if _tower_theme_active:
+			card_bg = Color("#2A2618")
+		body.add_theme_stylebox_override("panel", _make_flat(card_bg, bdr_col, 3, 4))
+	# 呼吸光晕（常驻，随行动阶段持续；新行动/新回合时清除）
+	var glow := ColorRect.new()
+	glow.color = Color("#FAC775")
+	glow.self_modulate = Color(1, 1, 1, 0)
+	glow.position = Vector2(-4, -4)
+	glow.size = card.custom_minimum_size + Vector2(8, 8)
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glow.z_index = -1
+	card.add_child(glow)
+	card.move_child(glow, 0)
+	_action_glow = glow
+	# 呼吸动画：循环淡入淡出（无限播放，直到清除时 kill）
+	var tw := create_tween().bind_node(glow).set_loops()
+	tw.tween_property(glow, "self_modulate", Color(1, 1, 1, 0.35), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(glow, "self_modulate", Color(1, 1, 1, 0.08), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# 记录 tween 以便清除时 kill
+	glow.set_meta("highlight_tween", tw)
+	card.scale = Vector2(1.03, 1.03)
+
+## 清除当前行动角色高亮（新回合/换人行动时调用）
+func _clear_action_highlight() -> void:
+	if _action_glow != null and is_instance_valid(_action_glow):
+		var tw: Tween = _action_glow.get_meta("highlight_tween", null)
+		if tw != null:
+			tw.kill()
+		_action_glow.queue_free()
+	_action_glow = null
+	if _highlighted_action_pid >= 0:
+		var card: Control = _player_cards.get(_highlighted_action_pid)
+		if card != null:
+			card.scale = Vector2(1.0, 1.0)
+	_highlighted_action_pid = -1
+
 # ── Target panel ──────────────────────────────────────────────────────────────
 
 func _show_target_panel(skill_index: int, skill: SkillData) -> void:
@@ -1940,6 +2035,7 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			_stop_turn_timer()
 			_in_tiebreak = false
 			_odd_even_panel.hide()
+			_clear_action_highlight()
 			if not _is_draw_reentry:
 				_current_round += 1
 			_is_draw_reentry = false
@@ -1967,6 +2063,7 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			_hide_all_thinking()
 			gesture_panel.hide()
 			_odd_even_panel.hide()
+			_clear_action_highlight()
 			phase_label.text = "结算中..."
 			_play_all_gesture_reveals()
 
@@ -2140,6 +2237,8 @@ func _on_round_resolved(result: Dictionary) -> void:
 
 func _on_action_required(player_id: int) -> void:
 	print("[game_ui] _on_action_required called player_id=%d, _human_player_id=%d" % [player_id, _human_player_id])
+	# 高亮当前行动角色卡片（AI 也高亮：明确"轮到谁行动"）
+	_highlight_action_player(player_id)
 	if player_id != _human_player_id:
 		print("[game_ui] _on_action_required SKIP: player_id != _human_player_id")
 		return
@@ -2397,6 +2496,36 @@ func _on_player_eliminated(player_id: int) -> void:
 		_play_elimination_effect(card)
 	_refresh_all_distances()
 	_rebuild_distance_labels()
+
+## 慈悲尖塔一次性被动祝福触发：刷新卡片图标（免死金牌触发后隐藏）
+func _on_tower_blessing_triggered(player_id: int, blessing_name: String) -> void:
+	var card: Control = _player_cards.get(player_id)
+	if card:
+		var body := card.get_node_or_null("CardBody")
+		if body:
+			var medal: Panel = body.get_node_or_null("ImmortalMedalIcon")
+			if medal:
+				medal.visible = false
+	# 飘字反馈：免死金牌/涅槃触发
+	if blessing_name == "免死金牌" or blessing_name == "涅槃":
+		_show_damage_popup(player_id, 0.0, "heal")
+		# 在卡片上叠加提示文字
+		var card2: Control = _player_cards.get(player_id)
+		if card2:
+			var tip := Label.new()
+			tip.text = blessing_name + " 触发！"
+			tip.add_theme_font_size_override("font_size", 12)
+			tip.add_theme_color_override("font_color", Color("#FAC775"))
+			tip.add_theme_color_override("font_outline_color", Color("#412402"))
+			tip.add_theme_constant_override("outline_size", 1)
+			tip.position = Vector2(4.0, 34.0)
+			tip.size = Vector2(96.0, 14.0)
+			tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card2.add_child(tip)
+			var tw := create_tween().bind_node(tip)
+			tw.tween_property(tip, "modulate:a", 0.0, 1.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw.tween_callback(tip.queue_free)
 
 ## 淘汰特效：闪烁→缩放碎裂→旋转→淡出
 func _play_elimination_effect(card: Control) -> void:
