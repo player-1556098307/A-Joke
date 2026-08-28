@@ -151,6 +151,8 @@ func _ready() -> void:
 	GameManager.round_resolved.connect(_on_round_resolved)
 	# 宙斯一阶段→二阶段转换对话
 	GameManager.zeus_phase_transition_required.connect(_on_zeus_phase_transition)
+	# 免死金牌/涅槃触发 → 在持久化 buff 条目上标记已消耗（一次性祝福用完回池的依据）
+	GameManager.tower_blessing_triggered.connect(_on_tower_blessing_triggered)
 
 	# 二阶段BGM播放器（默认静音，仅在阶段转换时播放）
 	_bgm_player = AudioStreamPlayer.new()
@@ -333,7 +335,7 @@ func _inject_enemy_buffs() -> void:
 
 ## 换层前清理已消耗的一次性祝福
 ## 斩魂/回春是消耗品：用完一次永久失效，从持久化 buff 列表移除 → 祝福池可再次随机到
-## 免死金牌/涅槃是一次性被动：触发后消费（medal_used/niepan_used 标记）同样移除回池
+## 免死金牌/涅槃是一次性被动：触发后消费（_consumed 标记）同样移除回池
 func _cleanup_consumed_limited_buffs() -> void:
 	var consumed_buff_ids := { "soul_slash": true, "spring": true, "immortal_medal": true, "niepan": true }
 	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
@@ -354,7 +356,11 @@ func _cleanup_consumed_limited_buffs() -> void:
 		if team_idx >= per_player.size() or not (per_player[team_idx] is Array):
 			continue
 		var buffs: Array = per_player[team_idx]
-		# 检查该玩家是否有已使用/已触发的限定技祝福
+		# 检查该玩家是否有已使用/已触发的一次性祝福
+		# - 技能型消耗品（斩魂/回春）：用 limited_skills_used 判断（安全：新选未注入时列表为空不会误判）
+		# - 被动型（免死金牌/涅槃）：只认持久化 _consumed 标记（触发时由 tower_blessing_triggered 写入）。
+		#   不能回退到 PlayerState 判断——bool 字段默认 false 无法区分"未持有"与"已触发清除"，
+		#   且奖励选择后到注入前 PlayerState 尚未持有该祝福，回退会把刚选未触发的误判为已消耗而错误回池
 		var to_remove := []
 		for b in buffs:
 			if not (b is Dictionary):
@@ -368,14 +374,49 @@ func _cleanup_consumed_limited_buffs() -> void:
 					consumed = "斩魂" in p.limited_skills_used
 				"spring":
 					consumed = "回春" in p.limited_skills_used
-				"immortal_medal":
-					consumed = not p.immortal_medal  # 触发后标记被清除
-				"niepan":
-					consumed = not p.niepan_active
+				"immortal_medal", "niepan":
+					consumed = b.get("_consumed", false)
 			if consumed:
 				to_remove.append(b)
 		for b in to_remove:
 			buffs.erase(b)
+	SceneManager.last_tower_config["tower_buffs_per_player"] = per_player
+
+## 一次性被动祝福触发回调：免死金牌/涅槃触发时，在持久化 buff 条目上标记已消耗
+func _on_tower_blessing_triggered(player_id: int, blessing_name: String) -> void:
+	var buff_id: String = ""
+	match blessing_name:
+		"免死金牌":
+			buff_id = "immortal_medal"
+		"涅槃":
+			buff_id = "niepan"
+	if buff_id == "":
+		return
+	_mark_buff_consumed(player_id, buff_id)
+
+## 将指定玩家持久化列表中的 buff 条目标记为已消耗（一次性祝福用完回池的依据）
+## 注意：不能依赖 PlayerState 判断——奖励选择后到下一层注入前，PlayerState 尚未持有该祝福，
+## 若按 "字段被清除" 判断会把刚选未触发的祝福误判为已消耗并错误回池
+func _mark_buff_consumed(player_id: int, buff_id: String) -> void:
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	if per_player.is_empty():
+		return
+	# 按 team_id=1 的队伍顺序定位该玩家对应的 buff 列表索引
+	var team_idx := 0
+	var found := false
+	for p in GameManager.get_alive_players():
+		if p.team_id != 1:
+			continue
+		if p.player_id == player_id:
+			found = true
+			break
+		team_idx += 1
+	if not found or team_idx >= per_player.size() or not (per_player[team_idx] is Array):
+		return
+	for b in per_player[team_idx]:
+		if b is Dictionary and b.get("id", "") == buff_id:
+			b["_consumed"] = true
+			break
 	SceneManager.last_tower_config["tower_buffs_per_player"] = per_player
 
 ## 一次性技能祝福：将限定技加入玩家 unlocked_skills（防重复，每层注入幂等）
