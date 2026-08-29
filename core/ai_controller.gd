@@ -349,6 +349,21 @@ func decide_dream_end_target(
 	# 如果自己气>=4（即将放大招），优先标记自己
 	if caster.energy >= 4:
 		return caster
+	# 组队模式：优先标记队友（伤害翻倍收益更大）
+	if caster.team_id != 0:
+		var ally_best: PlayerState = null
+		var ally_best_hp: float = 999.0
+		for p in alive_players:
+			if p.player_id == caster.player_id:
+				continue
+			if p.team_id != caster.team_id:
+				continue
+			# 优先标记气多的队友（高伤害潜力），同为0气时标记低血
+			if ally_best == null or p.energy > ally_best.energy or (p.energy == ally_best.energy and p.hp < ally_best_hp):
+				ally_best = p
+				ally_best_hp = p.hp
+		if ally_best != null:
+			return ally_best
 	# 否则标记血量最低的敌人
 	var best: PlayerState = null
 	var best_hp: float = 999.0

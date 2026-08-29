@@ -28,6 +28,7 @@ func _ready() -> void:
 	await _test_immune_next_attack(ob_char, naruto_char, sasuke_char, sakura_char)
 	await _test_damage_zero_with_night(ob_char, naruto_char, sasuke_char, sakura_char)
 	await _test_ai(ob_char, naruto_char, sasuke_char, sakura_char)
+	await _test_team_ai_dream_end(ob_char, naruto_char, sasuke_char)
 
 	print("=== 奥伯龙测试结束：PASS=" + str(_pass_count) + " FAIL=" + str(_fail_count) + " ===")
 	get_tree().quit(0 if _fail_count == 0 else 1)
@@ -328,6 +329,44 @@ func _test_ai(ob_char: CharacterData, naruto_char: CharacterData, sasuke_char: C
 	_assert(target != null, "8d: AI梦之终结目标非null")
 	# 5气时优先标记自己
 	_assert(target.player_id == 0, "8e: 5气时梦之终结标记自己（实际=%d）" % (target.player_id if target else -1))
+
+## ═════════ 测试9：组队模式 AI 梦之终结可标记队友 ═════════════
+func _test_team_ai_dream_end(ob_char: CharacterData, naruto_char: CharacterData, sasuke_char: CharacterData) -> void:
+	print("--- 测试9：组队模式 AI 梦之终结标记队友 ---")
+	var ai := AIController.new()
+	var gm := GameManager
+	gm.setup_game({
+		"players": [
+			{"name": "AI奥伯龙", "character": ob_char, "is_human": false, "team_id": 1},
+			{"name": "鸣人", "character": naruto_char, "is_human": true, "team_id": 1},
+			{"name": "佐助", "character": sasuke_char, "is_human": true, "team_id": 2},
+		]
+	})
+	await get_tree().process_frame
+	var ob: PlayerState = gm.get_player(0)
+	var p1: PlayerState = gm.get_player(1)  # 队友鸣人
+	var p2: PlayerState = gm.get_player(2)  # 敌人佐助
+
+	# 自己气不足（<4），组队模式应标记队友（高气队友优先）
+	ob.energy = 0
+	p1.energy = 3
+	p2.energy = 0
+	var target := ai.decide_dream_end_target(ob, gm.get_alive_players())
+	_assert(target != null, "9a: 组队梦之终结目标非null")
+	_assert(target.player_id == 1, "9b: 组队模式标记高气队友(1)（实际=%d）" % (target.player_id if target else -1))
+
+	# 队友气相同 → 标记低血队友
+	p1.energy = 1
+	p1.hp = 3.0
+	p2.hp = 5.0
+	target = ai.decide_dream_end_target(ob, gm.get_alive_players())
+	_assert(target.player_id == 1, "9c: 组队模式标记低血队友(1)（实际=%d）" % (target.player_id if target else -1))
+
+	# 自己气>=4 时仍优先标记自己
+	ob.energy = 4
+	p1.energy = 5
+	target = ai.decide_dream_end_target(ob, gm.get_alive_players())
+	_assert(target.player_id == 0, "9d: 自己气>=4仍标记自己（实际=%d）" % (target.player_id if target else -1))
 
 ## ═════════ 辅助函数 ═════════════════════════════════════════
 func _setup4(ob_char: CharacterData, naruto_char: CharacterData, sasuke_char: CharacterData, sakura_char: CharacterData):
