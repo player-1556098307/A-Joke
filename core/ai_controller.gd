@@ -31,7 +31,10 @@ func decide_action(
 
 	# 目标池：排除自己；组队/塔模式（team_id != 0）下排除队友（AI不打自己人）
 	var others: Array[PlayerState] = []
+	# 全体存活玩家（含自己和队友）：辅助技能（ALLY_OR_SELF）专用候选池
+	var all_alive: Array[PlayerState] = []
 	for p in alive_players:
+		all_alive.append(p)
 		if p.player_id == player.player_id:
 			continue
 		if player.team_id != 0 and p.team_id == player.team_id:
@@ -96,9 +99,9 @@ func decide_action(
 		if result.size() > 0:
 			return result
 
-	# 阿尔托莉雅·卡斯特特殊策略
+	# 阿尔托莉雅·卡斯特特殊策略（需含队友/自己的候选池）
 	if _is_caster(player):
-		var result := _decide_caster_action(player, others, distance_system)
+		var result := _decide_caster_action(player, others, all_alive, distance_system)
 		if result.size() > 0:
 			return result
 
@@ -134,16 +137,21 @@ func decide_action(
 		var skill_index: int   = chosen["index"]
 		var target_id          := -1
 
-		# 需要单一目标的技能，随机选一个合法目标
+		# 需要单一目标的技能（ENEMY_SINGLE 或 ALLY_OR_SELF），随机选一个合法目标
 		var needs_single_target := false
+		var is_ally_skill := false
 		for effect in skill.effects:
 			if effect.target == SkillEffect.EffectTarget.ENEMY_SINGLE:
 				needs_single_target = true
-				break
+			elif effect.target == SkillEffect.EffectTarget.ALLY_OR_SELF:
+				needs_single_target = true
+				is_ally_skill = true
 
 		if needs_single_target:
 			var valid: Array[PlayerState] = []
-			for other in others:
+			# ALLY_OR_SELF 技能可指定任意存活玩家（含自己/队友），用 all_alive
+			var candidate_pool: Array[PlayerState] = all_alive if is_ally_skill else others
+			for other in candidate_pool:
 				if RoundResolver.can_use_skill(player, skill, other, distance_system):
 					valid.append(other)
 			if valid.size() > 0:
@@ -264,32 +272,38 @@ func _is_caster(player: PlayerState) -> bool:
 	return false
 
 ## 阿尔托莉雅·卡斯特专用决策策略
-## 优先级：圣剑锻造（3气，升级后可用，让队友/自己无消耗释放技能）> Around Caliburn（3气，给目标圣盾+伤害x2）
+## 优先级：圣剑锻造（3气，升级后可用，让任意玩家无消耗释放技能）> Around Caliburn（3气，给目标圣盾+伤害x2）
 ## > 普攻 > 充能
 ## 乐园妖精开局5气/巡礼被动/湖之加护均自动触发，AI只需决定操作阶段行动
+## all_alive: 全体存活玩家（含自己和队友），用于辅助技能（ALLY_OR_SELF）目标选择
 func _decide_caster_action(
 	player: PlayerState,
 	others: Array[PlayerState],
+	all_alive: Array[PlayerState],
 	distance_system: DistanceSystem
 ) -> Dictionary:
 	var all_skills := player.get_all_skills()
 
-	# 1. 圣剑锻造（3气，升级后可用）：选技能最多的队友释放
+	# 1. 圣剑锻造（3气，升级后可用）：选技能最多的玩家（含自己/队友）
 	var forge_idx := _find_skill_index(all_skills, player, "圣剑锻造")
 	if forge_idx >= 0 and player.energy >= 3:
-		# 优先选技能最多的队友（释放高伤技能）
 		var best_target: PlayerState = null
 		var best_skill_count: int = -1
-		for p in others:
-			if player.team_id != 0 and p.team_id != player.team_id:
-				continue  # 组队模式下只选队友
+		for p in all_alive:
+			if p.player_id == player.player_id:
+				continue  # 不对自己释放（自己有气时自己用更划算）
 			var cnt: int = p.get_all_skills().size()
+			# 组队模式优先选队友
+			if player.team_id != 0 and p.team_id != player.team_id:
+				continue
 			if cnt > best_skill_count:
 				best_skill_count = cnt
 				best_target = p
 		# 非组队模式：选任意其他玩家
 		if best_target == null and player.team_id == 0:
-			for p in others:
+			for p in all_alive:
+				if p.player_id == player.player_id:
+					continue
 				var cnt: int = p.get_all_skills().size()
 				if cnt > best_skill_count:
 					best_skill_count = cnt
@@ -297,22 +311,23 @@ func _decide_caster_action(
 		if best_target != null:
 			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": forge_idx, "target_id": best_target.player_id }
 
-	# 2. Around Caliburn（3气）：给队友（组队）或自己圣盾+伤害x2
+	# 2. Around Caliburn（3气）：给自己圣盾+伤害x2（组队模式也优先给自己，因为下次普攻x2）
 	var caliburn_idx := _find_skill_index(all_skills, player, "Around Caliburn")
 	if caliburn_idx >= 0 and player.energy >= 3:
-		# 优先给高伤队友（伤害x2收益最大）
+		# 组队模式：优先给气最多的队友（伤害翻倍收益最大）
 		var best_target: PlayerState = null
 		if player.team_id != 0:
-			for p in others:
+			for p in all_alive:
+				if p.player_id == player.player_id:
+					continue
 				if p.team_id != player.team_id:
 					continue
 				if best_target == null or p.energy > best_target.energy:
 					best_target = p
-		# 非组队：给自己（下次普攻x2）
-		if best_target == null and player.team_id == 0:
+		# fallback：给自己（下次普攻x2）
+		if best_target == null:
 			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": caliburn_idx, "target_id": player.player_id }
-		if best_target != null:
-			return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": caliburn_idx, "target_id": best_target.player_id }
+		return { "action": PlayerState.ActionType.USE_SKILL, "skill_index": caliburn_idx, "target_id": best_target.player_id }
 
 	# 3. 普攻：有气时攻击
 	var basic_idx := _find_skill_index(all_skills, player, "普攻")
@@ -1059,7 +1074,7 @@ func _decide_zeus_action(
 	return { "action": PlayerState.ActionType.CHARGE, "skill_index": -1, "target_id": -1 }
 
 
-## 检查技能是否有至少一个合法目标（包含 SELF 类型和敌对目标）
+## 检查技能是否有至少一个合法目标（包含 SELF/ALLY_OR_SELF 类型和敌对目标）
 func _has_valid_target(
 	player: PlayerState,
 	skill: SkillData,
@@ -1069,6 +1084,23 @@ func _has_valid_target(
 	for effect in skill.effects:
 		if effect.target == SkillEffect.EffectTarget.SELF:
 			return true
+		if effect.target == SkillEffect.EffectTarget.ALLY_OR_SELF:
+			# 辅助技能：可指定任意存活玩家（含自己/队友），只查距离是否满足
+			# 先查自身（距离0，技能 min_range=1 时需要排除自身→但也可能有队友）
+			var dist_self := 0
+			if dist_self >= skill.min_range and dist_self <= skill.max_range:
+				return true
+			for other in others:
+				if RoundResolver.can_use_skill(player, skill, other, distance_system):
+					return true
+			# others 可能已排除队友，还需检查队友（ALLY_OR_SELF 不排除队友）
+			for p in GameManager.get_alive_players():
+				if p.player_id == player.player_id:
+					continue
+				if p.team_id == player.team_id and player.team_id != 0:
+					if RoundResolver.can_use_skill(player, skill, p, distance_system):
+						return true
+			continue
 		for other in others:
 			# 防御性过滤：排除队友
 			if player.team_id != 0 and other.team_id == player.team_id:

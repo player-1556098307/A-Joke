@@ -120,10 +120,16 @@ static func apply_effects(
 					"result":      res
 				})
 
-			SkillEffect.EffectTarget.ENEMY_SINGLE, SkillEffect.EffectTarget.ENEMY_ALL:
+			SkillEffect.EffectTarget.ENEMY_SINGLE, SkillEffect.EffectTarget.ENEMY_ALL, SkillEffect.EffectTarget.ALLY_OR_SELF:
 				for tgt in targets:
-					var dist := distance_system.get_distance(attacker.player_id, tgt.player_id)
-					if dist >= skill.min_range and dist <= skill.max_range:
+					# ALLY_OR_SELF 指定自己时距离=0，跳过距离校验（自身施加辅助效果）
+					var in_range := false
+					if effect.target == SkillEffect.EffectTarget.ALLY_OR_SELF and tgt.player_id == attacker.player_id:
+						in_range = true
+					else:
+						var dist := distance_system.get_distance(attacker.player_id, tgt.player_id)
+						in_range = dist >= skill.min_range and dist <= skill.max_range
+					if in_range:
 						var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage, skill.skill_name)
 						logs.append({
 							"attacker_id": attacker.player_id,
@@ -142,31 +148,6 @@ static func apply_effects(
 						"attacker_id": attacker.player_id,
 						"target_id":   tgt.player_id,
 						"skill_name":  skill.skill_name,
-						"effect_type": effect.effect_type,
-						"value":       effect.value,
-						"result":      res
-					})
-
-			SkillEffect.EffectTarget.ENEMY_SINGLE, SkillEffect.EffectTarget.ENEMY_ALL:
-				for tgt in targets:
-					var dist := distance_system.get_distance(attacker.player_id, tgt.player_id)
-					if dist >= skill.min_range and dist <= skill.max_range:
-						var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage)
-						logs.append({
-							"attacker_id": attacker.player_id,
-							"target_id":   tgt.player_id,
-							"effect_type": effect.effect_type,
-							"value":       effect.value,
-							"result":      res
-						})
-
-			SkillEffect.EffectTarget.ENEMY_SPLASH:
-				# 溅射目标由 game_manager 按 splash_range 预计算，此处直接应用
-				for tgt in splash_targets:
-					var res := _apply_single_effect(effect, attacker, tgt, distance_system, skill.bonus_if_paralyzed, has_damage)
-					logs.append({
-						"attacker_id": attacker.player_id,
-						"target_id":   tgt.player_id,
 						"effect_type": effect.effect_type,
 						"value":       effect.value,
 						"result":      res

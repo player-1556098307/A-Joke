@@ -52,12 +52,12 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_pg")])
 script = ExtResource("1_effect")
 effect_type = 1
 value = -1
-target = 0
+target = 4
 
 [sub_resource type="Resource" id="SD_ac"]
 script = ExtResource("2_skill")
 skill_name = "Around Caliburn"
-description = "消耗3个气，选择任意一名玩家，使其获得圣盾（全挡护盾）+ 下一次造成的伤害翻倍。"
+description = "消耗3个气，选择任意一名玩家（含自己/队友），使其获得圣盾（全挡护盾）+ 下一次造成的伤害翻倍。"
 energy_cost = 3
 min_range = 1
 max_range = 999
@@ -81,12 +81,12 @@ effects = Array[ExtResource("1_effect")]([SubResource("SE_lb")])
 script = ExtResource("1_effect")
 effect_type = 56
 value = 0
-target = 0
+target = 4
 
 [sub_resource type="Resource" id="SD_sf"]
 script = ExtResource("2_skill")
 skill_name = "圣剑锻造"
-description = "操作阶段，消耗3个气，选择一名其他玩家，使其无消耗释放一次他的任意需要耗气的技能（无视释放条件）。若目标无可用技能则获得3个气。"
+description = "操作阶段，消耗3个气，选择任意一名玩家，使其无消耗释放一次他的任意需要耗气的技能（无视释放条件）。若目标无可用技能则获得3个气。"
 energy_cost = 3
 min_range = 1
 max_range = 999

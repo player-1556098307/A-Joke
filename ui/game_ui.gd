@@ -1641,9 +1641,26 @@ func _can_use_skill_on_any(player: PlayerState, skill: SkillData) -> bool:
 	# 钟消耗校验：无钟不可使用需钟的技能（如砸钟）
 	if player.bell_count < skill.bell_cost:
 		return false
+	# 判断技能是否含 ALLY_OR_SELF 效果（辅助技能可指定自己/队友/任意玩家）
+	var has_ally_target := false
 	for effect in skill.effects:
 		if effect.target == SkillEffect.EffectTarget.SELF:
 			return true
+		if effect.target == SkillEffect.EffectTarget.ALLY_OR_SELF:
+			has_ally_target = true
+	# ALLY_OR_SELF 技能：自身距离0也合法（min_range<=0），或任意存活玩家在射程内
+	if has_ally_target:
+		if 0 >= skill.min_range and 0 <= skill.max_range:
+			return true
+		for other in GameManager.get_alive_players():
+			if other.player_id == player.player_id:
+				continue
+			var dist_a := GameManager.get_distance(player.player_id, other.player_id)
+			if dist_a >= skill.min_range and dist_a <= skill.max_range:
+				return true
+		return false
+	# 普通技能：检查任意非自身存活玩家是否在射程内（含队友，UI 层面只管距离，
+	# 实际能否选队友由 _show_target_panel 的过滤决定）
 	for other in GameManager.get_alive_players():
 		if other.player_id == player.player_id:
 			continue
@@ -1847,15 +1864,28 @@ func _show_target_panel(skill_index: int, skill: SkillData) -> void:
 		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 		target_panel.add_child(desc_lbl)
 
+	# 判断是否为辅助技能（ALLY_OR_SELF）：这类技能可指定自己/队友/任意玩家
+	var is_ally_skill := false
+	for effect in skill.effects:
+		if effect.target == SkillEffect.EffectTarget.ALLY_OR_SELF:
+			is_ally_skill = true
+			break
+
 	# Target buttons
 	for player in GameManager.get_alive_players():
-		if player.player_id == _current_action_player_id:
+		# ALLY_OR_SELF 技能：可指定自己（距离0需在射程内）
+		if not is_ally_skill and player.player_id == _current_action_player_id:
 			continue
-		# 组队/塔模式：队友不可选为目标
+		# ALLY_OR_SELF 技能：队友可选；普通技能队友不可选
 		var me := GameManager.get_player(_current_action_player_id)
-		if me != null and me.team_id != 0 and player.team_id == me.team_id:
+		if not is_ally_skill and me != null and me.team_id != 0 and player.team_id == me.team_id:
 			continue
-		var dist     := GameManager.get_distance(_current_action_player_id, player.player_id)
+		# ALLY_OR_SELF 技能指定自己时距离=0
+		var dist: int
+		if player.player_id == _current_action_player_id:
+			dist = 0
+		else:
+			dist = GameManager.get_distance(_current_action_player_id, player.player_id)
 		var in_range := dist >= skill.min_range and dist <= skill.max_range
 		var btn      := Button.new()
 		btn.custom_minimum_size = Vector2(172, 44)
@@ -1877,7 +1907,10 @@ func _show_target_panel(skill_index: int, skill: SkillData) -> void:
 		btn.add_child(vbox)
 
 		var n_lbl := Label.new()
-		n_lbl.text = player.player_name
+		var display_name := player.player_name
+		if player.player_id == _current_action_player_id:
+			display_name += "（自己）"
+		n_lbl.text = display_name
 		n_lbl.add_theme_font_size_override("font_size", 11)
 		n_lbl.add_theme_color_override("font_color", Color("#412402") if in_range else Color("#888780"))
 		n_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

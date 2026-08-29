@@ -1831,16 +1831,20 @@ func _apply_actions() -> void:
 		winner.action_points = 0
 	_enter_phase(GamePhase.ELIMINATION)
 
-## 构建技能目标列表：ENEMY_ALL 取全部敌人，ENEMY_SINGLE 取指定目标
+## 构建技能目标列表：ENEMY_ALL 取全部敌人，ENEMY_SINGLE/ALLY_OR_SELF 取指定目标
 ## 无法选择状态（untargetable_turns>0）的玩家不能被任何技能指定为目标
+## ALLY_OR_SELF 与 ENEMY_SINGLE 一样取指定目标（attacker.skill_target_id），可指向自己/队友
 func _build_skill_targets(attacker: PlayerState, skill: SkillData) -> Array[PlayerState]:
 	var has_enemy_all    := false
 	var has_enemy_single := false
+	var has_ally_or_self := false
 	for effect in skill.effects:
 		if effect.target == SkillEffect.EffectTarget.ENEMY_ALL:
 			has_enemy_all = true
 		elif effect.target == SkillEffect.EffectTarget.ENEMY_SINGLE:
 			has_enemy_single = true
+		elif effect.target == SkillEffect.EffectTarget.ALLY_OR_SELF:
+			has_ally_or_self = true
 
 	var targets: Array[PlayerState] = []
 	if has_enemy_all:
@@ -1853,7 +1857,7 @@ func _build_skill_targets(attacker: PlayerState, skill: SkillData) -> Array[Play
 				if p.untargetable_turns > 0:
 					continue
 				targets.append(p)
-	elif has_enemy_single:
+	elif has_enemy_single or has_ally_or_self:
 		var tgt := get_player(attacker.skill_target_id)
 		if tgt != null and tgt.is_alive:
 			# 无法选择状态：技能无法指定该玩家为目标

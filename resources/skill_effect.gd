@@ -146,10 +146,11 @@ enum EffectType {
 
 ## 效果目标枚举
 enum EffectTarget {
-	ENEMY_SINGLE,  ## 单一敌人
-	ENEMY_ALL,     ## 所有敌人
-	SELF,          ## 自身
-	ENEMY_SPLASH,  ## 主目标周围 splash_range 内的其他敌人
+	ENEMY_SINGLE,    ## 单一敌人
+	ENEMY_ALL,       ## 所有敌人
+	SELF,            ## 自身
+	ENEMY_SPLASH,    ## 主目标周围 splash_range 内的其他敌人
+	ALLY_OR_SELF,    ## 任意存活玩家（含自己和队友）：辅助技能专用，不受"排除队友"过滤
 }
 
 @export var effect_type: EffectType             ## 效果类型
