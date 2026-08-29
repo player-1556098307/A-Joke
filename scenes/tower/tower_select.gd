@@ -1,6 +1,6 @@
 ## TowerSelect — 慈悲尖塔选人场景（房间式队伍）
-## 1号槽位=玩家（真人，默认）；2/3号槽位可填充 AI 队友，空槽位不参战（单人/双人/三人由填充决定）
-## ⇄ 按钮可交换站位（角色+模式一起换，影响战斗中座位顺序与距离）
+## 单机：1号槽位=玩家；2/3号槽位可填充 AI 队友，空槽位不参战；⇄ 交换站位（角色+模式一起换）
+## 联机：创建房间/凭房间码加入，槽位由服务器同步（真人队友加入空槽），对局由专用权威服务器驱动
 ## 样式与 PvE 选人一致：角色卡 + 等级筛选 + 详情预览 + 技能卡
 extends Control
 
@@ -39,12 +39,13 @@ const STAT_DEFS := [
 const GRADE_ORDER := { "S": 0, "A": 1, "B": 2, "C": 3 }
 
 ## 槽位模式：0=真人（仅1号玩家槽固定），1=AI（托管队友），-1=空（不参战）
-## 2/3号槽位仅支持 空/AI（本地单机无第二真人输入；真人队友留待联机部署开放）
+## 单机模式下 2/3 号槽位仅支持 空/AI；联机模式槽位来自服务器同步
 const MODE_HUMAN := 0
 const MODE_AI := 1
 const MODE_EMPTY := -1
 
 var _chars: Array[CharacterData] = []
+var _char_ids: Array[String] = []  # 与 _chars 平行：Characters.LIST 中的 id（联机 select_character 用）
 var _active_slot: int = 0
 var _selections: Array[int] = [-1, -1, -1]
 var _slot_modes: Array[int] = [MODE_HUMAN, MODE_EMPTY, MODE_EMPTY]
@@ -68,14 +69,43 @@ var _start_btn: Button
 var _swap_pending: int = -1  # 换位模式：-1=未激活，>=0=源槽位索引
 var _swap_buttons: Array[Button] = []
 
+# ── 联机房间状态 ──
+var _net_room: Dictionary = {}      # 最近一次服务器房间快照；空字典 = 未在联机房间
+var _net_pending: String = ""       # "create" / 房间码（等待 ENet 连上后发送）
+var _net_joining: bool = false
+var _net_preview: CharacterData = null  # 联机模式下的角色预览
+var _local_name: String = ""
+var _create_btn: Button
+var _join_btn: Button
+var _leave_btn: Button
+var _code_btn: Button
+var _toast: Label
+var _toast_seq: int = 0
+
 func _ready() -> void:
 	for data in Characters.LIST:
+		_char_ids.append(data.get("id", ""))
 		var res := load(data.get("res_path", "")) as CharacterData
 		if res != null:
 			_chars.append(res)
+	_local_name = _default_name()
 	_build_ui()
 	_selections[0] = 0  # 玩家槽位默认选第一个角色
 	_refresh_all()
+	RoomManager.lobby_sync_received.connect(_on_net_lobby_sync)
+	RoomManager.game_starting.connect(_on_net_game_starting)
+	RoomManager.join_failed.connect(_on_net_join_failed)
+	NetworkManager.disconnected_from_game_server.connect(_on_net_server_lost)
+
+func _exit_tree() -> void:
+	if RoomManager.lobby_sync_received.is_connected(_on_net_lobby_sync):
+		RoomManager.lobby_sync_received.disconnect(_on_net_lobby_sync)
+	if RoomManager.game_starting.is_connected(_on_net_game_starting):
+		RoomManager.game_starting.disconnect(_on_net_game_starting)
+	if RoomManager.join_failed.is_connected(_on_net_join_failed):
+		RoomManager.join_failed.disconnect(_on_net_join_failed)
+	if NetworkManager.disconnected_from_game_server.is_connected(_on_net_server_lost):
+		NetworkManager.disconnected_from_game_server.disconnect(_on_net_server_lost)
 
 func _get_cls(char_data: CharacterData) -> String:
 	return char_data.tags[0] if char_data.tags.size() > 0 else "战士"
@@ -161,9 +191,50 @@ func _build_ui() -> void:
 	start_lbl.anchor_right = 1.0; start_lbl.anchor_bottom = 1.0
 	_start_btn.add_child(start_lbl)
 
+	# 联机入口（开始按钮下方第二行右侧）：创建 / 加入 / 退出
+	_create_btn = _make_net_btn("创建联机房间", -196.0, -106.0)
+	_create_btn.pressed.connect(_on_create_room_pressed)
+	add_child(_create_btn)
+	_join_btn = _make_net_btn("加入房间", -100.0, -18.0)
+	_join_btn.pressed.connect(_on_join_room_pressed)
+	add_child(_join_btn)
+	_leave_btn = _make_net_btn("退出房间", -100.0, -18.0)
+	_leave_btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFF6E0"), Color("#C9A84C"), 2, 6))
+	_leave_btn.add_theme_color_override("font_color", Color("#8B6514"))
+	_leave_btn.pressed.connect(_on_leave_room_pressed)
+	add_child(_leave_btn)
+
+	# 房间号标签（联机时显示，点击复制）
+	_code_btn = Button.new()
+	_code_btn.text = ""
+	_code_btn.focus_mode = Control.FOCUS_NONE
+	_code_btn.add_theme_stylebox_override("normal", _make_flat(Color("#EEF4FB"), Color("#2A6AB0"), 1, 4))
+	_code_btn.add_theme_color_override("font_color", Color("#2A6AB0"))
+	_code_btn.add_theme_font_size_override("font_size", 11)
+	_code_btn.anchor_left = 1.0; _code_btn.anchor_right = 1.0; _code_btn.anchor_top = 0.0
+	_code_btn.offset_left = -470.0; _code_btn.offset_right = -110.0
+	_code_btn.offset_top = 48.0; _code_btn.offset_bottom = 70.0
+	_code_btn.pressed.connect(func():
+		if _in_net():
+			DisplayServer.clipboard_set(str(_net_room.get("room_code", "")))
+			_toast_msg("房间号已复制")
+	)
+	add_child(_code_btn)
+
+	# 轻提示（顶部中央，自动消失）
+	_toast = Label.new()
+	_toast.add_theme_font_size_override("font_size", 12)
+	_toast.add_theme_color_override("font_color", Color("#E24B4A"))
+	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.anchor_left = 0.0; _toast.anchor_right = 1.0
+	_toast.offset_top = 66.0; _toast.offset_bottom = 86.0
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.visible = false
+	add_child(_toast)
+
 	# 房间说明
 	var room_hint := Label.new()
-	room_hint.text = "1号 = 你（玩家）；2/3号可添加 AI 队友，⇄可交换站位，空槽位不参战（真人联机后续开放）"
+	room_hint.text = "1号 = 你（玩家）；2/3号可添加 AI 队友，⇄可交换站位，空槽位不参战；点右上「创建房间」联机组队"
 	room_hint.add_theme_font_size_override("font_size", 11)
 	room_hint.add_theme_color_override("font_color", Color("#888780"))
 	room_hint.anchor_left = 0.0; room_hint.anchor_top = 0.0
@@ -324,6 +395,203 @@ func _build_ui() -> void:
 		swap_btn.pressed.connect(_on_swap_pressed.bind(i))
 		slot_box.add_child(swap_btn)
 		_swap_buttons.append(swap_btn)
+
+# ── 联机房间 ───────────────────────────────────────────────────────
+
+func _make_net_btn(text: String, left: float, right: float) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.custom_minimum_size = Vector2(0, 30)
+	btn.anchor_left = 1.0; btn.anchor_right = 1.0; btn.anchor_top = 0.0
+	btn.offset_left = left; btn.offset_right = right
+	btn.offset_top = 48.0; btn.offset_bottom = 78.0
+	btn.add_theme_font_size_override("font_size", 11)
+	btn.add_theme_stylebox_override("normal", _make_flat(Color("#2C2C2A"), Color("#2C2C2A"), 0, 6))
+	btn.add_theme_stylebox_override("hover",  _make_flat(Color("#3A3A37"), Color("#2C2C2A"), 0, 6))
+	btn.add_theme_stylebox_override("pressed",_make_flat(Color("#1F1F1D"), Color("#2C2C2A"), 0, 6))
+	btn.add_theme_color_override("font_color", Color("#FFFDF5"))
+	return btn
+
+func _in_net() -> bool:
+	return not _net_room.is_empty()
+
+func _net_is_host() -> bool:
+	return _in_net() and int(_net_room.get("host_peer_id", -1)) == NetworkManager.my_game_peer_id
+
+func _default_name() -> String:
+	if NetworkManager._session != null and NetworkManager._session.username != "":
+		return NetworkManager._session.username
+	return "玩家%d" % (randi() % 9000 + 1000)
+
+func _on_create_room_pressed() -> void:
+	if _in_net() or _net_joining:
+		return
+	_net_pending = "create"
+	_ensure_server_connection()
+
+func _on_join_room_pressed() -> void:
+	if _in_net() or _net_joining:
+		return
+	_show_join_dialog()
+
+func _on_leave_room_pressed() -> void:
+	if not _in_net():
+		return
+	RoomManager.rpc_id(1, "leave_room")
+	_leave_net_room()
+
+## 弹出房间号输入框
+func _show_join_dialog() -> void:
+	var dim := ColorRect.new()
+	dim.name = "JoinDim"
+	dim.color = Color(0, 0, 0, 0.4)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.z_index = 200
+	dim.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed:
+			dim.queue_free()
+	)
+	add_child(dim)
+
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2(300, 130)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -150.0; panel.offset_right = 150.0
+	panel.offset_top = -65.0; panel.offset_bottom = 65.0
+	panel.z_index = 201
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color("#FFFDF5"); ps.border_color = Color("#2C2C2A")
+	ps.set_border_width_all(2); ps.set_corner_radius_all(8)
+	panel.add_theme_stylebox_override("panel", ps)
+	dim.add_child(panel)
+
+	var lbl := Label.new()
+	lbl.text = "输入 6 位房间号"
+	lbl.add_theme_font_size_override("font_size", 13)
+	lbl.add_theme_color_override("font_color", Color("#2C2C2A"))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.anchor_right = 1.0
+	lbl.offset_top = 14.0; lbl.offset_bottom = 34.0
+	panel.add_child(lbl)
+
+	var input := LineEdit.new()
+	input.placeholder_text = "如 AB23CD"
+	input.max_length = 6
+	input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	input.anchor_left = 0.5; input.anchor_right = 0.5
+	input.offset_left = -80.0; input.offset_right = 80.0
+	input.offset_top = 42.0; input.offset_bottom = 70.0
+	panel.add_child(input)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.anchor_right = 1.0
+	row.offset_top = 80.0; row.offset_bottom = 110.0
+	panel.add_child(row)
+	var ok := Button.new()
+	ok.text = "加入"
+	ok.custom_minimum_size = Vector2(90, 28)
+	ok.focus_mode = Control.FOCUS_NONE
+	ok.add_theme_stylebox_override("normal", _make_flat(Color("#3B6D11"), Color("#2C2C2A"), 2, 6))
+	ok.add_theme_color_override("font_color", Color("#EAF3DE"))
+	row.add_child(ok)
+	var cancel := Button.new()
+	cancel.text = "取消"
+	cancel.custom_minimum_size = Vector2(90, 28)
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#B4B2A9"), 1, 6))
+	cancel.add_theme_color_override("font_color", Color("#5F5E5A"))
+	row.add_child(cancel)
+	cancel.pressed.connect(func(): dim.queue_free())
+	var submit := func():
+		var code := input.text.strip_edges().to_upper()
+		if code.length() != 6:
+			_toast_msg("房间号格式不正确")
+			return
+		dim.queue_free()
+		_net_pending = code
+		_ensure_server_connection()
+	ok.pressed.connect(submit)
+	input.text_submitted.connect(func(_t: String): submit.call())
+	input.grab_focus()
+
+func _ensure_server_connection() -> void:
+	if NetworkManager.is_connected_to_game:
+		_send_pending_join()
+		return
+	_net_joining = true
+	_toast_msg("正在连接服务器...")
+	NetworkManager.connected_to_game_server.connect(_on_net_server_ready, CONNECT_ONE_SHOT)
+	NetworkManager.disconnected_from_game_server.connect(_on_net_connect_failed, CONNECT_ONE_SHOT)
+	NetworkManager.connect_to_game_server(NetworkManager.GAME_SERVER_IP, NetworkManager.GAME_SERVER_PORT, "")
+
+func _on_net_server_ready() -> void:
+	_net_joining = false
+	_send_pending_join()
+
+func _on_net_connect_failed() -> void:
+	_net_joining = false
+	_net_pending = ""
+	_toast_msg("连接服务器失败，请稍后重试")
+
+func _send_pending_join() -> void:
+	if _net_pending == "create":
+		RoomManager.rpc_id(1, "create_room", {
+			"mode": "tower",
+			"max_players": 3,
+			"player_name": _local_name,
+		})
+	elif _net_pending != "":
+		RoomManager.rpc_id(1, "join_room", _net_pending, _local_name)
+	_net_pending = ""
+
+func _leave_net_room() -> void:
+	_net_room = {}
+	_net_preview = null
+	_swap_pending = -1
+	_slot_modes = [MODE_HUMAN, MODE_EMPTY, MODE_EMPTY]
+	_refresh_all()
+
+func _on_net_lobby_sync(data: Dictionary) -> void:
+	_net_room = data
+	_net_preview = null
+	_refresh_all()
+
+func _on_net_join_failed(reason: String) -> void:
+	_toast_msg(reason)
+
+func _on_net_server_lost() -> void:
+	if _in_net():
+		_leave_net_room()
+		_toast_msg("与服务器的连接已断开")
+
+func _on_net_game_starting(config: Dictionary) -> void:
+	if config.get("mode", "") != "tower":
+		return  # 经典模式房间由 room.gd 处理
+	# 由服务器下发的队伍编成构建本地镜像（CharacterData + is_human）
+	var party: Array = []
+	for entry in config.get("party", []):
+		var cd: Dictionary = Characters.get_by_id(str(entry.get("character_id", "")))
+		if cd.is_empty():
+			continue
+		var res := load(cd.get("res_path", "")) as CharacterData
+		if res != null:
+			party.append({"character": res, "is_human": bool(entry.get("is_human", false))})
+	SceneManager.last_tower_config = { "players": party }
+	SceneManager.last_game_config = config
+	SceneManager.go_to("res://scenes/tower/tower_battle.tscn")
+
+func _toast_msg(msg: String) -> void:
+	_toast.text = msg
+	_toast.visible = true
+	_toast_seq += 1
+	var seq := _toast_seq
+	get_tree().create_timer(3.0).timeout.connect(func():
+		if seq == _toast_seq:
+			_toast.visible = false
+	)
 
 # ── 等级筛选 ───────────────────────────────────────────────────────
 
@@ -544,6 +812,13 @@ func _make_inline_badge(text: String, bg: Color, fg: Color,
 # ── 交互 ───────────────────────────────────────────────────────────
 
 func _set_active_slot(slot: int) -> void:
+	if _in_net():
+		# 联机模式：点击槽位仅预览该槽成员的角色（角色分配只作用于自己的槽位）
+		var slots: Array = _net_room.get("slots", [])
+		if slot < slots.size():
+			_net_preview = _char_by_id(slots[slot].get("character", ""))
+			_refresh_all()
+		return
 	if _swap_pending >= 0:
 		if slot != _swap_pending:
 			_swap_slots(_swap_pending, slot)
@@ -554,8 +829,24 @@ func _set_active_slot(slot: int) -> void:
 	_active_slot = slot
 	_refresh_all()
 
-## 切换槽位模式（2/3号）：空 ↔ AI（本地单机不支持填真人；真人队友留待联机部署）
+## 切换槽位模式（2/3号）：空 ↔ AI
+## 联机模式：仅房主可操作，且只允许调整末尾槽位（服务器槽位是紧凑数组）
 func _toggle_slot_mode(slot: int) -> void:
+	if _in_net():
+		if _net_room.get("status") != "waiting":
+			return
+		if not _net_is_host():
+			_toast_msg("只有房主可以调整队伍")
+			return
+		var slots: Array = _net_room.get("slots", [])
+		var n: int = slots.size()
+		if slot == n:
+			RoomManager.rpc_id(1, "add_ai")
+		elif slot == n - 1 and slot > 0 and slots[slot]["is_ai"]:
+			RoomManager.rpc_id(1, "remove_ai", slot)
+		else:
+			_toast_msg("只能增减最后的队伍槽位")
+		return
 	if _slot_modes[slot] == MODE_HUMAN:
 		return  # 真人槽位不可切换
 	if _slot_modes[slot] == MODE_EMPTY:
@@ -569,6 +860,18 @@ func _toggle_slot_mode(slot: int) -> void:
 
 ## 换位按钮：点击进入换位模式，再点另一个槽位完成交换
 func _on_swap_pressed(slot: int) -> void:
+	if _in_net():
+		if _net_room.get("status") != "waiting":
+			return
+		if _swap_pending == slot:
+			_swap_pending = -1
+		elif _swap_pending >= 0:
+			RoomManager.rpc_id(1, "swap_slots", _swap_pending, slot)
+			_swap_pending = -1
+		else:
+			_swap_pending = slot
+		_refresh_all()
+		return
 	if _swap_pending == slot:
 		_swap_pending = -1  # 再次点击取消
 	elif _swap_pending >= 0:
@@ -598,14 +901,46 @@ func _get_human_slot() -> int:
 
 func _select_for_active(char_data: CharacterData) -> void:
 	var idx := _chars.find(char_data)
-	if idx >= 0:
-		_selections[_active_slot] = idx
-		# 空槽位选角色后自动填充为 AI（可再切真人）
-		if _active_slot > 0 and _slot_modes[_active_slot] == MODE_EMPTY:
-			_slot_modes[_active_slot] = MODE_AI
+	if idx < 0:
+		return
+	if _in_net():
+		# 联机模式：角色只分配给自己的槽位，由服务器同步给全房间
+		if _net_room.get("status") != "waiting":
+			return
+		_net_preview = char_data
+		RoomManager.rpc_id(1, "select_character", _char_ids[idx])
+		_refresh_all()
+		return
+	_selections[_active_slot] = idx
+	# 空槽位选角色后自动填充为 AI（可再切真人）
+	if _active_slot > 0 and _slot_modes[_active_slot] == MODE_EMPTY:
+		_slot_modes[_active_slot] = MODE_AI
 	_refresh_all()
 
+func _char_by_id(char_id: String) -> CharacterData:
+	var idx: int = _char_ids.find(char_id)
+	return _chars[idx] if idx >= 0 else null
+
+func _refresh_net_ui() -> void:
+	var in_net := _in_net()
+	_create_btn.visible = not in_net
+	_join_btn.visible = not in_net
+	_leave_btn.visible = in_net
+	_code_btn.visible = in_net
+	if in_net:
+		var slots: Array = _net_room.get("slots", [])
+		var humans := 0
+		for s in slots:
+			if not s["is_ai"]:
+				humans += 1
+		var status_txt: String = "等待中" if _net_room.get("status") == "waiting" else "对局进行中"
+		_code_btn.text = "房间号 %s  ·  %d/%d 人  ·  %s（点击复制）" % [
+			_net_room.get("room_code", ""), slots.size(),
+			int(_net_room.get("max_players", 3)), status_txt,
+		]
+
 func _refresh_all() -> void:
+	_refresh_net_ui()
 	_refresh_list_highlight()
 	_refresh_slots()
 	_refresh_detail()
@@ -627,6 +962,9 @@ func _refresh_list_highlight() -> void:
 		_card_sel_badges[i].visible = is_sel
 
 func _refresh_slots() -> void:
+	if _in_net():
+		_refresh_net_slots()
+		return
 	for i in 3:
 		var btn: Button = _slot_buttons[i]
 		var lbl: Label = _slot_name_lbls[i]
@@ -686,13 +1024,104 @@ func _refresh_slots() -> void:
 			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#B4B2A9"), 1, 4))
 			swap_btn.add_theme_color_override("font_color", Color("#5F5E5A"))
 
+## 联机模式槽位渲染：槽位数据来自服务器快照，自己的槽位高亮
+func _refresh_net_slots() -> void:
+	var slots: Array = _net_room.get("slots", [])
+	var my_peer: int = NetworkManager.my_game_peer_id
+	var waiting: bool = _net_room.get("status") == "waiting"
+	for i in 3:
+		var btn: Button = _slot_buttons[i]
+		var lbl: Label = _slot_name_lbls[i]
+		var mode_btn: Button = _slot_mode_buttons[i]
+		var swap_btn: Button = _swap_buttons[i]
+		var filled: bool = i < slots.size()
+		var slot: Dictionary = slots[i] if filled else {}
+		var is_mine: bool = filled and int(slot.get("peer_id", -2)) == my_peer
+		var is_swap_mode: bool = _swap_pending >= 0
+		var is_swap_src: bool = _swap_pending == i
+		if is_swap_src:
+			btn.add_theme_stylebox_override("normal", _make_flat(Color("#FCE4E4"), Color("#E24B4A"), 3, 6))
+		elif is_mine:
+			btn.add_theme_stylebox_override("normal", _make_flat(Color("#EAF3DE"), Color("#3B6D11"), 3, 6))
+		elif filled:
+			btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFFDF5"), Color("#D3D1C7"), 2, 6))
+		else:
+			btn.add_theme_stylebox_override("normal", _make_flat(Color("#F7F5F0"), Color("#D3D1C7"), 1, 6))
+		if not filled:
+			lbl.text = "＋ 空槽位（等待真人加入或房主添加AI）"
+			lbl.add_theme_color_override("font_color", Color("#888780"))
+		else:
+			var cname: String = _char_name_by_id(slot.get("character", ""))
+			var tag: String = "（重连中）" if slot.get("disconnected", false) else ""
+			if slot["is_ai"]:
+				lbl.text = "AI成员 · %s%s" % [cname, tag]
+				lbl.add_theme_color_override("font_color", Color("#2C2C2A"))
+			else:
+				var who: String = ("你 · " + str(slot["player_name"])) if is_mine else str(slot["player_name"])
+				lbl.text = "%s · %s%s%s" % [who, cname, tag, " ◈" if is_mine else ""]
+				lbl.add_theme_color_override("font_color", Color("#27500A") if is_mine else Color("#2C2C2A"))
+		# 模式按钮：空/AI 槽位房主可切换，真人槽固定
+		if not filled:
+			mode_btn.text = "＋ 空"
+			mode_btn.disabled = not (_net_is_host() and waiting and i == slots.size())
+			mode_btn.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#B4B2A9"), 1, 4))
+			mode_btn.add_theme_color_override("font_color", Color("#5F5E5A"))
+		elif slot["is_ai"]:
+			mode_btn.text = "🤖 AI"
+			mode_btn.disabled = not (_net_is_host() and waiting and i == slots.size() - 1)
+			mode_btn.add_theme_stylebox_override("normal", _make_flat(Color("#EEF4FB"), Color("#2A6AB0"), 1, 4))
+			mode_btn.add_theme_color_override("font_color", Color("#2A6AB0"))
+		else:
+			mode_btn.text = "👤 玩家"
+			mode_btn.disabled = true
+			mode_btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFF6E0"), Color("#C9A84C"), 1, 4))
+			mode_btn.add_theme_color_override("font_color", Color("#8B6514"))
+		# 换位按钮
+		var can_swap := waiting
+		if is_swap_src:
+			swap_btn.text = "取消"
+			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#E24B4A"), Color("#2C2C2A"), 1, 4))
+			swap_btn.add_theme_color_override("font_color", Color("#FFFDF5"))
+		elif is_swap_mode:
+			swap_btn.text = "⇄"
+			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFF6E0"), Color("#C9A84C"), 1, 4))
+			swap_btn.add_theme_color_override("font_color", Color("#8B6514"))
+		else:
+			swap_btn.text = "⇄"
+			swap_btn.add_theme_stylebox_override("normal", _make_flat(Color("#F1EFE8"), Color("#B4B2A9"), 1, 4))
+			swap_btn.add_theme_color_override("font_color", Color("#5F5E5A") if can_swap else Color("#B4B2A9"))
+
+func _char_name_by_id(char_id: String) -> String:
+	if char_id == "":
+		return "未选择"
+	var cd: Dictionary = Characters.get_by_id(char_id)
+	return str(cd.get("character_name", char_id)) if not cd.is_empty() else char_id
+
 func _refresh_detail() -> void:
+	if _in_net():
+		var preview: CharacterData = _net_preview
+		if preview == null:
+			# 默认预览自己槽位的角色
+			var slots: Array = _net_room.get("slots", [])
+			var my_peer: int = NetworkManager.my_game_peer_id
+			for slot in slots:
+				if int(slot.get("peer_id", -2)) == my_peer:
+					preview = _char_by_id(slot.get("character", ""))
+					break
+		if preview == null:
+			_name_label.text = "未选择"
+			_avatar_label.text = "?"
+			return
+		_show_detail(preview)
+		return
 	var sel: int = _selections[_active_slot]
 	if sel < 0 or sel >= _chars.size():
 		_name_label.text = "未选择"
 		_avatar_label.text = "?"
 		return
-	var c: CharacterData = _chars[sel]
+	_show_detail(_chars[sel])
+
+func _show_detail(c: CharacterData) -> void:
 	var cls := _get_cls(c)
 	_name_label.text = c.character_name
 	_avatar_label.text = c.character_name.left(1)
@@ -878,6 +1307,15 @@ func _update_start_label() -> void:
 	var lbl := _start_btn.get_child(0) as Label
 	if lbl == null:
 		return
+	if _in_net():
+		if _net_room.get("status") != "waiting":
+			lbl.text = "对局进行中"
+		elif _net_is_host():
+			var n: int = _net_room.get("slots", []).size()
+			lbl.text = "开始闯关（%d人队伍）" % n
+		else:
+			lbl.text = "等待房主开始"
+		return
 	var hs: int = _get_human_slot()
 	if _selections[hs] < 0:
 		lbl.text = "请先选择玩家角色"
@@ -905,6 +1343,12 @@ func _build_tower_config() -> Array:
 	return party
 
 func _on_start() -> void:
+	if _in_net():
+		# 联机模式：房主发起，服务器校验后广播 game_starting，由 _on_net_game_starting 切场景
+		if not _net_is_host() or _net_room.get("status") != "waiting":
+			return
+		RoomManager.rpc_id(1, "start_game")
+		return
 	# 真人玩家必须已选角色
 	var hs: int = _get_human_slot()
 	if _selections[hs] < 0 or _selections[hs] >= _chars.size():

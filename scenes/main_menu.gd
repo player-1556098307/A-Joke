@@ -12,6 +12,11 @@ extends Control
 @onready var border_frame: Panel = $BorderFrame
 
 func _ready() -> void:
+	# 专用服务器导出（dedicated_server/headless）直接进入服务器主循环，
+	# 不加载任何主菜单 UI（server_main.gd 负责 ENet 监听）
+	if OS.has_feature("dedicated_server") or DisplayServer.get_name() == "headless":
+		get_tree().change_scene_to_file("res://server/server_main.tscn")
+		return
 	_apply_border_frame()
 	_style_pve_button()
 	_style_pvp_button()

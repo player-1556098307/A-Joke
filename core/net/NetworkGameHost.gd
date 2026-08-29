@@ -3,9 +3,13 @@ class_name NetworkGameHost
 extends Node
 
 signal room_empty
+signal tower_reward_pick_received(player_index: int, buff: Dictionary)
+signal player_rejoined(peer_id: int, player_id: int)
 
 var room_id: String = ""
 var room_config: Dictionary = {}
+## 塔模式权威控制器（TowerMatchHost），由 RoomManager 在开局时注入
+var tower_host: Node = null
 
 ## key = peer_id, value = player_id
 var _peer_to_player: Dictionary = {}
@@ -23,6 +27,7 @@ func _ready() -> void:
 	_game_manager = GameManager
 	_game_manager._is_network_game = true
 	_connect_signals()
+	_hook_decision_failsafes()
 
 func _connect_signals() -> void:
 	_game_manager.phase_changed.connect(_on_phase_changed)
@@ -111,6 +116,7 @@ func on_player_join(peer_id: int, token: String) -> void:
 		_send_full_sync(peer_id)
 		_broadcast(NetworkProtocol.SrvOp.PLAYER_RECONNECTED,
 			{"player_id": player_id}, _spectator_peers)
+		player_rejoined.emit(peer_id, player_id)
 		return
 	# 如果游戏已通过 room 配置初始化，仅同步状态
 	if not room_config.is_empty() and room_config.has("players"):
@@ -154,7 +160,11 @@ func _start_game() -> void:
 func initialize_from_config(config: Dictionary) -> void:
 	room_config = config
 	_game_manager._is_network_game = true
-	_game_manager.setup_game({"players": config["players"]})
+	if config.get("tower_mode", false):
+		# 塔模式：GameManager 由 TowerMatchHost 逐层 setup_game 驱动，这里只建立映射
+		pass
+	else:
+		_game_manager.setup_game({"players": config["players"], "tower_mode": false})
 	# 建立 peer_id → player_id 映射（从 config 读取实际 peer_id）
 	for i in range(config["players"].size()):
 		var pc = config["players"][i]
@@ -178,6 +188,7 @@ func initialize_from_config(config: Dictionary) -> void:
 func client_submit_gesture(gesture: int) -> void:
 	var peer_id = multiplayer.get_remote_sender_id()
 	var player_id: int = _peer_to_player.get(peer_id, -1)
+	print("[DEBUG][NetHost] client_submit_gesture peer=%d player=%d gesture=%d phase=%d" % [peer_id, player_id, gesture, _game_manager._current_phase])
 	if player_id < 0:
 		return
 	if gesture < 0 or gesture > 4:
@@ -259,6 +270,31 @@ func client_request_spectate() -> void:
 		return
 	_spectator_peers.append(peer_id)
 	_send_full_sync(peer_id)
+
+## 塔模式：客户端提交祝福选择（actor 校验：只能为自己的角色选）
+@rpc("any_peer", "reliable")
+func client_submit_reward_pick(player_index: int, buff: Dictionary) -> void:
+	var peer_id = multiplayer.get_remote_sender_id()
+	var player_id: int = _peer_to_player.get(peer_id, -1)
+	if player_id != player_index:
+		print("[NetHost] client_submit_reward_pick REJECT: player_id=%d != player_index=%d" % [player_id, player_index])
+		return
+	tower_reward_pick_received.emit(player_index, buff)
+
+## 塔模式：TowerMatchHost 用此广播楼层/奖励事件
+func broadcast_tower_op(op: int, data: Dictionary) -> void:
+	_broadcast(op, data, _spectator_peers)
+
+## 塔模式：整局结束，稍后销毁房间（对齐经典模式 GAME_OVER 后的节奏）
+func finish_run() -> void:
+	get_tree().create_timer(2.0).timeout.connect(func(): room_empty.emit(), CONNECT_ONE_SHOT)
+
+## 断线重连：查某 player_id 的重连 token（开局时随 rpc_game_starting 下发）
+func get_token_for_player(player_id: int) -> String:
+	for t in _tokens:
+		if _tokens[t] == player_id:
+			return t
+	return ""
 
 # ────────────────────────── ᵘ RPC 发送端存根 ─────────────────────
 # ⚠ rpc_id() 从本节点发出，故本脚本也必须声明这些 @rpc 方法
@@ -385,6 +421,89 @@ func _on_phase_changed(phase: GameManager.GamePhase) -> void:
 	if phase == GameManager.GamePhase.ROUND_END:
 		_broadcast(NetworkProtocol.SrvOp.STATE_HASH,
 			{"hash": _compute_state_hash()}, _spectator_peers)
+	_arm_turn_failsafe(phase)
+
+# ── 塔模式决策兜底 ────────────────────────────────────────────
+# 准备阶段投影/结束阶段钟/闪避类决策若玩家 20 秒未响应，自动按"跳过/拒绝"处理，
+# 防止服务器停在等待决策的阶段造成整局永久卡死
+
+const DECISION_FAILSAFE := 20.0
+var _decision_pending: Dictionary = {}
+
+func _arm_decision_failsafe(key: String, player_id: int, decline: Callable) -> void:
+	if not room_config.get("tower_mode", false):
+		return
+	var k := "%s_%d" % [key, player_id]
+	if _decision_pending.has(k):
+		return
+	_decision_pending[k] = true
+	var t := get_tree().create_timer(DECISION_FAILSAFE)
+	t.timeout.connect(func():
+		if _decision_pending.erase(k) == false:
+			return
+		decline.call()
+	)
+
+func _hook_decision_failsafes() -> void:
+	_game_manager.end_phase_bell_decision_required.connect(func(player_id: int, _bell: int):
+		_arm_decision_failsafe("bell", player_id,
+			func(): _game_manager.submit_bell_decision(player_id, false)))
+	_game_manager.project_skill_required.connect(func(player_id: int, _targets: Array):
+		_arm_decision_failsafe("project", player_id,
+			func(): _game_manager.submit_project_skill(player_id, -1, "")))
+	_game_manager.phantom_dodge_required.connect(func(player_id: int, _attacker: int):
+		_arm_decision_failsafe("dodge", player_id,
+			func(): _game_manager.submit_phantom_dodge(player_id, false)))
+	_game_manager.backtrack_required.connect(func(player_id: int):
+		_arm_decision_failsafe("backtrack", player_id,
+			func(): _game_manager.submit_backtrack_decision(player_id, false)))
+
+# ── 塔模式回合推进保险 ────────────────────────────────────────
+# 客户端相位漂移或真人卡住时，服务器兜底提交（SKIP/蓄力），保证整局推进不卡死
+
+const TURN_FAILSAFE_GESTURE := 20.0
+const TURN_FAILSAFE_ACTION := 25.0
+
+var _failsafe_timer: Timer
+
+func _arm_turn_failsafe(phase: GameManager.GamePhase) -> void:
+	if not room_config.get("tower_mode", false):
+		return
+	if _failsafe_timer != null and is_instance_valid(_failsafe_timer):
+		_failsafe_timer.queue_free()
+	_failsafe_timer = null
+	var timeout := 0.0
+	if phase == GameManager.GamePhase.GESTURE_INPUT \
+			or phase == GameManager.GamePhase.TIEBREAK_INPUT:
+		timeout = TURN_FAILSAFE_GESTURE
+	elif phase == GameManager.GamePhase.ACTION_INPUT:
+		timeout = TURN_FAILSAFE_ACTION
+	if timeout <= 0.0:
+		return
+	var t := Timer.new()
+	t.one_shot = true
+	t.wait_time = timeout
+	t.timeout.connect(_on_turn_failsafe.bind(phase))
+	add_child(t)
+	t.start()
+	_failsafe_timer = t
+
+func _on_turn_failsafe(phase: GameManager.GamePhase) -> void:
+	_failsafe_timer = null
+	if _game_manager._current_phase != phase:
+		return
+	for p in _game_manager.get_alive_players():
+		if not p.is_human or p.is_ai_controlled:
+			continue
+		if (phase == GameManager.GamePhase.GESTURE_INPUT
+				or phase == GameManager.GamePhase.TIEBREAK_INPUT):
+			if p.current_gesture == PlayerState.Gesture.NONE:
+				_game_manager.submit_gesture(p.player_id, PlayerState.Gesture.SKIP)
+		elif phase == GameManager.GamePhase.ACTION_INPUT:
+			if _game_manager._sole_winner_id == p.player_id \
+					and p.pending_action == PlayerState.ActionType.NONE:
+				_game_manager.submit_action(p.player_id,
+					PlayerState.ActionType.CHARGE, -1, -1, 0)
 
 func _on_gesture_submitted(player_id: int, gesture: int) -> void:
 		_broadcast(NetworkProtocol.SrvOp.GESTURE_DECIDED,
@@ -435,6 +554,9 @@ func _on_player_eliminated(player_id: int) -> void:
 		_spectator_peers)
 
 func _on_game_over(winner_id: int, _record) -> void:
+	# 塔模式：game_over 是每层事件，整局结束由 TowerMatchHost 决定并广播
+	if room_config.get("tower_mode", false):
+		return
 	_broadcast(NetworkProtocol.SrvOp.GAME_OVER_RESULT,
 		{"winner_id": winner_id, "match_record": _record.to_dict()}, _spectator_peers)
 	# 2秒后销毁：让最后一帧 RPC 送达客户端

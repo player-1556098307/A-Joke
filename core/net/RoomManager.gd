@@ -27,6 +27,7 @@ const GAME_SERVER_IP := "8.130.49.62"
 const GAME_MODES := {
 	"ffa": {"min_players": 2, "max_players": 4, "team_count": 0},
 	"2v2": {"min_players": 4, "max_players": 4, "team_count": 2},
+	"tower": {"min_players": 1, "max_players": 3, "team_count": 1},
 }
 
 func _ready() -> void:
@@ -190,6 +191,43 @@ func add_ai() -> void:
 	_broadcast_sync(room_code)
 
 @rpc("any_peer", "reliable")
+func remove_ai(slot_index: int) -> void:
+	if not _is_dedicated_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	var room_code: String = _peer_to_room.get(peer_id, "")
+	if room_code == "" or not _rooms.has(room_code):
+		return
+	var room: Dictionary = _rooms[room_code]
+	if room["host_peer_id"] != peer_id or room["status"] != "waiting":
+		return
+	if slot_index < 0 or slot_index >= room["slots"].size():
+		return
+	if not room["slots"][slot_index]["is_ai"]:
+		return
+	room["slots"].remove_at(slot_index)
+	_broadcast_sync(room_code)
+
+@rpc("any_peer", "reliable")
+func swap_slots(index_a: int, index_b: int) -> void:
+	if not _is_dedicated_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	var room_code: String = _peer_to_room.get(peer_id, "")
+	if room_code == "" or not _rooms.has(room_code):
+		return
+	var room: Dictionary = _rooms[room_code]
+	if room["status"] != "waiting":
+		return
+	var n: int = room["slots"].size()
+	if index_a < 0 or index_a >= n or index_b < 0 or index_b >= n or index_a == index_b:
+		return
+	var tmp = room["slots"][index_a]
+	room["slots"][index_a] = room["slots"][index_b]
+	room["slots"][index_b] = tmp
+	_broadcast_sync(room_code)
+
+@rpc("any_peer", "reliable")
 func start_game() -> void:
 	if not _is_dedicated_server():
 		return
@@ -208,29 +246,19 @@ func start_game() -> void:
 	if slots.size() < mode_cfg["min_players"]:
 		rpc_id(peer_id, "rpc_join_failed", "需要至少 %d 名玩家" % mode_cfg["min_players"])
 		return
-	for slot in slots:
-		if not slot["is_ai"] and slot["peer_id"] != room["host_peer_id"]:
-			if not slot["is_ready"]:
-				rpc_id(peer_id, "rpc_join_failed", "等待所有玩家准备就绪")
-				return
+	# 塔模式为合作闯关，不强制准备；其余模式非房主人类需先准备
+	if room["mode"] != "tower":
+		for slot in slots:
+			if not slot["is_ai"] and slot["peer_id"] != room["host_peer_id"]:
+				if not slot["is_ready"]:
+					rpc_id(peer_id, "rpc_join_failed", "等待所有玩家准备就绪")
+					return
 
 	room["status"] = "playing"
 	_publish_room(room_code)
 
 	# 构建服务器端完整 config（含已加载的 Resource）
 	var server_config := _build_server_config(room)
-
-	# 通知各客户端切换场景（仅发 room_code + my_player_id，不发 Resource）
-	for i in range(slots.size()):
-		var slot = slots[i]
-		if slot["peer_id"] > 0 and not slot["is_ai"]:
-			rpc_id(slot["peer_id"], "rpc_game_starting", {
-				"is_network":    true,
-				"is_host":       false,
-				"my_player_id":  i,
-				"mode":          room["mode"],
-				"room_code":     room_code,
-			})
 
 	# 服务器端创建 NetworkGameHost，挂在本节点下（路径与客户端 NetworkGameClient 一致）
 	var host = preload("res://core/net/NetworkGameHost.gd").new()
@@ -239,7 +267,41 @@ func start_game() -> void:
 	add_child(host)
 	host.initialize_from_config(server_config)
 	host.room_empty.connect(func(): _destroy_room(room_code), CONNECT_ONE_SHOT)
+	# 断线重连：玩家凭 token 重回对局后，重新登记进房间并恢复槽位
+	host.player_rejoined.connect(_on_peer_rejoined.bind(room_code))
 	room["game_host"] = host
+
+	# 通知各客户端切换场景（仅发 room_code + my_player_id + token，不发 Resource）
+	for i in range(slots.size()):
+		var slot = slots[i]
+		if slot["peer_id"] > 0 and not slot["is_ai"]:
+			var payload := {
+				"is_network":    true,
+				"is_host":       false,
+				"my_player_id":  i,
+				"mode":          room["mode"],
+				"room_code":     room_code,
+				"token":         host.get_token_for_player(i),
+			}
+			if room["mode"] == "tower":
+				# 塔模式：下发队伍编成（服务器已解析的角色id + 是否AI），客户端据此镜像 TowerManager
+				var party := []
+				for p in server_config["players"]:
+					party.append({
+						"character_id": p["char_id"],
+						"is_human": p["is_human"],
+					})
+				payload["party"] = party
+			rpc_id(slot["peer_id"], "rpc_game_starting", payload)
+
+	if room["mode"] == "tower":
+		# 塔模式：整局由 TowerMatchHost 权威驱动（楼层推进/祝福编排/敌人强化）
+		var tower_host = preload("res://scenes/tower/tower_match_host.gd").new()
+		tower_host.name = "Tower_" + room_code
+		add_child(tower_host)
+		host.tower_host = tower_host
+		tower_host.setup(host, room_code, server_config)
+		tower_host.start_run()
 	print("[RoomManager] 游戏开始: %s  %d 人" % [room_code, slots.size()])
 
 @rpc("any_peer", "reliable")
@@ -294,6 +356,15 @@ func _remove_peer_from_room(peer_id: int) -> void:
 	if room_code == "" or not _rooms.has(room_code):
 		return
 	var room: Dictionary = _rooms[room_code]
+	# 对局中：保留槽位并标记断线（宽限期内可凭 token 重连），由 game_host 决定房间回收时机
+	if room["status"] == "playing" and room["game_host"] != null:
+		for slot in room["slots"]:
+			if slot["peer_id"] == peer_id:
+				slot["disconnected"] = true
+				break
+		room["game_host"].on_player_disconnect(peer_id)
+		_broadcast_sync(room_code)
+		return
 	for i in range(room["slots"].size()):
 		if room["slots"][i]["peer_id"] == peer_id:
 			room["slots"].remove_at(i)
@@ -314,9 +385,24 @@ func _destroy_room(room_code: String) -> void:
 	var room: Dictionary = _rooms[room_code]
 	if room["game_host"] != null and is_instance_valid(room["game_host"]):
 		room["game_host"].queue_free()
+	if room.get("tower_host") != null and is_instance_valid(room["tower_host"]):
+		room["tower_host"].queue_free()
 	_rooms.erase(room_code)
 	_unpublish_room(room_code)
 	print("[RoomManager] 销毁房间: %s" % room_code)
+
+## 断线重连：玩家凭 token 重回对局后重新登记进房间，恢复槽位
+func _on_peer_rejoined(peer_id: int, player_id: int, room_code: String) -> void:
+	if not _rooms.has(room_code):
+		return
+	_peer_to_room[peer_id] = room_code
+	var room: Dictionary = _rooms[room_code]
+	if player_id >= 0 and player_id < room["slots"].size():
+		var slot: Dictionary = room["slots"][player_id]
+		slot["disconnected"] = false
+		slot["peer_id"] = peer_id
+	_broadcast_sync(room_code)
+	print("[RoomManager] 玩家 %d 重连回房间 %s（player_id=%d）" % [peer_id, room_code, player_id])
 
 # ─────────────────────────────────────────────────────────────
 # 状态广播
@@ -341,6 +427,7 @@ func _serialize_room(room: Dictionary) -> Dictionary:
 			"character":   slot["character"],
 			"is_ready":    slot["is_ready"],
 			"is_ai":       slot["is_ai"],
+			"disconnected": slot.get("disconnected", false),
 		})
 	return {
 		"room_code":    room["room_code"],
@@ -391,16 +478,23 @@ func _build_server_config(room: Dictionary) -> Dictionary:
 			"name":     slot["player_name"],
 			"is_human": not slot["is_ai"],
 			"character": char_res,
+			"char_id":  char_data.get("id", ""),
 			"team_id":  team_id,
 			"peer_id":  slot["peer_id"],
 		})
-	return {
+	var config := {
 		"mode":        mode,
 		"max_players": max_p,
 		"players":     players,
 		"is_network":  true,
 		"is_host":     false,
 	}
+	if mode == "tower":
+		# 塔模式：全员同队（敌人由 TowerManager 逐层生成），battle 场景走 tower_battle
+		config["tower_mode"] = true
+		for p in players:
+			p["team_id"] = 1
+	return config
 
 # ─────────────────────────────────────────────────────────────
 # Nakama storage 同步

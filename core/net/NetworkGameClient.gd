@@ -24,6 +24,13 @@ signal hiroari_received(player_id: int, target_ids: Array[int])
 signal dream_end_received(player_id: int, target_ids: Array[int])
 signal lake_blessing_received(player_id: int, target_ids: Array[int])
 signal sword_forge_received(player_id: int, skill_names: Array[String], attack_target_ids: Array[int])
+# 塔模式专用信号
+signal tower_floor_start_received(floor_num: int, enemy_name: String, seed_val: int, enemy_buffs: Array)
+signal tower_floor_cleared_received(floor_num: int)
+signal tower_reward_offer_received(player_index: int, char_name: String, choices: Array)
+signal tower_reward_picked_received(player_index: int, buff: Dictionary)
+signal tower_run_ended_received(victory: bool, floor_num: int)
+signal tower_run_sync_received(floor_num: int, enemy_name: String, seed_val: int, buffs_per_player: Array)
 
 var my_player_id: int = -1
 var reconnect_token: String = ""
@@ -107,6 +114,31 @@ func server_broadcast(op: int, data: Dictionary) -> void:
 				data.get("player_id", -1),
 				data.get("skill_names", []),
 				data.get("attack_target_ids", []))
+		NetworkProtocol.SrvOp.TOWER_FLOOR_START:
+			tower_floor_start_received.emit(
+				data.get("floor", 0),
+				data.get("enemy_name", ""),
+				data.get("seed", 0),
+				data.get("enemy_buffs", []))
+		NetworkProtocol.SrvOp.TOWER_FLOOR_CLEARED:
+			tower_floor_cleared_received.emit(data.get("floor", 0))
+		NetworkProtocol.SrvOp.TOWER_REWARD_OFFER:
+			tower_reward_offer_received.emit(
+				data.get("player_index", -1),
+				data.get("char_name", ""),
+				data.get("choices", []))
+		NetworkProtocol.SrvOp.TOWER_REWARD_PICKED:
+			tower_reward_picked_received.emit(
+				data.get("player_index", -1),
+				data.get("buff", {}))
+		NetworkProtocol.SrvOp.TOWER_RUN_ENDED:
+			tower_run_ended_received.emit(data.get("victory", false), data.get("floor", 0))
+		NetworkProtocol.SrvOp.TOWER_RUN_SYNC:
+			tower_run_sync_received.emit(
+				data.get("floor", 0),
+				data.get("enemy_name", ""),
+				data.get("seed", 0),
+				data.get("buffs_per_player", []))
 
 ## 服务器调用：确认加入成功，返回 token 和 player_id
 @rpc("authority", "reliable")
@@ -164,6 +196,10 @@ func submit_lake_blessing(caster_id: int, target_id: int) -> void:
 
 func submit_sword_forge(target_id: int, skill_index: int, attack_target_id: int) -> void:
 	rpc_id(1, "client_submit_sword_forge", target_id, skill_index, attack_target_id)
+
+## 塔模式：提交本角色的祝福选择
+func submit_reward_pick(player_index: int, buff: Dictionary) -> void:
+	rpc_id(1, "client_submit_reward_pick", player_index, buff)
 
 func send_ping() -> void:
 	rpc_id(1, "client_ping", Time.get_unix_time_from_system())
@@ -236,6 +272,10 @@ func client_submit_lake_blessing(_caster_id: int, _target_id: int) -> void:
 
 @rpc("any_peer", "reliable")
 func client_submit_sword_forge(_target_id: int, _skill_index: int, _attack_target_id: int) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func client_submit_reward_pick(_player_index: int, _buff: Dictionary) -> void:
 	pass
 
 ## RoomManager 通知加入失败时调用

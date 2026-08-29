@@ -52,6 +52,8 @@ var _auto_advance: bool = true
 var _used_elite_count: int = 0
 ## 随机数生成器
 var _rng := RandomNumberGenerator.new()
+## 额外注入 setup_game 的配置（联机时覆盖 auto_rps 等，双端保持一致）
+var config_overrides: Dictionary = {}
 
 func _ready() -> void:
 	_rng.randomize()
@@ -313,7 +315,9 @@ func _start_next_floor_impl() -> void:
 			"team_id": 2,
 		})
 
-	GameManager.setup_game({ "players": players, "tower_mode": true })
+	var cfg := { "players": players, "tower_mode": true }
+	cfg.merge(config_overrides, true)
+	GameManager.setup_game(cfg)
 	GameManager.game_over.connect(_on_game_over, CONNECT_ONE_SHOT)
 	floor_changed.emit(_current_floor, _current_enemy_name)
 

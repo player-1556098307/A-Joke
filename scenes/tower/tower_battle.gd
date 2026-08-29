@@ -34,6 +34,15 @@ var fast_mode: bool = false
 ## 敌人祝福随机数生成器（后期小怪自带祝福）
 var _rng := RandomNumberGenerator.new()
 
+## ── 联机模式 ──
+## 服务器权威：楼层推进/祝福三选一/整局结束由 TowerMatchHost 驱动，
+## 客户端本地 TowerManager 仅作确定性镜像（同种子生成相同敌人）
+var _is_net: bool = false
+var _net_client: NetworkGameClient
+var _my_player_index: int = 0
+var _net_floor_enemy_buffs: Array = []  # 服务器下发的本层敌人祝福（替代本地随机）
+var _net_waiting_label: Label
+
 ## 战斗中剧情触发标记
 var _enemy_hp50_triggered: bool = false    ## 敌人HP首次低于50%
 var _player_eliminated_triggered: bool = false  ## 玩家队有人被淘汰
@@ -165,11 +174,220 @@ func _ready() -> void:
 	# 应用塔模式暗色主题
 	_ui.apply_tower_theme()
 
+	# 联机模式：接网络客户端，等待服务器事件驱动（不本地启动第1层）
+	_is_net = SceneManager.last_game_config.get("mode", "") == "tower" \
+		and SceneManager.last_game_config.get("is_network", false)
+	if _is_net:
+		_setup_net_mode()
+		_show_net_waiting("等待服务器开始战斗...")
+		return
+
 	# 启动第1层
 	if fast_mode:
 		_begin_floor_battle(1)
 	else:
 		_start_first_floor()
+
+# ============================================================
+#  联机模式
+# ============================================================
+
+## 接入网络：NetworkGameClient 节点路径与服务器 NetworkGameHost 一致（同 main.gd 模式）
+func _setup_net_mode() -> void:
+	var config := SceneManager.last_game_config
+	var room_code: String = config.get("room_code", "")
+	_my_player_index = int(config.get("my_player_id", 0))
+	_net_client = NetworkGameClient.new()
+	_net_client.name = "Room_" + room_code if room_code != "" else "CurrentGameHost"
+	_net_client.my_player_id = _my_player_index
+	RoomManager.add_child(_net_client)
+	_ui.net_client = _net_client
+	# 经典对局信号（与 main.gd 完全一致——缺少任何一个，对应决策弹窗将永远不出现，
+	# 服务器会停在等待决策的阶段造成整局卡死）
+	_net_client.phase_changed.connect(_ui._on_phase_changed)
+	_net_client.gesture_decided.connect(_ui._mark_decided)
+	_net_client.gestures_revealed.connect(_ui._on_gestures_revealed)
+	_net_client.action_result.connect(_ui._on_action_result)
+	_net_client.full_state_received.connect(_ui._on_full_state_sync)
+	_net_client.state_hash_received.connect(_ui._on_state_hash_received)
+	_net_client.game_over_received.connect(_ui._on_game_over_result)
+	_net_client.end_phase_bell_received.connect(_ui._on_end_phase_bell_decision_required)
+	_net_client.ftg_intercept_received.connect(_ui._on_ftg_intercept_required)
+	_net_client.rasengan_counter_received.connect(_ui._on_rasengan_counter_required)
+	_net_client.project_skill_received.connect(_ui._on_project_skill_required)
+	_net_client.phantom_dodge_received.connect(_ui._on_phantom_dodge_required)
+	_net_client.backtrack_received.connect(_ui._on_backtrack_required)
+	_net_client.hiroari_received.connect(_ui._on_hiroari_targets_required)
+	_net_client.dream_end_received.connect(_ui._on_dream_end_required)
+	_net_client.lake_blessing_received.connect(_ui._on_lake_blessing_required)
+	_net_client.sword_forge_received.connect(_ui._on_sword_forge_required)
+	# 塔事件（服务器权威驱动）
+	_net_client.tower_floor_start_received.connect(_on_net_floor_start)
+	_net_client.tower_floor_cleared_received.connect(_on_net_floor_cleared)
+	_net_client.tower_reward_offer_received.connect(_on_net_reward_offer)
+	_net_client.tower_reward_picked_received.connect(_on_net_reward_picked)
+	_net_client.tower_run_ended_received.connect(_on_net_run_ended)
+	_net_client.tower_run_sync_received.connect(_on_net_run_sync)
+	# 断线重连
+	NetworkManager.connected_to_game_server.connect(_on_net_reconnected)
+	NetworkManager.disconnected_from_game_server.connect(_on_net_disconnected_in_battle)
+	_net_client.player_disconnected_notice.connect(_on_net_player_disconnected)
+	_net_client.player_reconnected_notice.connect(_on_net_player_reconnected)
+	# 本地镜像与服务器保持一致的输入策略（出拳由真人提交，AI 由服务器代打）
+	tower_mgr.config_overrides = {"auto_rps": false}
+
+func _exit_tree() -> void:
+	GameManager.game_over.disconnect(_on_game_over_for_stats)
+	GameManager.player_eliminated.disconnect(_on_player_eliminated)
+	GameManager.round_resolved.disconnect(_on_round_resolved)
+	GameManager.zeus_phase_transition_required.disconnect(_on_zeus_phase_transition)
+	GameManager.tower_blessing_triggered.disconnect(_on_tower_blessing_triggered)
+	if NetworkManager.connected_to_game_server.is_connected(_on_net_reconnected):
+		NetworkManager.connected_to_game_server.disconnect(_on_net_reconnected)
+	if NetworkManager.disconnected_from_game_server.is_connected(_on_net_disconnected_in_battle):
+		NetworkManager.disconnected_from_game_server.disconnect(_on_net_disconnected_in_battle)
+	if _net_client != null and is_instance_valid(_net_client):
+		_net_client.queue_free()
+		_net_client = null
+
+## 传输层断开：显示重连遮罩（NetworkManager 自动指数退避重连，不踢回主菜单）
+func _on_net_disconnected_in_battle() -> void:
+	_show_net_waiting("连接中断，正在重连...（断线期间你的角色由 AI 托管）")
+
+## 传输层重连成功：凭 token 请求重回对局，服务器会重绑 peer 并补发快照
+func _on_net_reconnected() -> void:
+	if _net_client == null or not is_instance_valid(_net_client):
+		return
+	var token: String = _net_client.reconnect_token
+	if token == "":
+		token = NetworkManager._load_pref("reconnect_token", "")
+	if token == "":
+		return
+	_show_net_waiting("已重连，正在同步战斗状态...")
+	await get_tree().create_timer(0.5).timeout
+	if _net_client != null and is_instance_valid(_net_client):
+		_net_client.rpc_id(1, "on_player_join", multiplayer.get_unique_id(), token)
+
+## 重连后：以服务器快照重建本地塔镜像
+func _on_net_run_sync(floor_num: int, enemy_name: String, seed_val: int, buffs_per_player: Array) -> void:
+	SceneManager.last_tower_config["tower_buffs_per_player"] = buffs_per_player
+	_hide_net_waiting()
+	if not tower_mgr.is_running():
+		tower_mgr.set_seed(seed_val)
+		var party: Array = SceneManager.last_tower_config.get("players", [])
+		tower_mgr.start_tower(party)
+	while tower_mgr.get_current_floor() < floor_num:
+		tower_mgr.start_next_floor()
+	_inject_tower_buffs()
+	_ui.setup_players(GameManager.get_alive_players())
+	_enemy_name = tower_mgr.get_current_enemy_name()
+	_floor_label.text = "慈悲尖塔 第%d层 — %s" % [floor_num, _enemy_name]
+	_phase = "battle"
+	_update_buff_btn_visibility()
+
+## 队友断线/重连提示
+func _on_net_player_disconnected(player_id: int) -> void:
+	_show_net_waiting("玩家 %d 断线，AI 托管中..." % player_id)
+	var t := get_tree().create_timer(4.0)
+	t.timeout.connect(func():
+		if _net_waiting_label != null and _net_waiting_label.text.begins_with("玩家 %d" % player_id):
+			_hide_net_waiting()
+	)
+
+func _on_net_player_reconnected(player_id: int) -> void:
+	_show_net_waiting("玩家 %d 已重连" % player_id)
+	var t := get_tree().create_timer(3.0)
+	t.timeout.connect(func():
+		if _net_waiting_label != null and _net_waiting_label.text.begins_with("玩家 %d" % player_id):
+			_hide_net_waiting()
+	)
+
+## 服务器开始新楼层 → 播放进场过渡 → 镜像推进 TowerManager
+func _on_net_floor_start(floor_num: int, enemy_name: String, seed_val: int, enemy_buffs: Array) -> void:
+	_hide_net_waiting()
+	if not tower_mgr.is_running():
+		tower_mgr.set_seed(seed_val)
+	_net_floor_enemy_buffs = enemy_buffs
+	if fast_mode:
+		_begin_floor_battle(floor_num)
+		return
+	var entry_dlg := _get_floor_entry_dialogue(floor_num)
+	_phase = "transition"
+	_transition.start(floor_num, enemy_name, entry_dlg)
+
+## 层胜利（服务器权威）→ 退场对话 → 等待祝福编排
+func _on_net_floor_cleared(_floor_num: int) -> void:
+	_hide_buff_panel()
+	_buff_btn.visible = false
+	var exit_dlg: Dictionary = tower_mgr.get_exit_dialogue()
+	if exit_dlg.is_empty():
+		_phase = "reward_wait"
+		_show_net_waiting("等待队伍选择祝福...")
+		return
+	_phase = "exit_dialogue"
+	_dialogue_box.visible = true
+	_dialogue_box.start(exit_dlg)
+
+## 服务器发来本角色的祝福三选一
+func _on_net_reward_offer(player_index: int, char_name: String, choices: Array) -> void:
+	if player_index != _my_player_index:
+		return
+	_hide_net_waiting()
+	_phase = "reward"
+	_reward_ui.set_subtitle("%s 选择祝福" % char_name)
+	_reward_ui.visible = true
+	var typed: Array[Dictionary] = []
+	for c in choices:
+		if c is Dictionary:
+			typed.append(c)
+	_reward_ui.start_with_choices(typed)
+
+## 服务器广播权威祝福结果（含他人/AI）→ 镜像到本地持久化
+func _on_net_reward_picked(player_index: int, buff: Dictionary) -> void:
+	if buff.is_empty():
+		return
+	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
+	while per_player.size() <= player_index:
+		per_player.append([])
+	if per_player[player_index] is Array:
+		(per_player[player_index] as Array).append(buff)
+	else:
+		per_player[player_index] = [buff]
+	SceneManager.last_tower_config["tower_buffs_per_player"] = per_player
+	if player_index == _my_player_index:
+		_reward_ui.visible = false
+		_phase = "reward_wait"
+		_show_net_waiting("等待其他成员选择祝福...")
+
+## 整局结束（服务器权威）→ 走本地结算
+func _on_net_run_ended(victory: bool, _floor_num: int) -> void:
+	_hide_net_waiting()
+	if victory:
+		_on_tower_victory()
+	else:
+		_on_tower_defeat()
+
+func _show_net_waiting(text: String) -> void:
+	if _net_waiting_label == null:
+		_net_waiting_label = Label.new()
+		_net_waiting_label.add_theme_font_size_override("font_size", 16)
+		_net_waiting_label.add_theme_color_override("font_color", Color("#FAC775"))
+		_net_waiting_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_net_waiting_label.anchor_left = 0.0
+		_net_waiting_label.anchor_right = 1.0
+		_net_waiting_label.anchor_top = 0.5
+		_net_waiting_label.anchor_bottom = 0.5
+		_net_waiting_label.offset_top = -20.0
+		_net_waiting_label.offset_bottom = 20.0
+		_net_waiting_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_net_waiting_label.z_index = 6
+		add_child(_net_waiting_label)
+	_net_waiting_label.text = text
+	_net_waiting_label.visible = true
+
+func _hide_net_waiting() -> void:
+	if _net_waiting_label != null:
+		_net_waiting_label.visible = false
 
 # ============================================================
 #  层启动
@@ -240,8 +458,16 @@ func _inject_tower_buffs() -> void:
 	_ui.setup_players(GameManager.get_alive_players())
 	# 后期小怪攻击力强化（第3-4轮 +1/+2 普攻增伤）
 	_inject_enemy_attack_bonus()
-	# 后期小怪自带祝福（第3-4轮 cycle≥3 的普通小怪层，敌人随机获得 0-2 个普通祝福）
-	_inject_enemy_buffs()
+	# 后期小怪自带祝福：联机模式应用服务器下发的分配（保证双端一致），单机本地随机
+	if _is_net:
+		for entry in _net_floor_enemy_buffs:
+			var ep := GameManager.get_player(entry.get("player_id", -1))
+			if ep == null:
+				continue
+			for b in entry.get("buffs", []):
+				_apply_buff(ep, b)
+	else:
+		_inject_enemy_buffs()
 
 ## 应用单个 buff 到 PlayerState
 func _apply_buff(p: PlayerState, buff: Dictionary) -> void:
@@ -688,7 +914,12 @@ func _on_dialogue_generic_finished() -> void:
 	# 确保对话结束后恢复自动出拳（防止暂停标记残留）
 	GameManager.tower_dialogue_paused = false
 	if _phase == "exit_dialogue":
-		_show_reward_selection()
+		if _is_net:
+			# 联机：祝福编排由服务器驱动，等待 TOWER_REWARD_OFFER
+			_phase = "reward_wait"
+			_show_net_waiting("等待队伍选择祝福...")
+		else:
+			_show_reward_selection()
 	elif _phase == "zeus_transition":
 		_on_zeus_transition_dialogue_finished()
 	else:
@@ -773,6 +1004,12 @@ func _get_all_obtained_ids() -> Array:
 ## 奖励选择完成 → 保存 buff 到当前角色的列表 → 下一个角色选 / 推进下一层
 func _on_reward_selected(buff: Dictionary) -> void:
 	_reward_ui.visible = false
+	if _is_net:
+		# 联机：提交给服务器，等待权威回执（TOWER_REWARD_PICKED）后再镜像
+		_net_client.submit_reward_pick(_my_player_index, buff)
+		_phase = "reward_wait"
+		_show_net_waiting("等待其他成员选择祝福...")
+		return
 	# 持久化 buff 到 SceneManager（按角色索引存储）
 	var per_player: Array = SceneManager.last_tower_config.get("tower_buffs_per_player", [])
 	# 确保数组足够大
@@ -792,7 +1029,10 @@ func _on_reward_selected(buff: Dictionary) -> void:
 		_proceed_to_next_floor()
 
 ## 推进到下一层（正常模式=过渡动画，fast_mode=直接启动）
+## 联机模式下永远不由本地推进（由服务器 TOWER_FLOOR_START 驱动）
 func _proceed_to_next_floor() -> void:
+	if _is_net:
+		return
 	if tower_mgr.get_current_floor() >= TowerManager.MAX_FLOORS:
 		tower_mgr.tower_victory.emit()
 		return

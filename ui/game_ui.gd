@@ -654,6 +654,9 @@ func setup_players(players: Array[PlayerState]) -> void:
 	for player in players:
 		if player.is_human and _human_player_id == -1:
 			_human_player_id = player.player_id
+	# 联机模式：以服务器分配的 my_player_id 为准（多真人时第一个 is_human 未必是自己）
+	if net_client != null and net_client.my_player_id >= 0:
+		_human_player_id = net_client.my_player_id
 
 	var count := players.size()
 	var center := _get_arena_center()
@@ -1993,6 +1996,25 @@ func _update_timer_label() -> void:
 
 var _current_phase_for_timer: int = -1
 
+## 联机 ⚡自动出拳：开启时随机出拳经网络提交（去重：本地镜像与服务器广播会各触发一次阶段事件）
+var _net_auto_stamp: int = 0
+
+func _net_auto_play_gesture() -> void:
+	if net_client == null or not GameManager.auto_rps_enabled:
+		return
+	if _human_player_id < 0 or is_spectating:
+		return
+	if _timer_start_msec == _net_auto_stamp:
+		return
+	_net_auto_stamp = _timer_start_msec
+	var gestures: Array[PlayerState.Gesture] = [PlayerState.Gesture.ROCK, PlayerState.Gesture.SCISSORS, PlayerState.Gesture.PAPER]
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var g: PlayerState.Gesture = gestures[rng.randi() % 3]
+	net_client.submit_gesture(g)
+	gesture_panel.hide()
+	_mark_decided(_human_player_id)
+
 func _on_turn_timer_tick() -> void:
 	# Use real wall-clock time so Engine.time_scale doesn't affect the countdown
 	var elapsed_real := float(Time.get_ticks_msec() - _timer_start_msec) / 1000.0
@@ -2090,6 +2112,7 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			_append_log("── 回合 %d 开始 ──" % _current_round, LT_PHASE)
 			_start_turn_timer()
 			_show_all_thinking()
+			_net_auto_play_gesture()
 
 		GameManager.GamePhase.RESOLVING:
 			_stop_turn_timer()
@@ -2122,6 +2145,7 @@ func _on_phase_changed(phase: GameManager.GamePhase, data: Dictionary = {}) -> v
 			target_panel.hide()
 			_start_turn_timer()
 			_show_all_thinking()
+			_net_auto_play_gesture()
 
 		GameManager.GamePhase.TIEBREAK_RESOLVING:
 			_stop_turn_timer()
@@ -2320,6 +2344,10 @@ func _on_action_required(player_id: int) -> void:
 
 	action_panel.show()
 	_start_turn_timer()
+	# 联机 ⚡自动：自动聚气（经网络提交，服务器权威）
+	if net_client != null and GameManager.auto_rps_enabled:
+		net_client.submit_action(PlayerState.ActionType.CHARGE, -1, -1)
+		action_panel.hide()
 
 func _on_gesture_pressed(gesture: PlayerState.Gesture) -> void:
 	gesture_panel.hide()
@@ -3775,16 +3803,22 @@ func _on_state_hash_received(expected_hash: int) -> void:
 			net_client.rpc_id(1, "client_request_sync")
 
 func _compute_local_state_hash() -> int:
+	# 与服务器 NetworkGameHost._compute_state_hash 保持字段一致（否则每次都会误报不同步）
 	var parts: Array[String] = []
 	for p in GameManager._players:
-		parts.append("%d:%.1f:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d" % [
+		parts.append("%d:%.1f:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%s:%d:%d:%d:%d" % [
 			p.player_id, p.hp, p.energy, p.shield,
-			p.clone_count, p.paralyze_turns, p.bell_count,
+			p.clone_count, p.paralyze_turns, p.knockdown_turns, p.bell_count,
 			1 if p.counter_stance else 0, p.skill_disabled_turns,
 			p.gate_count, p.invincible_turns,
 			1 if p.burning else 0, 1 if p.berserker else 0,
 			p.ftg_marks, p.nine_tails_stage,
-			p.max_energy, p.stomp_active
+			p.max_energy, p.stomp_active,
+			p.projected_skill.resource_path if p.projected_skill != null else "",
+			1 if p.projected_used_this_round else 0,
+			p.binding_field_turns,
+			p.binding_field_targets.size() + p.binding_field_skills.size(),
+			p.phantom_count,
 		])
 	parts.sort()
 	return hash(",".join(PackedStringArray(parts)))

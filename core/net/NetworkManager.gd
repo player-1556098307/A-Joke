@@ -5,6 +5,7 @@ extends Node
 const NAKAMA_HOST    := "8.130.49.62"
 const NAKAMA_PORT    := 7350
 const NAKAMA_KEY     := "defaultkey"           # 与 Nakama 服务器配置一致
+## 游戏服务器地址：可用环境变量 GAME_SERVER_IP 覆盖（本地联机测试连 127.0.0.1）
 const GAME_SERVER_IP := "8.130.49.62"
 const GAME_SERVER_PORT := 7777
 
@@ -117,12 +118,20 @@ func connect_to_game_server(ip: String, port: int, token: String) -> void:
 		mp.connected_to_server.disconnect(_on_game_connected)
 	if mp.server_disconnected.is_connected(_on_game_disconnected):
 		mp.server_disconnected.disconnect(_on_game_disconnected)
-	var err = _enet_peer.create_client(ip, port)
+	var err = _enet_peer.create_client(_resolve_server_ip(ip), port)
 	if err != OK:
 		return
 	mp.multiplayer_peer = _enet_peer
 	mp.connected_to_server.connect(_on_game_connected)
 	mp.server_disconnected.connect(_on_game_disconnected)
+
+## 本地联机测试钩子：连接默认生产地址时，允许用环境变量 GAME_SERVER_IP 重定向
+func _resolve_server_ip(ip: String) -> String:
+	if ip == GAME_SERVER_IP:
+		var env_ip := OS.get_environment("GAME_SERVER_IP")
+		if env_ip != "":
+			return env_ip
+	return ip
 
 func _on_game_connected() -> void:
 	my_game_peer_id = get_tree().get_multiplayer().get_unique_id()
@@ -137,9 +146,8 @@ func _on_game_disconnected() -> void:
 
 func _attempt_reconnect() -> void:
 	_reconnect_attempt += 1
-	if reconnect_token == "" or current_room_id == "":
-		_reconnect_attempt = 0
-		return
+	# 传输层总是自动重试；应用层是否重回对局由各场景凭 token 调用 on_player_join 决定
+	# （重连期间玩家处于对局中时，服务器会 AI 托管并在宽限期内保留其槽位）
 	if _reconnect_attempt > MAX_RECONNECT_ATTEMPTS:
 		push_warning("[NetworkManager] 重连超过最大次数，放弃")
 		_reconnect_attempt = 0

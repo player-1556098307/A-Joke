@@ -28,6 +28,12 @@ enum SrvOp {
 	DREAM_END_REQUIRED   = 59,  # 梦之终结目标选择请求（奥伯龙结束阶段弹窗）
 	LAKE_BLESSING_REQUIRED = 60,  # 湖之加护目标选择请求（卡斯特结束阶段弹窗）
 	SWORD_FORGE_REQUIRED = 61,  # 圣剑锻造技能+目标选择请求（卡斯特→被锻造目标弹窗）
+	TOWER_FLOOR_START    = 62,  # 塔模式：开始新楼层 {floor, enemy_name, seed, enemy_buffs}
+	TOWER_FLOOR_CLEARED  = 66,  # 塔模式：层胜利（触发客户端退场对话）{floor}
+	TOWER_REWARD_OFFER   = 63,  # 塔模式：向指定真人发祝福三选一 {player_index, char_name, choices}
+	TOWER_REWARD_PICKED  = 64,  # 塔模式：某成员祝福已定（含AI自动选）{player_index, buff}
+	TOWER_RUN_ENDED      = 65,  # 塔模式：整局结束 {victory, floor}
+	TOWER_RUN_SYNC       = 67,  # 塔模式：断线重连的塔元状态快照 {floor, seed, enemy_name, buffs_per_player}
 }
 
 # ── 客户端 → 服务器 OpCode ────────────────────────────────────
@@ -38,6 +44,7 @@ enum CliOp {
 	PING            = 10,  # {ts: float}
 	SPECTATE_JOIN   = 20,  # {}
 	BELL_DECISION   = 30,  # {player_id: int, use_bell: bool}
+	REWARD_PICK     = 40,  # {player_index: int, buff: Dictionary} 塔模式祝福选择
 }
 
 # 序列化：Dictionary → PackedByteArray（JSON）
