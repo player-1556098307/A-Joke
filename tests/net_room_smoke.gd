@@ -58,7 +58,7 @@ func _role_create() -> void:
 		print("SMOKE_FAIL: 创建房间未收到同步")
 		quit(1)
 		return
-	var f := FileAccess.open("C:/Users/player/AppData/Local/Temp/tower_room_code.txt", FileAccess.WRITE)
+	var f := FileAccess.open("user://tower_room_code.txt", FileAccess.WRITE)
 	f.store_string(_code)
 	f.close()
 	print("SMOKE_C1: 房间已创建 %s" % _code)
@@ -72,8 +72,8 @@ func _role_create() -> void:
 func _role_join() -> void:
 	var waited := 0.0
 	while waited < 15.0:
-		if FileAccess.file_exists("C:/Users/player/AppData/Local/Temp/tower_room_code.txt"):
-			var f := FileAccess.open("C:/Users/player/AppData/Local/Temp/tower_room_code.txt", FileAccess.READ)
+		if FileAccess.file_exists("user://tower_room_code.txt"):
+			var f := FileAccess.open("user://tower_room_code.txt", FileAccess.READ)
 			_code = f.get_as_text().strip_edges()
 			f.close()
 			if _code.length() == 6:

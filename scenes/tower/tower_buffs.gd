@@ -1,4 +1,3 @@
-class_name TowerBuffs
 extends RefCounted
 ## 慈悲尖塔祝福注入的共享逻辑（服务器 TowerMatchHost 与客户端 tower_battle 共用，
 ## 避免两端实现漂移）。仅操作 PlayerState 字段，不依赖场景/UI。

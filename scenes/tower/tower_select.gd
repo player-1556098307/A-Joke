@@ -129,6 +129,7 @@ func _build_ui() -> void:
 
 	var border := Panel.new()
 	border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 纯装饰边框，不拦截点击
 	var bf := StyleBoxFlat.new()
 	bf.draw_center = false
 	bf.border_color = Color("#2C2C2A")
@@ -171,9 +172,10 @@ func _build_ui() -> void:
 	_start_btn.focus_mode = Control.FOCUS_NONE
 	_start_btn.custom_minimum_size = Vector2(150, 34)
 	# 靠右对齐（anchor_left=1.0 必须设置，否则 offset_left=-178 会让按钮横跨整个屏幕）
-	_start_btn.anchor_left = 1.0; _start_btn.anchor_right = 1.0; _start_btn.anchor_top = 0.0
-	_start_btn.offset_left = -178.0; _start_btn.offset_right = -18.0
+	_start_btn.anchor_left = 0.0; _start_btn.anchor_right = 0.0; _start_btn.anchor_top = 0.0
+	_start_btn.offset_left = 784.0; _start_btn.offset_right = 944.0
 	_start_btn.offset_top = 9.0; _start_btn.offset_bottom = 43.0
+	_start_btn.z_index = 50  # 始终在右侧面板之上
 	_start_btn.add_theme_stylebox_override("normal", _make_flat(Color("#3B6D11"), Color("#2C2C2A"), 3, 8))
 	_start_btn.add_theme_stylebox_override("hover",  _make_flat(Color("#4A8A16"), Color("#2C2C2A"), 3, 8))
 	_start_btn.add_theme_stylebox_override("pressed",_make_flat(Color("#27500A"), Color("#2C2C2A"), 3, 8))
@@ -192,13 +194,13 @@ func _build_ui() -> void:
 	_start_btn.add_child(start_lbl)
 
 	# 联机入口（开始按钮下方第二行右侧）：创建 / 加入 / 退出
-	_create_btn = _make_net_btn("创建联机房间", -196.0, -106.0)
+	_create_btn = _make_net_btn("创建联机房间", 706.0, 838.0)
 	_create_btn.pressed.connect(_on_create_room_pressed)
 	add_child(_create_btn)
-	_join_btn = _make_net_btn("加入房间", -100.0, -18.0)
+	_join_btn = _make_net_btn("加入房间", 844.0, 940.0)
 	_join_btn.pressed.connect(_on_join_room_pressed)
 	add_child(_join_btn)
-	_leave_btn = _make_net_btn("退出房间", -100.0, -18.0)
+	_leave_btn = _make_net_btn("退出房间", 740.0, 940.0)
 	_leave_btn.add_theme_stylebox_override("normal", _make_flat(Color("#FFF6E0"), Color("#C9A84C"), 2, 6))
 	_leave_btn.add_theme_color_override("font_color", Color("#8B6514"))
 	_leave_btn.pressed.connect(_on_leave_room_pressed)
@@ -211,9 +213,10 @@ func _build_ui() -> void:
 	_code_btn.add_theme_stylebox_override("normal", _make_flat(Color("#EEF4FB"), Color("#2A6AB0"), 1, 4))
 	_code_btn.add_theme_color_override("font_color", Color("#2A6AB0"))
 	_code_btn.add_theme_font_size_override("font_size", 11)
-	_code_btn.anchor_left = 1.0; _code_btn.anchor_right = 1.0; _code_btn.anchor_top = 0.0
-	_code_btn.offset_left = -470.0; _code_btn.offset_right = -110.0
+	_code_btn.anchor_left = 0.0; _code_btn.anchor_right = 0.0; _code_btn.anchor_top = 0.0
+	_code_btn.offset_left = 536.0; _code_btn.offset_right = 706.0
 	_code_btn.offset_top = 48.0; _code_btn.offset_bottom = 70.0
+	_code_btn.z_index = 50  # 始终在右侧面板之上
 	_code_btn.pressed.connect(func():
 		if _in_net():
 			DisplayServer.clipboard_set(str(_net_room.get("room_code", "")))
@@ -234,12 +237,12 @@ func _build_ui() -> void:
 
 	# 房间说明
 	var room_hint := Label.new()
-	room_hint.text = "1号 = 你（玩家）；2/3号可添加 AI 队友，⇄可交换站位，空槽位不参战；点右上「创建房间」联机组队"
+	room_hint.text = "1号 = 你（玩家）；2/3号可添加 AI 队友，⇄可交换站位，空槽位不参战；右侧「创建联机房间」组队"
 	room_hint.add_theme_font_size_override("font_size", 11)
 	room_hint.add_theme_color_override("font_color", Color("#888780"))
 	room_hint.anchor_left = 0.0; room_hint.anchor_top = 0.0
 	room_hint.offset_left = 120.0; room_hint.offset_top = 44.0
-	room_hint.offset_right = 560.0; room_hint.offset_bottom = 62.0
+	room_hint.offset_right = 500.0; room_hint.offset_bottom = 62.0
 	room_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(room_hint)
 
@@ -248,6 +251,7 @@ func _build_ui() -> void:
 	left_bg.anchor_left = 0.0; left_bg.anchor_top = 0.0
 	left_bg.offset_left = 10.0; left_bg.offset_top = 64.0
 	left_bg.offset_right = 340.0; left_bg.offset_bottom = 482.0
+	left_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 纯背景，不拦截点击
 	var ls := StyleBoxFlat.new()
 	ls.bg_color = Color("#FFFDF5"); ls.border_color = Color("#2C2C2A")
 	ls.set_border_width_all(2); ls.set_corner_radius_all(4)
@@ -277,6 +281,7 @@ func _build_ui() -> void:
 	right_bg.anchor_left = 0.0; right_bg.anchor_top = 0.0
 	right_bg.offset_left = 348.0; right_bg.offset_top = 64.0
 	right_bg.offset_right = 950.0; right_bg.offset_bottom = 482.0
+	right_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 纯背景，不拦截点击（修复联机按钮无法点击）
 	var rs := StyleBoxFlat.new()
 	rs.bg_color = Color("#FFFDF5"); rs.border_color = Color("#2C2C2A")
 	rs.set_border_width_all(2); rs.set_corner_radius_all(4)
@@ -287,6 +292,7 @@ func _build_ui() -> void:
 	_avatar_box.anchor_left = 0.0; _avatar_box.anchor_top = 0.0
 	_avatar_box.offset_left = 366.0; _avatar_box.offset_top = 78.0
 	_avatar_box.offset_right = 526.0; _avatar_box.offset_bottom = 238.0
+	_avatar_box.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 纯展示，不拦截点击
 	add_child(_avatar_box)
 	_avatar_label = Label.new()
 	_avatar_label.add_theme_font_size_override("font_size", 72)
@@ -319,6 +325,7 @@ func _build_ui() -> void:
 	_stats_panel.anchor_left = 0.0; _stats_panel.anchor_top = 0.0
 	_stats_panel.offset_left = 540.0; _stats_panel.offset_top = 134.0
 	_stats_panel.offset_right = 934.0; _stats_panel.offset_bottom = 238.0
+	_stats_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 纯展示，不拦截点击
 	add_child(_stats_panel)
 
 	var sk_header := Label.new()
@@ -403,9 +410,10 @@ func _make_net_btn(text: String, left: float, right: float) -> Button:
 	btn.text = text
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = Vector2(0, 30)
-	btn.anchor_left = 1.0; btn.anchor_right = 1.0; btn.anchor_top = 0.0
+	btn.anchor_left = 0.0; btn.anchor_right = 0.0; btn.anchor_top = 0.0
 	btn.offset_left = left; btn.offset_right = right
 	btn.offset_top = 48.0; btn.offset_bottom = 78.0
+	btn.z_index = 50  # 始终在右侧面板之上
 	btn.add_theme_font_size_override("font_size", 11)
 	btn.add_theme_stylebox_override("normal", _make_flat(Color("#2C2C2A"), Color("#2C2C2A"), 0, 6))
 	btn.add_theme_stylebox_override("hover",  _make_flat(Color("#3A3A37"), Color("#2C2C2A"), 0, 6))

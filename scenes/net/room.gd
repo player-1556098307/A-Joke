@@ -227,6 +227,7 @@ func _make_character_card(data: Dictionary) -> Control:
 	av.name = "AvatarRect"
 	av.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	av.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	av.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 穿透点击，让 card.gui_input 接收
 	av.add_theme_stylebox_override("panel", _make_flat(bg_color, Color(color, 0.25), 0, 2))
 	inner.add_child(av)
 

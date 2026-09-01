@@ -11,6 +11,7 @@ extends Node
 ##   通关/团灭 → TOWER_RUN_ENDED 广播 → finish_run（销毁房间）
 
 const REWARD_PICK_TIMEOUT := 45.0  # 人类玩家选祝福的超时（超时自动选）
+const TowerBuffs := preload("res://scenes/tower/tower_buffs.gd")
 
 var game_host: NetworkGameHost
 var room_code: String = ""
