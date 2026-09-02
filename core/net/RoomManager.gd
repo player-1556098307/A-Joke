@@ -161,6 +161,10 @@ func toggle_ready() -> void:
 		return
 	for slot in room["slots"]:
 		if slot["peer_id"] == peer_id:
+			# 准备时校验已选角色，取消准备不受限制
+			if not slot["is_ready"] and slot["character"] == "":
+				rpc_id(peer_id, "rpc_join_failed", "请先选择角色")
+				return
 			slot["is_ready"] = not slot["is_ready"]
 			break
 	_broadcast_sync(room_code)
