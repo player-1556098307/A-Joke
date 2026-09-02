@@ -158,16 +158,19 @@ grow_vertical = 2
 script = ExtResource("1_room")
 
 [node name="Background" type="ColorRect" parent="."]
-layout_mode = 0
-offset_right = 960.0
-offset_bottom = 540.0
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 material = SubResource("ShaderMat_bg")
 color = Color(0.239, 0.196, 0.157, 1)
 
 [node name="TopBar" type="Panel" parent="."]
-layout_mode = 0
-offset_right = 960.0
+layout_mode = 1
+anchor_right = 1.0
+grow_horizontal = 2
 offset_bottom = 64.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("SB_topbar")
@@ -196,10 +199,13 @@ theme_override_font_sizes/font_size = 10
 text = "RM-00000"
 
 [node name="NickRow" type="HBoxContainer" parent="TopBar"]
-layout_mode = 0
-offset_left = 672.0
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+grow_horizontal = 0
+offset_left = -288.0
 offset_top = 16.0
-offset_right = 952.0
+offset_right = -8.0
 offset_bottom = 48.0
 theme_override_constants/separation = 6
 
@@ -229,11 +235,15 @@ theme_override_colors/font_color = Color(0.784, 0.525, 0.039, 1)
 text = "改"
 
 [node name="MainLayout" type="HBoxContainer" parent="."]
-layout_mode = 0
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 offset_left = 10.0
 offset_top = 66.0
-offset_right = 950.0
-offset_bottom = 468.0
+offset_right = -10.0
+offset_bottom = -72.0
 theme_override_constants/separation = 10
 
 [node name="LeftPanel" type="VBoxContainer" parent="MainLayout"]
@@ -467,10 +477,13 @@ theme_override_styles/normal = SubResource("SB_send_btn")
 text = "发送"
 
 [node name="BottomBar" type="PanelContainer" parent="."]
-layout_mode = 0
-offset_top = 468.0
-offset_right = 960.0
-offset_bottom = 540.0
+layout_mode = 1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+offset_top = -72.0
 theme_override_styles/panel = SubResource("SB_bottom_bar")
 
 [node name="BtnRow" type="HBoxContainer" parent="BottomBar"]

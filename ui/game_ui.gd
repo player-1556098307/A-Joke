@@ -213,8 +213,92 @@ func _style_panels() -> void:
 	var log_panel: Panel = $LogPanelBg
 	log_panel.add_theme_stylebox_override("panel", _make_flat(Color("#FFFDF5"), Color("#2C2C2A"), 2, 4))
 
-	# RightPanelBg — white background, dark border
+	# TopBarBg 锚定：左右贴满视口、高度固定（修正手机端 expand 模式下右侧露出黑边）
+	var top_bar_bg: ColorRect = $TopBarBg
+	top_bar_bg.anchor_left = 0.0
+	top_bar_bg.anchor_right = 1.0
+	top_bar_bg.offset_left = 4.0
+	top_bar_bg.offset_top = 4.0
+	top_bar_bg.offset_right = -4.0
+	top_bar_bg.offset_bottom = 48.0
+	top_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# TimerBadge / TimerLabel 锚定到视口右上角（offset_right 为负值贴右缘）
+	for timer_node_name in ["TimerBadge", "TimerLabel"]:
+		var timer_node: Control = get_node("TimerBadge") if timer_node_name == "TimerBadge" else get_node("TimerLabel")
+		timer_node.anchor_left = 1.0
+		timer_node.anchor_right = 1.0
+		timer_node.offset_left = -120.0
+		timer_node.offset_top = 10.0
+		timer_node.offset_right = -12.0
+		timer_node.offset_bottom = 34.0
+		timer_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# LogPanelBg / LogHeaderBg / LogHeaderLabel / LogScroll 左列锚定（左贴边、上下固定，宽度固定）
+	var log_header_bg: ColorRect = $LogHeaderBg
+	log_header_bg.anchor_right = 0.0
+	log_header_bg.offset_left = 8.0
+	log_header_bg.offset_top = 52.0
+	log_header_bg.offset_right = 196.0
+	log_header_bg.offset_bottom = 80.0
+
+	var log_header_label: Label = $LogHeaderLabel
+	log_header_label.offset_left = 8.0
+	log_header_label.offset_top = 52.0
+	log_header_label.offset_right = 196.0
+	log_header_label.offset_bottom = 80.0
+
+	log_panel.anchor_right = 0.0
+	log_panel.anchor_bottom = 1.0
+	log_panel.offset_left = 8.0
+	log_panel.offset_top = 52.0
+	log_panel.offset_right = 196.0
+	log_panel.offset_bottom = -8.0
+
+	var log_scroll: ScrollContainer = $LogScroll
+	log_scroll.anchor_bottom = 1.0
+	log_scroll.offset_left = 14.0
+	log_scroll.offset_top = 102.0
+	log_scroll.offset_right = 190.0
+	log_scroll.offset_bottom = -8.0
+
+	# RightPanelBg / RightHeaderBg / RightHeaderLabel 右列锚定（右贴边、上下固定，宽度固定）
 	var right_panel: Panel = $RightPanelBg
+	right_panel.anchor_left = 1.0
+	right_panel.anchor_right = 1.0
+	right_panel.anchor_bottom = 1.0
+	right_panel.offset_left = -196.0
+	right_panel.offset_top = 52.0
+	right_panel.offset_right = -4.0
+	right_panel.offset_bottom = -8.0
+
+	var right_header_bg: ColorRect = $RightHeaderBg
+	right_header_bg.anchor_left = 1.0
+	right_header_bg.anchor_right = 1.0
+	right_header_bg.offset_left = -196.0
+	right_header_bg.offset_top = 52.0
+	right_header_bg.offset_right = -4.0
+	right_header_bg.offset_bottom = 80.0
+
+	var right_header_label: Label = $RightHeaderLabel
+	right_header_label.anchor_left = 1.0
+	right_header_label.anchor_right = 1.0
+	right_header_label.offset_left = -196.0
+	right_header_label.offset_top = 52.0
+	right_header_label.offset_right = -4.0
+	right_header_label.offset_bottom = 80.0
+
+	# GesturePanel / ActionPanel / TargetPanel 右列内容锚定（与 RightPanelBg 同步贴右缘）
+	for panel_node in [gesture_panel, action_panel, target_panel]:
+		panel_node.anchor_left = 1.0
+		panel_node.anchor_right = 1.0
+		panel_node.anchor_bottom = 1.0
+		panel_node.offset_left = -186.0
+		panel_node.offset_top = 88.0
+		panel_node.offset_right = -14.0
+		panel_node.offset_bottom = -8.0
+
+	# RightPanelBg — white background, dark border（复用上方已声明的 right_panel）
 	right_panel.add_theme_stylebox_override("panel", _make_flat(Color("#FFFDF5"), Color("#2C2C2A"), 2, 4))
 
 	# BorderFrame — transparent fill, stroke only (Bug 1: was default dark panel)
@@ -241,6 +325,27 @@ func _style_panels() -> void:
 	add_child(dot_rect)
 	move_child(dot_rect, 1)
 
+## ── 手机端宽屏适配辅助 ──────────────────────────────────────────────────────
+## 视口逻辑尺寸（stretch=canvas_items + aspect=expand 下随窗口宽高比动态变化）
+func _view_size() -> Vector2:
+	return get_viewport_rect().size
+
+## 将浮层（弹窗/面板）水平+垂直居中：anchor 四边 0.5，布局一帧后按最小尺寸设置 offsets
+func _center_overlay(overlay: Control) -> void:
+	overlay.anchor_left = 0.5
+	overlay.anchor_right = 0.5
+	overlay.anchor_top = 0.5
+	overlay.anchor_bottom = 0.5
+	add_child(overlay)
+	await get_tree().process_frame
+	if not is_instance_valid(overlay):
+		return
+	var sz := overlay.get_combined_minimum_size()
+	overlay.offset_left = -sz.x / 2.0
+	overlay.offset_right = sz.x / 2.0
+	overlay.offset_top = -sz.y / 2.0
+	overlay.offset_bottom = sz.y / 2.0
+
 func _setup_turn_timer() -> void:
 	_turn_timer = Timer.new()
 	_turn_timer.one_shot = false
@@ -254,8 +359,12 @@ func _setup_menu_button() -> void:
 	menu_btn.add_theme_font_size_override("font_size", 10)
 	menu_btn.focus_mode = Control.FOCUS_NONE
 	menu_btn.custom_minimum_size = Vector2(56, 24)
-	menu_btn.position = Vector2(772, 8)
-	menu_btn.size = Vector2(52, 22)
+	menu_btn.anchor_left = 1.0
+	menu_btn.anchor_right = 1.0
+	menu_btn.offset_left = -68.0
+	menu_btn.offset_top = 8.0
+	menu_btn.offset_right = -12.0
+	menu_btn.offset_bottom = 30.0
 	menu_btn.add_theme_stylebox_override("normal",   _make_flat(Color("#3A3A38"), Color("#5A5A57"), 1, 3))
 	menu_btn.add_theme_stylebox_override("hover",    _make_flat(Color("#4A4A47"), Color("#888780"), 1, 3))
 	menu_btn.add_theme_stylebox_override("pressed",  _make_flat(Color("#2C2C2A"), Color("#FAC775"), 1, 3))
@@ -275,8 +384,13 @@ func _setup_auto_rps_button() -> void:
 	_auto_rps_btn.add_theme_font_size_override("font_size", 9)
 	_auto_rps_btn.focus_mode = Control.FOCUS_NONE
 	_auto_rps_btn.custom_minimum_size = Vector2(52, 18)
-	_auto_rps_btn.position = Vector2(210, 514)
-	_auto_rps_btn.size = Vector2(52, 18)
+	# 左下角贴底缘（跟随视口高度变化）
+	_auto_rps_btn.anchor_top = 1.0
+	_auto_rps_btn.anchor_bottom = 1.0
+	_auto_rps_btn.offset_left = 210.0
+	_auto_rps_btn.offset_top = -26.0
+	_auto_rps_btn.offset_right = 262.0
+	_auto_rps_btn.offset_bottom = -8.0
 	_update_auto_rps_btn_style()
 	_auto_rps_btn.pressed.connect(_on_auto_rps_toggled)
 	add_child(_auto_rps_btn)
@@ -311,8 +425,14 @@ var _btn_palm: Button   # 手心
 var _btn_back: Button   # 手背
 func _setup_odd_even_panel() -> void:
 	_odd_even_panel = VBoxContainer.new()
-	_odd_even_panel.position = Vector2(774, 88)
-	_odd_even_panel.size = Vector2(172, 0)
+	# 右列锚定（与 GesturePanel/ActionPanel/TargetPanel 同步贴右缘）
+	_odd_even_panel.anchor_left = 1.0
+	_odd_even_panel.anchor_right = 1.0
+	_odd_even_panel.anchor_bottom = 1.0
+	_odd_even_panel.offset_left = -186.0
+	_odd_even_panel.offset_top = 88.0
+	_odd_even_panel.offset_right = -14.0
+	_odd_even_panel.offset_bottom = -8.0
 	_odd_even_panel.add_theme_constant_override("separation", 8)
 	_odd_even_panel.visible = false
 	add_child(_odd_even_panel)
@@ -1130,8 +1250,9 @@ func _skill_range_str(skill: SkillData) -> String:
 func _calc_tooltip_pos(card: Control, panel_size: Vector2) -> Vector2:
 	var card_pos := card.global_position
 	var card_size := card.size
-	var view_width := 960.0
-	var view_height := 540.0
+	var vs := _view_size()
+	var view_width := vs.x
+	var view_height := vs.y
 	var gap := 8.0
 	# 优先放卡片右侧
 	var x := card_pos.x + card_size.x + gap
@@ -2834,8 +2955,6 @@ func _show_glory_decision_dialog(player_id: int, target_id: int) -> void:
 	if _glory_decision_dialog != null:
 		_glory_decision_dialog.queue_free()
 	_glory_decision_dialog = PanelContainer.new()
-	_glory_decision_dialog.position = Vector2(300, 180)
-	_glory_decision_dialog.size = Vector2(380, 160)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#6B3A2A")
@@ -2888,7 +3007,7 @@ func _show_glory_decision_dialog(player_id: int, target_id: int) -> void:
 	)
 	hbox.add_child(btn_no)
 
-	add_child(_glory_decision_dialog)
+	_center_overlay(_glory_decision_dialog)
 
 func _on_uchiha_stance_entered(player_id: int) -> void:
 	var player := GameManager.get_player(player_id)
@@ -3063,8 +3182,6 @@ func _show_bell_decision_dialog(player_id: int, bell_count: int) -> void:
 	if _bell_decision_dialog != null:
 		_bell_decision_dialog.queue_free()
 	_bell_decision_dialog = PanelContainer.new()
-	_bell_decision_dialog.position = Vector2(300, 180)
-	_bell_decision_dialog.size = Vector2(360, 140)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#6B3A2A")
@@ -3115,7 +3232,7 @@ func _show_bell_decision_dialog(player_id: int, bell_count: int) -> void:
 	)
 	hbox.add_child(btn_no)
 
-	add_child(_bell_decision_dialog)
+	_center_overlay(_bell_decision_dialog)
 
 ## 血付弹窗（回调模式）：玩家选择用多少血支付，确认后携带 hp_paid 提交行动
 var _hp_payment_dialog: PanelContainer = null
@@ -3124,8 +3241,6 @@ func _show_hp_payment_dialog_with_callback(skill_index: int, skill: SkillData, t
 	if _hp_payment_dialog != null:
 		_hp_payment_dialog.queue_free()
 	_hp_payment_dialog = PanelContainer.new()
-	_hp_payment_dialog.position = Vector2(260, 160)
-	_hp_payment_dialog.size = Vector2(440, 200)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#A32D2D")
@@ -3197,7 +3312,7 @@ func _show_hp_payment_dialog_with_callback(skill_index: int, skill: SkillData, t
 	)
 	btn_row.add_child(btn_cancel)
 
-	add_child(_hp_payment_dialog)
+	_center_overlay(_hp_payment_dialog)
 
 func _dismiss_hp_payment_dialog() -> void:
 	if _hp_payment_dialog:
@@ -3236,8 +3351,6 @@ func _show_ftg_intercept_dialog(target_id: int, attacker_id: int, marked_player_
 	if _ftg_intercept_dialog != null:
 		_ftg_intercept_dialog.queue_free()
 	_ftg_intercept_dialog = PanelContainer.new()
-	_ftg_intercept_dialog.position = Vector2(240, 140)
-	_ftg_intercept_dialog.size = Vector2(480, 260)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#3B5BA5")
@@ -3311,7 +3424,7 @@ func _show_ftg_intercept_dialog(target_id: int, attacker_id: int, marked_player_
 	)
 	vbox.add_child(btn_skip)
 
-	add_child(_ftg_intercept_dialog)
+	_center_overlay(_ftg_intercept_dialog)
 
 func _submit_ftg_intercept_choice(choice: int, swap_target_id: int) -> void:
 	var target_id: int = _ftg_intercept_ctx.get("target_id", -1)
@@ -3350,8 +3463,6 @@ func _show_rasengan_counter_dialog(target_id: int, attacker_id: int, minato_ener
 	if _rasengan_counter_dialog != null:
 		_rasengan_counter_dialog.queue_free()
 	_rasengan_counter_dialog = PanelContainer.new()
-	_rasengan_counter_dialog.position = Vector2(240, 160)
-	_rasengan_counter_dialog.size = Vector2(460, 200)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#E24B4A")
@@ -3389,7 +3500,7 @@ func _show_rasengan_counter_dialog(target_id: int, attacker_id: int, minato_ener
 	)
 	vbox.add_child(btn_no)
 
-	add_child(_rasengan_counter_dialog)
+	_center_overlay(_rasengan_counter_dialog)
 
 func _submit_rasengan_counter(use_counter: bool) -> void:
 	var target_id: int = _rasengan_counter_ctx.get("target_id", -1)
@@ -3425,8 +3536,6 @@ func _on_project_skill_required(player_id: int, target_ids: Array[int]) -> void:
 func _show_project_target_step(player_id: int, target_ids: Array[int]) -> void:
 	_dismiss_project_dialog()
 	_project_dialog = PanelContainer.new()
-	_project_dialog.position = Vector2(240, 150)
-	_project_dialog.size = Vector2(480, 240)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#3B5BA5")
@@ -3478,7 +3587,7 @@ func _show_project_target_step(player_id: int, target_ids: Array[int]) -> void:
 	)
 	vbox.add_child(skip_btn)
 
-	add_child(_project_dialog)
+	_center_overlay(_project_dialog)
 
 ## 第二步：选择要投影的技能（含被动技）
 func _show_project_skill_step(player_id: int, target_id: int) -> void:
@@ -3490,8 +3599,6 @@ func _show_project_skill_step(player_id: int, target_id: int) -> void:
 	var all_skills := target.get_all_skills()
 
 	_project_dialog = PanelContainer.new()
-	_project_dialog.position = Vector2(240, 130)
-	_project_dialog.size = Vector2(480, 300)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#3B5BA5")
@@ -3559,7 +3666,7 @@ func _show_project_skill_step(player_id: int, target_id: int) -> void:
 	)
 	vbox.add_child(back_btn)
 
-	add_child(_project_dialog)
+	_center_overlay(_project_dialog)
 
 ## 提交投影选择：-1 表示跳过
 func _submit_project_choice(target_id: int, skill_path: String) -> void:
@@ -3954,8 +4061,6 @@ func _show_phantom_dodge_dialog(player_id: int, attacker_id: int) -> void:
 	if _phantom_dodge_dialog != null:
 		_phantom_dodge_dialog.queue_free()
 	_phantom_dodge_dialog = PanelContainer.new()
-	_phantom_dodge_dialog.position = Vector2(240, 170)
-	_phantom_dodge_dialog.size = Vector2(460, 200)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#2A5A7A")
@@ -3995,7 +4100,7 @@ func _show_phantom_dodge_dialog(player_id: int, attacker_id: int) -> void:
 	)
 	vbox.add_child(btn_no)
 
-	add_child(_phantom_dodge_dialog)
+	_center_overlay(_phantom_dodge_dialog)
 
 func _submit_phantom_dodge(dodge: bool) -> void:
 	var player_id: int = _phantom_dodge_ctx.get("player_id", -1)
@@ -4020,8 +4125,6 @@ func _show_backtrack_dialog(player_id: int) -> void:
 	if _backtrack_dialog != null:
 		_backtrack_dialog.queue_free()
 	_backtrack_dialog = PanelContainer.new()
-	_backtrack_dialog.position = Vector2(240, 170)
-	_backtrack_dialog.size = Vector2(460, 190)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#3B5BA5")
@@ -4071,7 +4174,7 @@ func _show_backtrack_dialog(player_id: int) -> void:
 	)
 	vbox.add_child(btn_no)
 
-	add_child(_backtrack_dialog)
+	_center_overlay(_backtrack_dialog)
 
 ## ── 日影舞目标选择弹窗（4段，可重复选择目标） ──
 func _on_hiroari_targets_required(player_id: int, target_ids: Array[int]) -> void:
@@ -4089,8 +4192,6 @@ func _show_hiroari_step() -> void:
 	var player_id: int = ctx.get("player_id", -1)
 
 	_hiroari_dialog = PanelContainer.new()
-	_hiroari_dialog.position = Vector2(240, 150)
-	_hiroari_dialog.size = Vector2(480, 260)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#993C1D")
@@ -4149,7 +4250,7 @@ func _show_hiroari_step() -> void:
 	)
 	vbox.add_child(skip_btn)
 
-	add_child(_hiroari_dialog)
+	_center_overlay(_hiroari_dialog)
 
 func _submit_hiroari() -> void:
 	if _hiroari_dialog:
@@ -4182,8 +4283,6 @@ func _show_hiano_dialog(player_id: int, target_id: int) -> void:
 	if _hiano_dialog != null:
 		_hiano_dialog.queue_free()
 	_hiano_dialog = PanelContainer.new()
-	_hiano_dialog.position = Vector2(260, 170)
-	_hiano_dialog.size = Vector2(440, 240)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#993C1D")
@@ -4233,7 +4332,7 @@ func _show_hiano_dialog(player_id: int, target_id: int) -> void:
 		)
 		vbox.add_child(btn)
 
-	add_child(_hiano_dialog)
+	_center_overlay(_hiano_dialog)
 
 func _submit_hiano_interrupt(player_id: int, interrupt_at: int) -> void:
 	if _hiano_dialog:
@@ -4261,8 +4360,6 @@ func _show_target_pick_dialog(title: String, hint: String, player_id: int,
 		_target_pick_dialog.queue_free()
 	_target_pick_ctx = {"callback": callback, "player_id": player_id}
 	_target_pick_dialog = PanelContainer.new()
-	_target_pick_dialog.position = Vector2(240, 150)
-	_target_pick_dialog.size = Vector2(480, 300)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#2A4A8C")
@@ -4306,7 +4403,7 @@ func _show_target_pick_dialog(title: String, hint: String, player_id: int,
 		)
 		vbox.add_child(btn)
 
-	add_child(_target_pick_dialog)
+	_center_overlay(_target_pick_dialog)
 
 func _dismiss_target_pick_dialog() -> void:
 	if _target_pick_dialog:
@@ -4390,8 +4487,6 @@ func _show_sword_forge_skill_select() -> void:
 	if _sword_forge_dialog != null:
 		_sword_forge_dialog.queue_free()
 	_sword_forge_dialog = PanelContainer.new()
-	_sword_forge_dialog.position = Vector2(220, 130)
-	_sword_forge_dialog.size = Vector2(520, 360)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#FFFDF5")
 	style.border_color = Color("#8C6A2A")
@@ -4436,7 +4531,7 @@ func _show_sword_forge_skill_select() -> void:
 		)
 		vbox.add_child(btn)
 
-	add_child(_sword_forge_dialog)
+	_center_overlay(_sword_forge_dialog)
 
 ## 第二步：选择攻击目标（无敌方目标的技能才需要；纯自身技能跳过）
 func _show_sword_forge_target_select() -> void:
@@ -4448,8 +4543,6 @@ func _show_sword_forge_target_select() -> void:
 	if _sword_forge_dialog_step2 != null:
 		_sword_forge_dialog_step2.queue_free()
 	_sword_forge_dialog_step2 = PanelContainer.new()
-	_sword_forge_dialog_step2.position = Vector2(240, 150)
-	_sword_forge_dialog_step2.size = Vector2(480, 320)
 	var style2 := StyleBoxFlat.new()
 	style2.bg_color = Color("#FFFDF5")
 	style2.border_color = Color("#8C6A2A")
@@ -4491,7 +4584,7 @@ func _show_sword_forge_target_select() -> void:
 		)
 		vbox2.add_child(btn)
 
-	add_child(_sword_forge_dialog_step2)
+	_center_overlay(_sword_forge_dialog_step2)
 
 func _submit_sword_forge_choice() -> void:
 	var player_id: int = _sword_forge_ctx.get("player_id", -1)
