@@ -355,16 +355,18 @@ func _setup_turn_timer() -> void:
 
 func _setup_menu_button() -> void:
 	var menu_btn := Button.new()
+	menu_btn.name = "MenuButton"
 	menu_btn.text = "← 菜单"
-	menu_btn.add_theme_font_size_override("font_size", 10)
+	menu_btn.add_theme_font_size_override("font_size", 12)
 	menu_btn.focus_mode = Control.FOCUS_NONE
-	menu_btn.custom_minimum_size = Vector2(56, 24)
+	# 手机端触控目标加大：88x36（约8mm物理尺寸），避免点击偏移到周围背景
+	menu_btn.custom_minimum_size = Vector2(88, 36)
 	menu_btn.anchor_left = 1.0
 	menu_btn.anchor_right = 1.0
-	menu_btn.offset_left = -68.0
-	menu_btn.offset_top = 8.0
-	menu_btn.offset_right = -12.0
-	menu_btn.offset_bottom = 30.0
+	menu_btn.offset_left = -96.0
+	menu_btn.offset_top = 6.0
+	menu_btn.offset_right = -8.0
+	menu_btn.offset_bottom = 42.0
 	menu_btn.add_theme_stylebox_override("normal",   _make_flat(Color("#3A3A38"), Color("#5A5A57"), 1, 3))
 	menu_btn.add_theme_stylebox_override("hover",    _make_flat(Color("#4A4A47"), Color("#888780"), 1, 3))
 	menu_btn.add_theme_stylebox_override("pressed",  _make_flat(Color("#2C2C2A"), Color("#FAC775"), 1, 3))
