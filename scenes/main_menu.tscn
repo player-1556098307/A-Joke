@@ -103,7 +103,7 @@ offset_right = -4.0
 offset_bottom = 487.0
 theme_override_colors/font_color = Color(0.533333, 0.529412, 0.501961, 1)
 theme_override_font_sizes/font_size = 11
-text = "v1.0.9 · 本地单机原型"
+text = "v1.0.8.1 · 本地单机原型"
 
 [node name="FooterLabel2" type="Label" parent="." unique_id=1939021685]
 layout_mode = 1
