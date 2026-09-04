@@ -146,6 +146,18 @@ func _on_floor_cleared(floor_num: int, _enemy_name: String) -> void:
 func _on_reward_pick(player_index: int, buff: Dictionary) -> void:
 	if not _reward_phase or not _pending_humans.has(player_index):
 		return
+	# unique 祝福冲突校验：offer 是并行下发的，后选者的选项生成于先选者提交之前，
+	# 两人可能都选到同一 unique（如斩魂）。此处拒绝冲突选择并重发一份排除已占有的选项，
+	# 客户端收到重发 offer 会重新弹出三选一（_on_net_reward_offer 幂等支持）。
+	if not buff.is_empty() and buff.get("unique", false) and str(buff.get("id", "")) in _all_obtained_ids():
+		var bid: String = buff.get("id", "")
+		print("[TowerHost] 玩家 %d 选择的祝福 %s 已被他人持有，重发选项" % [player_index, bid])
+		game_host.rpc_id(_party[player_index]["peer_id"], "server_broadcast", NetworkProtocol.SrvOp.TOWER_REWARD_OFFER, {
+			"player_index": player_index,
+			"char_name": (_party[player_index]["character"] as CharacterData).character_name,
+			"choices": _pick_rewards(),
+		})
+		return
 	_pending_humans.erase(player_index)
 	_pending_picks[player_index] = buff
 	if _pending_humans.is_empty():

@@ -457,6 +457,14 @@ func _hook_decision_failsafes() -> void:
 	_game_manager.backtrack_required.connect(func(player_id: int):
 		_arm_decision_failsafe("backtrack", player_id,
 			func(): _game_manager.submit_backtrack_decision(player_id, false)))
+	# 梦之终结（奥伯龙）/湖之加护（卡斯特）：END_PHASE 人类决策，
+	# 无响应时按"标记自己/给施法者自己+1气"兜底，防止服务器停在 END_PHASE 卡死整局
+	_game_manager.dream_end_required.connect(func(player_id: int, _targets: Array):
+		_arm_decision_failsafe("dream_end", player_id,
+			func(): _game_manager.submit_dream_end(player_id, player_id)))
+	_game_manager.lake_blessing_required.connect(func(caster_id: int, _targets: Array):
+		_arm_decision_failsafe("lake_blessing", caster_id,
+			func(): _game_manager.submit_lake_blessing(caster_id, caster_id)))
 
 # ── 塔模式回合推进保险 ────────────────────────────────────────
 # 客户端相位漂移或真人卡住时，服务器兜底提交（SKIP/蓄力），保证整局推进不卡死
