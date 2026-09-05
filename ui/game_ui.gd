@@ -363,9 +363,10 @@ func _setup_menu_button() -> void:
 	menu_btn.custom_minimum_size = Vector2(88, 36)
 	menu_btn.anchor_left = 1.0
 	menu_btn.anchor_right = 1.0
-	menu_btn.offset_left = -96.0
+	# 右上角布局：TimeBadge（剩余时间徽章）占 offset [-120,-12]，本按钮左移至其左侧，避免遮挡
+	menu_btn.offset_left = -212.0
 	menu_btn.offset_top = 6.0
-	menu_btn.offset_right = -8.0
+	menu_btn.offset_right = -124.0
 	menu_btn.offset_bottom = 42.0
 	menu_btn.add_theme_stylebox_override("normal",   _make_flat(Color("#3A3A38"), Color("#5A5A57"), 1, 3))
 	menu_btn.add_theme_stylebox_override("hover",    _make_flat(Color("#4A4A47"), Color("#888780"), 1, 3))

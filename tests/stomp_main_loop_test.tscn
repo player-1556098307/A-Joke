@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/stomp_main_loop_test.gd" id="1_stomp"]
+
+[node name="StompTest" type="Node"]
+script = ExtResource("1_stomp")

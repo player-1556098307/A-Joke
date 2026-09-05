@@ -759,8 +759,6 @@ func _resolve_round() -> void:
 			gestures[player.player_id] = player.current_gesture
 
 	var result := RoundResolver.resolve_gestures(gestures)
-	round_resolved.emit(result)
-	_record_round_snapshot(result)
 
 	# ── 反馈（司马懿）：猜拳未获得回合 → 获得1个怒标记（至多4）──
 	var tower_winners: Array = result.get("winners", [])
@@ -769,6 +767,8 @@ func _resolve_round() -> void:
 			p.fury_marks += 1
 
 	# ── 跺脚/无限剑制 强制判胜：force_win_next_round 的玩家直接成为唯一赢家 ──
+	# 注意：必须在 round_resolved.emit 之前覆盖 result，否则 UI/战报/联机广播显示原始
+	# 猜拳结果（柱间"输了"），与实际强制判胜不符，玩家会误以为机制未生效
 	var force_win_id: int = -1
 	for player in _players:
 		if player.is_alive and player.force_win_next_round:
@@ -777,7 +777,12 @@ func _resolve_round() -> void:
 			break
 	if force_win_id >= 0:
 		# 清除其他玩家的手势，仅保留跺脚/无限剑制玩家为唯一赢家
-		var force_result := { "winners": [force_win_id], "losers": [], "is_draw": false }
+		result = { "winners": [force_win_id], "losers": [], "is_draw": false }
+
+	round_resolved.emit(result)
+	_record_round_snapshot(result)
+
+	if force_win_id >= 0:
 		_sole_winner_id = force_win_id
 		var ws: PlayerMatchStats = _match_record.player_stats.get(_sole_winner_id)
 		if ws:
